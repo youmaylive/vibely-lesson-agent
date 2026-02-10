@@ -1,0 +1,1729 @@
+{
+  "course_title": "Mathematical Foundations of Computational Neuroscience",
+  "course_description": "A rigorous, research-grade course covering dynamical systems theory, stochastic processes, information theory, and optimal control as applied to neuronal modeling and neural coding. Emphasizes mathematical derivations, computational implementations, and connections to experimental neuroscience.",
+  "target_audience": "Master's and PhD students in Biotechnology, Cognitive Science, or Bio-Engineering with strong foundations in biology, mathematics, and programming, preparing for research in computational neuroscience.",
+  "prerequisites": [
+    "Multivariable calculus and differential equations",
+    "Linear algebra and matrix theory",
+    "Probability theory and stochastic processes (introductory)",
+    "Programming proficiency (Python/MATLAB/Julia)",
+    "Basic neurobiology (action potentials, synapses, ion channels)",
+    "Ordinary differential equations and phase plane analysis"
+  ],
+  "learning_objectives": [
+    "Derive and analyze deterministic and stochastic neuron models from biophysical principles",
+    "Apply dynamical systems theory to characterize neuronal excitability, stability, and bifurcations",
+    "Implement and simulate point models, conductance-based models, and network models computationally",
+    "Quantify neural coding using information-theoretic measures including Shannon information, mutual information, and Fisher information",
+    "Formulate and solve optimal control problems for neuronal systems and motor control",
+    "Analyze synchronization phenomena in coupled neuronal oscillators using phase reduction techniques",
+    "Estimate model parameters from data using maximum likelihood and Bayesian methods",
+    "Connect mathematical frameworks to experimental data and neurobiological mechanisms"
+  ],
+  "modules": [
+    {
+      "module_id": "module_01",
+      "module_title": "Foundations of Neuronal Dynamics",
+      "module_description": "Introduction to dynamical systems theory and its application to single neuron modeling, covering deterministic point models and their mathematical analysis.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_01_01",
+          "lesson_title": "Dynamical Systems Framework for Neuroscience",
+          "key_insight": "Neuronal behavior can be precisely characterized as trajectories in state space, where understanding attractors and basins reveals how neurons respond to stimuli and return to rest.",
+          "learning_objectives": [
+            "Define dynamical systems in the context of neuronal modeling",
+            "Distinguish between deterministic and stochastic dynamical systems",
+            "Identify fixed point attractors and their attractive basins in neuronal models",
+            "Relate mathematical concepts to biological phenomena (resting potential, firing patterns)"
+          ],
+          "warmup_callback": null,
+          "content_outline": [
+            "Mathematical definition of dynamical systems: dx/dt = f(x, t)",
+            "State space representation and trajectories",
+            "Deterministic vs. stochastic systems: when noise matters",
+            "Attractors: fixed points, limit cycles, and strange attractors",
+            "Attractive basins and initial condition sensitivity",
+            "Biological interpretation: resting potential as fixed point attractor",
+            "Phase portraits and geometric analysis"
+          ],
+          "key_concepts": [
+            "State space",
+            "Trajectory",
+            "Attractor",
+            "Fixed point",
+            "Attractive basin",
+            "Deterministic vs. stochastic dynamics"
+          ],
+          "practical_examples": [
+            "1D linear system: dV/dt = -(V - V_rest)/\u03c4 with analytical solution",
+            "Geometric analysis of resting potential as stable fixed point",
+            "Numerical simulation of trajectories from different initial conditions",
+            "Phase portrait construction for 2D neuronal models"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive equilibrium points analytically, classify stability, and simulate trajectories converging to attractors",
+            "success_indicators": [
+              "Correctly identifies fixed points from differential equations",
+              "Sketches accurate phase portraits showing flow directions",
+              "Explains biological meaning of attractors in neuronal context",
+              "Implements numerical integration to verify analytical predictions"
+            ],
+            "common_misconceptions": [
+              "Confusing equilibrium points with attractors (not all equilibria are attracting)",
+              "Assuming all neuronal models have unique attractors",
+              "Neglecting the role of initial conditions in determining long-term behavior"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_01_02",
+          "lesson_title": "Integrate-and-Fire Models: Minimal Neuronal Dynamics",
+          "key_insight": "The integrate-and-fire model captures essential neuronal excitability with minimal mathematical complexity, revealing how threshold dynamics and reset mechanisms generate discrete spiking from continuous input integration.",
+          "learning_objectives": [
+            "Derive the integrate-and-fire model from RC circuit principles",
+            "Analyze the role of threshold and reset in generating action potentials",
+            "Compute firing rates analytically for constant and time-varying inputs",
+            "Implement IF models computationally and validate against analytical solutions"
+          ],
+          "warmup_callback": "Recall fixed point attractors from lesson_01_01; IF model combines continuous dynamics with discrete reset",
+          "content_outline": [
+            "RC circuit analogy: C dV/dt = -g_L(V - V_rest) + I",
+            "Dimensionless form: dV/dt = (V - V_rest)/\u03b3 + I/\u03b3",
+            "Threshold condition V \u2265 V_thre triggers spike and reset",
+            "Analytical solution for constant input: V(t) = V_rest + (I/g_L)(1 - exp(-t/\u03c4))",
+            "Firing rate calculation: f = 1/T where T is interspike interval",
+            "Time-varying inputs and numerical integration requirements",
+            "Limitations: no action potential shape, no refractoriness"
+          ],
+          "key_concepts": [
+            "Membrane time constant \u03c4 = C/g_L",
+            "Threshold potential V_thre",
+            "Reset mechanism",
+            "Interspike interval",
+            "Firing rate",
+            "Subthreshold integration"
+          ],
+          "practical_examples": [
+            "Analytical derivation of firing rate for constant suprathreshold input",
+            "Numerical simulation with Euler method: threshold detection and reset implementation",
+            "Response to step current: latency to first spike",
+            "Frequency-current (f-I) curve construction and interpretation"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive firing rates analytically, implement IF model with proper threshold handling, and generate f-I curves matching theoretical predictions",
+            "success_indicators": [
+              "Correctly derives time to threshold for constant input",
+              "Implements reset mechanism without numerical artifacts",
+              "Generates f-I curves showing linear regime and saturation",
+              "Explains biological significance of threshold and reset"
+            ],
+            "common_misconceptions": [
+              "Treating threshold crossing as continuous rather than discrete event",
+              "Forgetting to reset after spike detection in simulations",
+              "Assuming linear f-I relationship holds for all input ranges"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_01_03",
+          "lesson_title": "Hodgkin-Huxley Model: Biophysical Foundation",
+          "key_insight": "The Hodgkin-Huxley equations reveal how voltage-gated ion channels generate action potentials through a precise orchestration of sodium activation, sodium inactivation, and potassium activation\u2014a mechanistic understanding that grounds all modern neuronal modeling.",
+          "learning_objectives": [
+            "Derive the HH equations from ionic current principles and gating kinetics",
+            "Analyze the roles of m, h, n gating variables in action potential generation",
+            "Implement the HH model numerically using appropriate integration methods",
+            "Characterize action potential waveform features (threshold, peak, undershoot, duration)"
+          ],
+          "warmup_callback": "IF model (lesson_01_02) abstracts threshold; HH model mechanistically explains threshold through channel dynamics",
+          "content_outline": [
+            "Ionic current formulation: I_ion = g_ion * (V - E_ion)",
+            "Full HH equation: C dV/dt = -g_Na m\u00b3h(V - V_Na) - g_K n\u2074(V - V_K) - g_L(V - V_L) + I",
+            "Gating variable kinetics: dn/dt = \u03b1_n(V)(1 - n) - \u03b2_n(V)n",
+            "Voltage-dependent rate functions \u03b1(V) and \u03b2(V): empirical fits",
+            "Sodium channel: fast activation (m\u00b3), slower inactivation (h)",
+            "Potassium channel: delayed activation (n\u2074)",
+            "Action potential phases: depolarization, repolarization, hyperpolarization",
+            "Numerical integration: stiff ODE considerations, adaptive timesteps"
+          ],
+          "key_concepts": [
+            "Voltage-gated channels",
+            "Gating variables (m, h, n)",
+            "Activation and inactivation",
+            "Reversal potentials (E_Na, E_K, E_L)",
+            "Conductances (g_Na, g_K, g_L)",
+            "Action potential waveform"
+          ],
+          "practical_examples": [
+            "Numerical simulation of single action potential with current pulse",
+            "Gating variable trajectories during action potential",
+            "Ionic current decomposition: I_Na, I_K, I_L contributions",
+            "Refractory period demonstration: response to paired pulses",
+            "Parameter sensitivity analysis: effect of g_Na, g_K on waveform"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement HH model producing physiological action potentials, decompose ionic currents, and explain each gating variable's role",
+            "success_indicators": [
+              "Generates action potentials with correct amplitude (~100 mV) and duration (~1 ms)",
+              "Plots gating variables showing proper activation/inactivation sequences",
+              "Explains threshold as balance between I_Na and I_K",
+              "Demonstrates absolute and relative refractory periods"
+            ],
+            "common_misconceptions": [
+              "Confusing activation (m, n) with inactivation (h)",
+              "Assuming gating variables respond instantaneously to voltage changes",
+              "Neglecting the importance of leak current in setting resting potential",
+              "Using inappropriate numerical methods for stiff HH equations"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_01_04",
+          "lesson_title": "FitzHugh-Nagumo Model: Reduced Excitable Dynamics",
+          "key_insight": "The FitzHugh-Nagumo reduction distills the essential excitability of the Hodgkin-Huxley model into two dimensions, revealing the geometric structure of threshold, excitability, and oscillations through nullcline analysis.",
+          "learning_objectives": [
+            "Derive the FHN model as a reduction of HH dynamics",
+            "Perform nullcline analysis to understand excitability and oscillations",
+            "Classify fixed points and determine stability via linearization",
+            "Relate FHN parameters to biological timescales and excitability properties"
+          ],
+          "warmup_callback": "HH model (lesson_01_03) has 4 dimensions; FHN reduces to 2D while preserving excitability",
+          "content_outline": [
+            "FHN equations: dv/dt = K[-v(v - \u03b1)(v - 1) - w] + I, dw/dt = b(v - cw)",
+            "Variable interpretation: v ~ voltage, w ~ recovery (combines h, n)",
+            "Nullcline analysis: dv/dt = 0 (cubic), dw/dt = 0 (linear)",
+            "Fixed point location: intersection of nullclines",
+            "Linearization and stability: Jacobian eigenvalues",
+            "Excitability: large response to suprathreshold, small response to subthreshold",
+            "Hopf bifurcation: transition from excitable to oscillatory regime",
+            "Geometric interpretation: phase plane trajectories"
+          ],
+          "key_concepts": [
+            "Nullclines",
+            "Fixed point stability",
+            "Excitability vs. oscillations",
+            "Recovery variable",
+            "Hopf bifurcation",
+            "Phase plane analysis"
+          ],
+          "practical_examples": [
+            "Nullcline plotting and fixed point identification",
+            "Trajectory simulation showing excitable response to brief pulse",
+            "Parameter variation: transition from excitable to oscillatory (vary I or b)",
+            "Comparison with HH model: matching action potential features",
+            "Linearization at fixed point: eigenvalue calculation for stability"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should construct nullclines, classify fixed points, and demonstrate excitability vs. oscillatory regimes through parameter variation",
+            "success_indicators": [
+              "Accurately plots cubic v-nullcline and linear w-nullcline",
+              "Identifies fixed point and determines stability from eigenvalues",
+              "Demonstrates all-or-none response characteristic of excitability",
+              "Shows transition to limit cycle oscillations via bifurcation"
+            ],
+            "common_misconceptions": [
+              "Confusing nullclines with trajectories",
+              "Assuming fixed point stability without eigenvalue analysis",
+              "Neglecting the role of timescale separation (fast v, slow w)",
+              "Misinterpreting recovery variable w as purely inhibitory"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_02",
+      "module_title": "Stability, Bifurcations, and Chaos",
+      "module_description": "Advanced dynamical systems analysis including stability theory, bifurcation analysis, and characterization of chaotic dynamics in neuronal systems.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_02_01",
+          "lesson_title": "Stability Analysis: Lyapunov Functions and Exponents",
+          "key_insight": "Lyapunov methods provide rigorous mathematical proofs of stability and detect chaos, enabling prediction of long-term neuronal behavior and identification of parameter regimes where dynamics become unpredictable.",
+          "learning_objectives": [
+            "Construct Lyapunov functions to prove stability of equilibria",
+            "Compute Lyapunov exponents numerically from trajectories",
+            "Interpret positive Lyapunov exponents as signatures of chaos",
+            "Apply stability analysis to neuronal models to predict response reliability"
+          ],
+          "warmup_callback": "Fixed point stability (lesson_01_04) via linearization; Lyapunov methods extend to nonlinear global analysis",
+          "content_outline": [
+            "Lyapunov function definition: V(x) > 0, dV/dt \u2264 0 along trajectories",
+            "Energy-like functions for neuronal models",
+            "Lyapunov's direct method: proving asymptotic stability",
+            "Lyapunov exponents: \u03bb = lim(t\u2192\u221e) (1/t)ln|\u03b4x(t)/\u03b4x(0)|",
+            "Numerical computation: trajectory separation method",
+            "Interpretation: \u03bb > 0 (chaos), \u03bb = 0 (marginal), \u03bb < 0 (stable)",
+            "Spectrum of Lyapunov exponents for high-dimensional systems",
+            "Application to neuronal models: detecting chaotic firing patterns"
+          ],
+          "key_concepts": [
+            "Lyapunov function",
+            "Asymptotic stability",
+            "Lyapunov exponent",
+            "Chaotic dynamics",
+            "Trajectory separation",
+            "Sensitive dependence on initial conditions"
+          ],
+          "practical_examples": [
+            "Constructing quadratic Lyapunov function for linear system",
+            "Numerical computation of largest Lyapunov exponent for FHN model",
+            "Parameter scan: identifying chaotic regimes in modified HH model",
+            "Comparison of regular vs. chaotic firing patterns",
+            "Visualization: trajectory divergence in phase space"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should construct Lyapunov functions for simple systems, compute Lyapunov exponents numerically, and identify chaotic parameter regimes",
+            "success_indicators": [
+              "Successfully constructs Lyapunov function proving stability",
+              "Implements algorithm computing Lyapunov exponents from time series",
+              "Correctly identifies chaotic vs. regular dynamics from exponent sign",
+              "Relates chaos to unpredictability in neuronal firing"
+            ],
+            "common_misconceptions": [
+              "Assuming Lyapunov function existence is easy to establish",
+              "Confusing local (linearization) with global (Lyapunov function) stability",
+              "Interpreting irregular firing as necessarily chaotic without computing exponents",
+              "Neglecting finite-time effects in numerical Lyapunov exponent estimation"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_02_02",
+          "lesson_title": "Bifurcation Theory in Neuronal Excitability",
+          "key_insight": "Bifurcations mark qualitative transitions in neuronal behavior\u2014from silence to firing, from tonic to bursting\u2014and understanding bifurcation structure reveals how neurons switch between computational modes as parameters vary.",
+          "learning_objectives": [
+            "Classify common bifurcations: saddle-node, Hopf, saddle-node on invariant circle",
+            "Perform bifurcation analysis on neuronal models using continuation methods",
+            "Relate bifurcation types to neuronal excitability classes (Type I vs. Type II)",
+            "Predict firing onset and offset as bifurcation phenomena"
+          ],
+          "warmup_callback": "FHN Hopf bifurcation (lesson_01_04) introduced transition to oscillations; now systematic bifurcation classification",
+          "content_outline": [
+            "Bifurcation definition: qualitative change in dynamics at critical parameter",
+            "Saddle-node bifurcation: creation/annihilation of fixed points",
+            "Hopf bifurcation: birth of limit cycle from fixed point",
+            "Saddle-node on invariant circle (SNIC): continuous f-I curve",
+            "Subcritical vs. supercritical bifurcations",
+            "Neuronal excitability classes: Type I (SNIC) vs. Type II (Hopf)",
+            "Continuation methods: numerical tracking of equilibria and limit cycles",
+            "Bifurcation diagrams: parameter vs. state variable plots"
+          ],
+          "key_concepts": [
+            "Bifurcation point",
+            "Saddle-node bifurcation",
+            "Hopf bifurcation",
+            "SNIC bifurcation",
+            "Type I vs. Type II excitability",
+            "Continuation method"
+          ],
+          "practical_examples": [
+            "Saddle-node bifurcation in IF model: threshold appearance",
+            "Hopf bifurcation in FHN model: parameter scan showing onset",
+            "SNIC bifurcation in theta neuron model: arbitrarily low firing rates",
+            "Bifurcation diagram construction for HH model with varying I",
+            "Numerical continuation using AUTO or PyDSTool"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should identify bifurcation types from phase portraits, construct bifurcation diagrams, and relate bifurcations to neuronal excitability classes",
+            "success_indicators": [
+              "Correctly classifies bifurcations from eigenvalue analysis",
+              "Constructs bifurcation diagrams showing parameter-dependent transitions",
+              "Distinguishes Type I (continuous f-I) from Type II (discontinuous f-I)",
+              "Uses continuation software to track equilibria and limit cycles"
+            ],
+            "common_misconceptions": [
+              "Assuming all firing onset is via Hopf bifurcation",
+              "Confusing subcritical and supercritical bifurcations",
+              "Neglecting hysteresis in subcritical bifurcations",
+              "Misidentifying bifurcation type without eigenvalue calculation"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_02_03",
+          "lesson_title": "Perturbation Theory: Noise Effects on Stability",
+          "key_insight": "Small noise can qualitatively alter deterministic predictions\u2014stabilizing unstable states, inducing transitions between attractors, and generating coherence resonance\u2014requiring perturbation theory to predict noise-induced phenomena.",
+          "learning_objectives": [
+            "Apply perturbation theory to analyze weak noise effects on fixed points",
+            "Derive noise-induced transition rates using Kramers' formula",
+            "Understand coherence resonance: noise-optimized regularity",
+            "Distinguish parameter regimes where noise is perturbative vs. dominant"
+          ],
+          "warmup_callback": "Deterministic stability (lesson_02_01) assumes no noise; perturbation theory quantifies when noise matters",
+          "content_outline": [
+            "Perturbation expansion: x = x\u2080 + \u03b5x\u2081 + \u03b5\u00b2x\u2082 + ...",
+            "Weak noise limit: \u03c3 \u2192 0 analysis",
+            "Fokker-Planck equation for probability density evolution",
+            "Kramers' escape rate: r \u221d exp(-\u0394V/\u03c3\u00b2) for barrier crossing",
+            "Coherence resonance: optimal noise level for regular firing",
+            "Stochastic resonance: noise-enhanced signal detection",
+            "Validity limits: when perturbation theory breaks down",
+            "Numerical validation: comparing perturbative predictions with simulations"
+          ],
+          "key_concepts": [
+            "Perturbation expansion",
+            "Weak noise approximation",
+            "Fokker-Planck equation",
+            "Kramers' rate",
+            "Coherence resonance",
+            "Stochastic resonance"
+          ],
+          "practical_examples": [
+            "Perturbative correction to fixed point location with weak noise",
+            "Kramers' formula application: escape from potential well",
+            "Coherence resonance in FHN model: CV vs. noise intensity",
+            "Stochastic resonance demonstration: subthreshold signal detection",
+            "Numerical simulation validating perturbative predictions"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should apply perturbation expansions, compute Kramers' rates, and demonstrate coherence/stochastic resonance numerically",
+            "success_indicators": [
+              "Correctly performs perturbation expansion to first order",
+              "Computes escape rates matching Kramers' formula predictions",
+              "Demonstrates coherence resonance with optimal noise level",
+              "Identifies parameter regimes where perturbation theory fails"
+            ],
+            "common_misconceptions": [
+              "Assuming perturbation theory applies for arbitrary noise strength",
+              "Neglecting higher-order corrections when necessary",
+              "Confusing coherence resonance with stochastic resonance",
+              "Misapplying Kramers' formula outside weak noise regime"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_03",
+      "module_title": "Stochastic Processes in Neuronal Modeling",
+      "module_description": "Comprehensive treatment of stochastic processes including diffusion, jump, and jump-diffusion processes, with applications to modeling synaptic noise and channel fluctuations.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_03_01",
+          "lesson_title": "Diffusion Processes: Ornstein-Uhlenbeck and Beyond",
+          "key_insight": "The Ornstein-Uhlenbeck process provides the canonical model for continuous stochastic fluctuations in membrane potential, balancing mean reversion with diffusive noise to capture subthreshold dynamics.",
+          "learning_objectives": [
+            "Derive the Ornstein-Uhlenbeck process from physical principles",
+            "Solve for stationary distribution and correlation functions analytically",
+            "Implement numerical integration using Euler-Maruyama method",
+            "Apply OU process to model subthreshold membrane potential fluctuations"
+          ],
+          "warmup_callback": "Deterministic IF model (lesson_01_02) with constant input; OU process adds realistic fluctuations",
+          "content_outline": [
+            "Wiener process (Brownian motion): dW with Gaussian increments",
+            "OU process definition: dV = -(V - \u03bc)/\u03b3 dt + \u03c3 dW",
+            "Mean reversion: drift toward \u03bc with timescale \u03b3",
+            "Analytical solution: V(t) = \u03bc + (V\u2080 - \u03bc)exp(-t/\u03b3) + noise integral",
+            "Stationary distribution: Gaussian with mean \u03bc, variance \u03c3\u00b2\u03b3/2",
+            "Autocorrelation function: C(\u03c4) = (\u03c3\u00b2\u03b3/2)exp(-|\u03c4|/\u03b3)",
+            "Numerical integration: Euler-Maruyama scheme",
+            "Application: subthreshold membrane potential with synaptic bombardment"
+          ],
+          "key_concepts": [
+            "Wiener process",
+            "Ornstein-Uhlenbeck process",
+            "Mean reversion",
+            "Stationary distribution",
+            "Autocorrelation function",
+            "Euler-Maruyama method"
+          ],
+          "practical_examples": [
+            "Analytical derivation of OU stationary distribution",
+            "Numerical simulation: trajectory generation and histogram comparison",
+            "Autocorrelation estimation from simulated data",
+            "Parameter fitting: estimating \u03bc, \u03b3, \u03c3 from experimental traces",
+            "OU-driven IF model: firing rate with fluctuating input"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive stationary distribution, implement Euler-Maruyama integration, and validate numerical results against analytical predictions",
+            "success_indicators": [
+              "Correctly derives stationary Gaussian distribution",
+              "Implements Euler-Maruyama with appropriate timestep",
+              "Numerical histogram matches analytical distribution",
+              "Computes autocorrelation matching exponential decay"
+            ],
+            "common_misconceptions": [
+              "Confusing Wiener process increments with Gaussian white noise",
+              "Using deterministic integration schemes for SDEs",
+              "Assuming OU process is always at stationarity",
+              "Neglecting timestep dependence in numerical accuracy"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_03_02",
+          "lesson_title": "Jump Processes: Poisson Synaptic Input",
+          "key_insight": "Synaptic inputs arrive as discrete, random events best modeled by jump processes, where Poisson statistics capture the stochastic timing and jump amplitudes represent postsynaptic potential sizes.",
+          "learning_objectives": [
+            "Derive Poisson process properties: exponential inter-event intervals",
+            "Model synaptic input as compound Poisson process with random amplitudes",
+            "Implement event-driven simulation of jump processes",
+            "Analyze firing statistics of neurons driven by Poisson input"
+          ],
+          "warmup_callback": "OU process (lesson_03_01) models continuous noise; jump processes capture discrete synaptic events",
+          "content_outline": [
+            "Poisson process: N(t) counting events with rate \u03bb",
+            "Inter-event interval distribution: P(\u03c4) = \u03bbexp(-\u03bb\u03c4)",
+            "Compound Poisson process: random jump amplitudes a\u03b5",
+            "SDE with jumps: dV = -(V - V_rest)/\u03b3 dt + a\u03b5 dN",
+            "Event-driven vs. time-driven simulation strategies",
+            "Firing rate calculation with Poisson input: renewal theory",
+            "Coefficient of variation: CV = \u03c3_ISI / \u03bc_ISI",
+            "Comparison with experimental data: irregular firing patterns"
+          ],
+          "key_concepts": [
+            "Poisson process",
+            "Compound Poisson process",
+            "Jump amplitude",
+            "Inter-event interval",
+            "Event-driven simulation",
+            "Coefficient of variation"
+          ],
+          "practical_examples": [
+            "Poisson event generation: exponential interval sampling",
+            "Event-driven IF simulation with Poisson synaptic input",
+            "ISI distribution analysis: exponential vs. gamma distributions",
+            "CV calculation: quantifying firing irregularity",
+            "Rate modulation: varying \u03bb to control input statistics"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement event-driven Poisson simulations, analyze ISI distributions, and compute CV from spike trains",
+            "success_indicators": [
+              "Correctly generates Poisson events with exponential intervals",
+              "Implements event-driven simulation efficiently",
+              "ISI histogram matches theoretical predictions",
+              "Computes CV showing irregular firing (CV \u2248 1 for Poisson)"
+            ],
+            "common_misconceptions": [
+              "Assuming fixed inter-event intervals for Poisson process",
+              "Confusing event rate \u03bb with firing rate",
+              "Using time-driven simulation inefficiently for rare events",
+              "Misinterpreting CV: CV = 1 is irregular, not regular"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_03_03",
+          "lesson_title": "Jump-Diffusion Processes: Unified Stochastic Framework",
+          "key_insight": "Real neurons experience both continuous channel noise (diffusion) and discrete synaptic events (jumps), requiring jump-diffusion models that integrate both stochastic components for accurate predictions.",
+          "learning_objectives": [
+            "Formulate jump-diffusion SDEs combining Wiener and Poisson terms",
+            "Derive Fokker-Planck equations with jump terms",
+            "Implement hybrid numerical schemes for jump-diffusion processes",
+            "Analyze how diffusion and jump components interact to shape firing statistics"
+          ],
+          "warmup_callback": "OU diffusion (lesson_03_01) + Poisson jumps (lesson_03_02) = jump-diffusion unified model",
+          "content_outline": [
+            "Jump-diffusion SDE: dV = f(V)dt + \u03c3dW + a\u03b5dN",
+            "Fokker-Planck with jumps: \u2202P/\u2202t = -\u2202(fP)/\u2202V + (\u03c3\u00b2/2)\u2202\u00b2P/\u2202V\u00b2 + \u03bb\u222b[P(V-a\u03b5) - P(V)]",
+            "Numerical integration: combining Euler-Maruyama with event-driven jumps",
+            "Relative contributions: diffusion vs. jump variance",
+            "Firing rate modulation: additive vs. multiplicative effects",
+            "First-passage time problems with mixed noise",
+            "Experimental validation: matching in vivo recordings"
+          ],
+          "key_concepts": [
+            "Jump-diffusion process",
+            "Fokker-Planck equation with jumps",
+            "Hybrid numerical scheme",
+            "Diffusion vs. jump variance",
+            "First-passage time",
+            "Mixed noise sources"
+          ],
+          "practical_examples": [
+            "Jump-diffusion IF model implementation",
+            "Variance decomposition: \u03c3\u00b2 (diffusion) vs. \u03bba\u00b2\u03b5\u00b2 (jumps)",
+            "Parameter regime exploration: diffusion-dominated vs. jump-dominated",
+            "First-passage time distribution: numerical vs. analytical approximations",
+            "Comparison with experimental intracellular recordings"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement jump-diffusion models, decompose variance contributions, and solve first-passage time problems",
+            "success_indicators": [
+              "Correctly combines Euler-Maruyama with Poisson event handling",
+              "Accurately decomposes total variance into components",
+              "Identifies parameter regimes where jumps vs. diffusion dominate",
+              "Computes first-passage times matching theoretical bounds"
+            ],
+            "common_misconceptions": [
+              "Assuming diffusion and jump components are independent in their effects",
+              "Neglecting jump contribution to variance",
+              "Using inappropriate timesteps when jump rate is high",
+              "Misapplying pure diffusion approximations to jump-dominated regimes"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_03_04",
+          "lesson_title": "Large Deviation Theory for Rare Events",
+          "key_insight": "Large deviation theory provides the mathematical framework to quantify probabilities of rare but significant neuronal events\u2014spontaneous synchronization, rare bursts, or escape from attractors\u2014that standard perturbation theory cannot address.",
+          "learning_objectives": [
+            "Understand rate functions and large deviation principles",
+            "Apply Freidlin-Wentzell theory to compute escape rates",
+            "Identify most probable escape paths in neuronal models",
+            "Relate large deviations to biological phenomena like spontaneous activity"
+          ],
+          "warmup_callback": "Kramers' rate (lesson_02_03) is special case; large deviation theory generalizes to complex landscapes",
+          "content_outline": [
+            "Large deviation principle: P(X \u2208 A) \u2248 exp(-I(A)/\u03b5\u00b2)",
+            "Rate function I(x): quantifying exponential decay of rare event probability",
+            "Freidlin-Wentzell theory: escape from attractors in small noise limit",
+            "Quasipotential: generalization of potential for non-gradient systems",
+            "Most probable escape path: minimizing action functional",
+            "Application to neuronal models: spontaneous firing, synchronization",
+            "Numerical methods: minimum action path algorithms",
+            "Connection to Kramers' formula: special case of large deviation theory"
+          ],
+          "key_concepts": [
+            "Large deviation principle",
+            "Rate function",
+            "Freidlin-Wentzell theory",
+            "Quasipotential",
+            "Most probable path",
+            "Action functional"
+          ],
+          "practical_examples": [
+            "Escape from fixed point in FHN model: quasipotential calculation",
+            "Most probable path computation using geometric minimum action method",
+            "Spontaneous synchronization in coupled oscillators: rare event analysis",
+            "Comparison: large deviation prediction vs. direct simulation",
+            "Parameter dependence: how rate function varies with noise intensity"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute rate functions, identify most probable paths, and validate large deviation predictions against simulations",
+            "success_indicators": [
+              "Correctly formulates rate function for given stochastic system",
+              "Computes quasipotential for non-gradient neuronal models",
+              "Identifies most probable escape path using variational methods",
+              "Validates exponential scaling of rare event probabilities"
+            ],
+            "common_misconceptions": [
+              "Assuming large deviation theory applies for moderate noise",
+              "Confusing quasipotential with thermodynamic potential",
+              "Neglecting non-gradient effects in neuronal systems",
+              "Misapplying gradient descent to find most probable paths"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_04",
+      "module_title": "Spatial Models: Cable Theory and Multi-Compartment Neurons",
+      "module_description": "Extension to spatially extended neuronal models including cable equations, dendritic integration, and multi-compartment modeling frameworks.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_04_01",
+          "lesson_title": "Cable Theory: Passive Signal Propagation",
+          "key_insight": "The cable equation reveals how dendritic geometry\u2014diameter, length, branching\u2014fundamentally shapes synaptic integration by determining how signals attenuate and summate across space and time.",
+          "learning_objectives": [
+            "Derive the cable equation from first principles (Ohm's law, current conservation)",
+            "Solve cable equation analytically for steady-state and transient cases",
+            "Define and compute space constant \u03bb and time constant \u03c4",
+            "Analyze how dendritic morphology affects synaptic integration"
+          ],
+          "warmup_callback": "Point models (lesson_01_02) ignore space; cable theory adds spatial dimension for realistic dendrites",
+          "content_outline": [
+            "Cylindrical dendrite model: axial and membrane currents",
+            "Cable equation derivation: \u03bb\u00b2\u2202\u00b2V/\u2202x\u00b2 = \u03c4\u2202V/\u2202t + V",
+            "Space constant: \u03bb = \u221a(r_m/r_a) where r_m is membrane resistance, r_a is axial resistance",
+            "Time constant: \u03c4 = r_m c_m",
+            "Steady-state solution: V(x) = V\u2080exp(-|x|/\u03bb)",
+            "Transient solution: Green's function approach",
+            "Boundary conditions: sealed end, voltage clamp, synaptic input",
+            "Electrotonic distance: x/\u03bb as dimensionless measure"
+          ],
+          "key_concepts": [
+            "Cable equation",
+            "Space constant \u03bb",
+            "Time constant \u03c4",
+            "Electrotonic distance",
+            "Axial resistance",
+            "Membrane resistance"
+          ],
+          "practical_examples": [
+            "Analytical solution: voltage attenuation along passive dendrite",
+            "Space constant calculation from morphological parameters",
+            "Numerical solution: finite difference method for cable equation",
+            "Synaptic input at different locations: proximal vs. distal efficacy",
+            "Branching effects: equivalent cylinder approximation"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive cable equation, compute \u03bb and \u03c4 from parameters, and solve for voltage profiles analytically and numerically",
+            "success_indicators": [
+              "Correctly derives cable equation from current conservation",
+              "Computes space constant matching exponential decay",
+              "Implements finite difference scheme with proper boundary conditions",
+              "Explains location-dependent synaptic efficacy using \u03bb"
+            ],
+            "common_misconceptions": [
+              "Confusing space constant with physical length",
+              "Assuming uniform voltage along dendrite (point neuron approximation)",
+              "Neglecting boundary conditions in analytical solutions",
+              "Misapplying sealed-end vs. open-end boundary conditions"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_04_02",
+          "lesson_title": "Active Dendrites: Propagation and Amplification",
+          "key_insight": "Voltage-gated channels in dendrites enable active signal propagation, amplification, and even dendritic spikes, transforming dendrites from passive cables into computational subunits with nonlinear integration properties.",
+          "learning_objectives": [
+            "Extend cable equation to include active conductances",
+            "Analyze conditions for dendritic spike initiation and propagation",
+            "Understand dendritic amplification and its computational implications",
+            "Implement active cable models numerically"
+          ],
+          "warmup_callback": "Passive cable (lesson_04_01) attenuates signals; active channels can amplify and regenerate",
+          "content_outline": [
+            "Active cable equation: \u03bb\u00b2\u2202\u00b2V/\u2202x\u00b2 = \u03c4\u2202V/\u2202t + V + I_active(V, x, t)",
+            "Dendritic sodium and calcium channels: distribution and kinetics",
+            "Dendritic spike initiation: local threshold mechanisms",
+            "Backpropagating action potentials: soma-to-dendrite propagation",
+            "Dendritic amplification: boosting distal synaptic inputs",
+            "Computational implications: coincidence detection, direction selectivity",
+            "Numerical methods: operator splitting for reaction-diffusion systems",
+            "Experimental validation: dendritic recordings and imaging"
+          ],
+          "key_concepts": [
+            "Active cable equation",
+            "Dendritic spike",
+            "Backpropagating action potential",
+            "Dendritic amplification",
+            "Reaction-diffusion system",
+            "Coincidence detection"
+          ],
+          "practical_examples": [
+            "Dendritic spike simulation: local Na+ channel activation",
+            "Backpropagation simulation: AP initiated at soma propagating to dendrites",
+            "Amplification demonstration: comparing passive vs. active integration",
+            "Coincidence detection: temporal window for dendritic spike generation",
+            "Parameter sensitivity: channel density effects on propagation"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement active cable models, demonstrate dendritic spikes and backpropagation, and analyze computational implications",
+            "success_indicators": [
+              "Successfully simulates dendritic spike initiation and propagation",
+              "Demonstrates backpropagating AP with realistic attenuation",
+              "Shows amplification of distal inputs by active conductances",
+              "Explains computational advantages of active dendrites"
+            ],
+            "common_misconceptions": [
+              "Assuming all dendrites support full action potentials",
+              "Neglecting calcium vs. sodium channel contributions",
+              "Confusing backpropagation with antidromic propagation",
+              "Misinterpreting amplification as eliminating distance dependence"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_04_03",
+          "lesson_title": "Multi-Compartment Models: Detailed Morphology",
+          "key_insight": "Multi-compartment models discretize complex neuronal morphology into coupled compartments, enabling simulation of realistic neurons with detailed dendritic trees while maintaining computational tractability through sparse matrix methods.",
+          "learning_objectives": [
+            "Discretize cable equation into compartmental ODEs",
+            "Construct coupling matrices from morphological data",
+            "Implement efficient numerical integration using sparse linear algebra",
+            "Incorporate realistic channel distributions across compartments"
+          ],
+          "warmup_callback": "Cable equation (lesson_04_01) is continuous PDE; compartmental models discretize for complex morphologies",
+          "content_outline": [
+            "Compartmental approximation: spatial discretization \u0394x",
+            "Coupled ODE system: C_i dV_i/dt = \u03a3_j G_ij(V_j - V_i) + I_ion,i + I_syn,i",
+            "Coupling conductance: G_ij from axial resistance",
+            "Morphology reconstruction: SWC format, NeuroMorpho.org",
+            "Sparse matrix representation: efficient storage and computation",
+            "Numerical integration: implicit methods for stiff systems",
+            "Channel distribution: soma vs. dendritic vs. axonal",
+            "Software tools: NEURON, Brian2, Arbor"
+          ],
+          "key_concepts": [
+            "Compartmental model",
+            "Coupling matrix",
+            "Sparse matrix",
+            "Morphology reconstruction",
+            "Channel distribution",
+            "Implicit integration"
+          ],
+          "practical_examples": [
+            "Simple multi-compartment model: soma + dendrite + axon",
+            "Coupling matrix construction from morphological parameters",
+            "Sparse matrix implementation in Python (scipy.sparse)",
+            "Realistic morphology: importing and simulating reconstructed neuron",
+            "Channel distribution effects: comparing uniform vs. realistic distributions"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should construct compartmental models from morphology, implement sparse matrix methods, and simulate realistic neurons",
+            "success_indicators": [
+              "Correctly discretizes cable equation into compartmental ODEs",
+              "Constructs coupling matrix matching morphological connectivity",
+              "Implements sparse matrix operations efficiently",
+              "Simulates realistic neuron with imported morphology"
+            ],
+            "common_misconceptions": [
+              "Using too coarse spatial discretization (violating \u0394x << \u03bb)",
+              "Neglecting sparse matrix methods for large morphologies",
+              "Assuming uniform channel distribution across compartments",
+              "Mishandling boundary conditions at branch points"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_05",
+      "module_title": "Phase Models and Network Synchronization",
+      "module_description": "Reduction techniques for oscillatory neurons, phase response curves, and analysis of synchronization in coupled neuronal networks using the Kuramoto model and extensions.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_05_01",
+          "lesson_title": "Phase Reduction Theory",
+          "key_insight": "Oscillatory neurons near limit cycles can be reduced to a single phase variable, dramatically simplifying analysis while preserving essential synchronization dynamics\u2014a powerful dimensionality reduction for network studies.",
+          "learning_objectives": [
+            "Derive phase reduction from limit cycle dynamics",
+            "Compute phase response curves (PRCs) from full models",
+            "Classify PRC types and relate to synchronization properties",
+            "Apply phase reduction to network coupling analysis"
+          ],
+          "warmup_callback": "FHN limit cycle (lesson_01_04) is high-dimensional; phase reduction captures oscillation with single variable \u03b8",
+          "content_outline": [
+            "Limit cycle oscillators: periodic solutions of ODEs",
+            "Phase variable definition: \u03b8 \u2208 [0, 2\u03c0) parameterizing cycle",
+            "Isochrons: surfaces of constant phase in state space",
+            "Phase response curve (PRC): \u0394\u03b8 vs. perturbation timing",
+            "Type I PRC: always positive (SNIC bifurcation)",
+            "Type II PRC: biphasic (Hopf bifurcation)",
+            "Weak coupling assumption: perturbations small compared to limit cycle",
+            "Phase dynamics: d\u03b8/dt = \u03c9 + \u03b5Z(\u03b8)I(t)"
+          ],
+          "key_concepts": [
+            "Phase variable",
+            "Limit cycle",
+            "Isochron",
+            "Phase response curve",
+            "Type I vs. Type II PRC",
+            "Weak coupling"
+          ],
+          "practical_examples": [
+            "PRC computation: perturbing FHN limit cycle at different phases",
+            "Type I PRC from SNIC model (theta neuron)",
+            "Type II PRC from Hopf bifurcation model",
+            "Numerical isochron calculation: backward integration",
+            "Phase reduction validation: comparing full vs. reduced dynamics"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute PRCs numerically, classify types, and validate phase reduction against full models",
+            "success_indicators": [
+              "Correctly computes PRC from limit cycle perturbations",
+              "Classifies PRC type based on shape and bifurcation",
+              "Validates phase reduction: reduced model matches full model",
+              "Explains relationship between PRC type and synchronization"
+            ],
+            "common_misconceptions": [
+              "Assuming phase reduction applies far from limit cycle",
+              "Confusing PRC with frequency-current curve",
+              "Neglecting weak coupling assumption violations",
+              "Misidentifying PRC type without considering bifurcation structure"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_05_02",
+          "lesson_title": "Kuramoto Model: Collective Synchronization",
+          "key_insight": "The Kuramoto model reveals how coupling strength and frequency heterogeneity compete to determine collective synchronization, exhibiting a phase transition where coherent oscillations emerge above critical coupling\u2014a paradigm for understanding brain rhythms.",
+          "learning_objectives": [
+            "Derive Kuramoto model from phase-coupled oscillators",
+            "Analyze mean-field theory and order parameter dynamics",
+            "Compute critical coupling strength for synchronization transition",
+            "Relate Kuramoto dynamics to neuronal network synchronization"
+          ],
+          "warmup_callback": "Phase reduction (lesson_05_01) gives single oscillator; Kuramoto couples many oscillators",
+          "content_outline": [
+            "Kuramoto model: d\u03b8_i/dt = \u03c9_i + (K/N)\u03a3_j sin(\u03b8_j - \u03b8_i)",
+            "Natural frequency distribution: g(\u03c9), often Lorentzian",
+            "Order parameter: r exp(i\u03c8) = (1/N)\u03a3_j exp(i\u03b8_j)",
+            "Mean-field reduction: d\u03b8_i/dt = \u03c9_i + Kr sin(\u03c8 - \u03b8_i)",
+            "Self-consistency equation for r(K)",
+            "Critical coupling: K_c = 2/(\u03c0g(0)) for Lorentzian g(\u03c9)",
+            "Phase transition: r = 0 (incoherent) to r > 0 (synchronized)",
+            "Biological interpretation: brain rhythms, epileptic seizures"
+          ],
+          "key_concepts": [
+            "Kuramoto model",
+            "Order parameter",
+            "Natural frequency distribution",
+            "Critical coupling",
+            "Phase transition",
+            "Mean-field theory"
+          ],
+          "practical_examples": [
+            "Numerical simulation: N oscillators with Lorentzian frequency distribution",
+            "Order parameter evolution: tracking r(t) and \u03c8(t)",
+            "Critical coupling determination: r vs. K bifurcation diagram",
+            "Frequency distribution effects: comparing Lorentzian vs. Gaussian",
+            "Biological application: modeling alpha rhythm synchronization"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should simulate Kuramoto model, compute order parameter, identify critical coupling, and relate to neuronal synchronization",
+            "success_indicators": [
+              "Correctly implements Kuramoto model for N oscillators",
+              "Computes order parameter showing synchronization transition",
+              "Identifies K_c matching theoretical prediction",
+              "Explains biological relevance to brain rhythms"
+            ],
+            "common_misconceptions": [
+              "Assuming synchronization occurs for any K > 0",
+              "Confusing order parameter r with firing rate",
+              "Neglecting frequency distribution shape effects on K_c",
+              "Misinterpreting partial synchronization (0 < r < 1)"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_05_03",
+          "lesson_title": "Beyond Kuramoto: Realistic Network Synchronization",
+          "key_insight": "Real neuronal networks exhibit complex synchronization patterns\u2014clustering, chimera states, metastability\u2014requiring extensions beyond Kuramoto including heterogeneous coupling, delays, and noise to capture experimental observations.",
+          "learning_objectives": [
+            "Extend Kuramoto model to include coupling heterogeneity and delays",
+            "Analyze chimera states: coexistence of synchrony and asynchrony",
+            "Incorporate noise and study noise-induced synchronization",
+            "Connect extended models to experimental data on brain rhythms"
+          ],
+          "warmup_callback": "Basic Kuramoto (lesson_05_02) assumes uniform coupling; realistic networks have heterogeneous, delayed connections",
+          "content_outline": [
+            "Heterogeneous coupling: d\u03b8_i/dt = \u03c9_i + \u03a3_j K_ij sin(\u03b8_j - \u03b8_i)",
+            "Coupling matrix K_ij: distance-dependent, small-world, scale-free",
+            "Time delays: d\u03b8_i/dt = \u03c9_i + \u03a3_j K_ij sin(\u03b8_j(t - \u03c4_ij) - \u03b8_i)",
+            "Chimera states: spatially localized synchrony/asynchrony",
+            "Noise effects: common noise synchronization, diversity-induced resonance",
+            "Metastability: transient synchronization patterns",
+            "Experimental validation: EEG/MEG rhythms, in vitro networks",
+            "Computational tools: network analysis, spectral methods"
+          ],
+          "key_concepts": [
+            "Heterogeneous coupling",
+            "Time delays",
+            "Chimera states",
+            "Metastability",
+            "Common noise synchronization",
+            "Network topology"
+          ],
+          "practical_examples": [
+            "Distance-dependent coupling: spatial Kuramoto model",
+            "Delay effects: stability analysis and oscillation death",
+            "Chimera state simulation: non-local coupling with phase lag",
+            "Noise-induced synchronization: common input to subpopulation",
+            "EEG data analysis: extracting phase and computing synchronization measures"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement extended Kuramoto models, demonstrate chimera states, and analyze experimental synchronization data",
+            "success_indicators": [
+              "Correctly implements heterogeneous coupling and delays",
+              "Demonstrates chimera states with appropriate parameters",
+              "Shows noise-induced synchronization effects",
+              "Analyzes experimental data using phase synchronization measures"
+            ],
+            "common_misconceptions": [
+              "Assuming delays always destabilize synchronization",
+              "Confusing chimera states with partial synchronization",
+              "Neglecting network topology effects on synchronization",
+              "Misapplying Kuramoto framework to non-oscillatory neurons"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_06",
+      "module_title": "Information Theory in Neural Coding",
+      "module_description": "Application of information theory to quantify neural coding efficiency, including Shannon information, mutual information, Fisher information, and their relationships to neural computation.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_06_01",
+          "lesson_title": "Shannon Information and Entropy",
+          "key_insight": "Shannon's framework quantifies information as reduction in uncertainty, providing fundamental limits on neural coding capacity and revealing that rare, surprising events carry more information than common ones.",
+          "learning_objectives": [
+            "Define Shannon information and entropy rigorously",
+            "Compute entropy for discrete and continuous distributions",
+            "Apply maximum entropy principle to neural coding",
+            "Relate entropy to neural coding efficiency and capacity"
+          ],
+          "warmup_callback": "Stochastic processes (module_03) generate random spike trains; information theory quantifies their information content",
+          "content_outline": [
+            "Shannon information: S(A) = -log\u2082(P(A)) bits",
+            "Entropy: H(X) = -\u03a3_x P(x)log\u2082(P(x)) for discrete X",
+            "Differential entropy: h(X) = -\u222b f(x)log\u2082(f(x))dx for continuous X",
+            "Maximum entropy principle: least biased distribution given constraints",
+            "Joint entropy: H(X,Y) and conditional entropy: H(Y|X)",
+            "Chain rule: H(X,Y) = H(X) + H(Y|X)",
+            "Application to spike trains: entropy rate of point processes",
+            "Coding efficiency: actual vs. maximum possible entropy"
+          ],
+          "key_concepts": [
+            "Shannon information",
+            "Entropy",
+            "Differential entropy",
+            "Maximum entropy principle",
+            "Conditional entropy",
+            "Entropy rate"
+          ],
+          "practical_examples": [
+            "Entropy calculation for Bernoulli spike train",
+            "Maximum entropy distribution: Gaussian with fixed variance",
+            "Spike train entropy rate estimation from data",
+            "Comparing entropy of regular vs. irregular firing",
+            "Coding efficiency: entropy relative to theoretical maximum"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute entropy for various distributions, apply maximum entropy principle, and estimate entropy from neural data",
+            "success_indicators": [
+              "Correctly computes entropy for discrete and continuous distributions",
+              "Derives maximum entropy distributions under constraints",
+              "Estimates entropy rate from spike train data",
+              "Interprets entropy in terms of coding capacity"
+            ],
+            "common_misconceptions": [
+              "Confusing Shannon information with Fisher information",
+              "Assuming differential entropy is always positive",
+              "Neglecting units: bits vs. nats",
+              "Misapplying discrete entropy formulas to continuous variables"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_06_02",
+          "lesson_title": "Mutual Information: Quantifying Neural Coding",
+          "key_insight": "Mutual information measures how much knowing neuronal responses reduces uncertainty about stimuli, providing a universal, model-free metric for neural coding quality that accounts for both signal and noise.",
+          "learning_objectives": [
+            "Derive mutual information from entropy definitions",
+            "Compute mutual information between stimuli and spike responses",
+            "Estimate mutual information from limited data with bias correction",
+            "Apply mutual information to analyze neural coding schemes"
+          ],
+          "warmup_callback": "Entropy (lesson_06_01) measures uncertainty; mutual information measures shared uncertainty between stimulus and response",
+          "content_outline": [
+            "Mutual information definition: I(X;Y) = H(Y) - H(Y|X) = H(X) + H(Y) - H(X,Y)",
+            "Symmetry: I(X;Y) = I(Y;X)",
+            "Bounds: 0 \u2264 I(X;Y) \u2264 min(H(X), H(Y))",
+            "Continuous case: I(X;Y) = \u222b\u222b f(x,y)log\u2082(f(x,y)/(f_X(x)f_Y(y)))dxdy",
+            "Estimation from data: histogram methods, kernel density estimation",
+            "Bias correction: finite sample effects, Panzeri-Treves correction",
+            "Application: stimulus-response mutual information in sensory neurons",
+            "Information-theoretic bounds on coding capacity"
+          ],
+          "key_concepts": [
+            "Mutual information",
+            "Conditional entropy",
+            "Information bottleneck",
+            "Bias correction",
+            "Coding capacity",
+            "Stimulus-response relationship"
+          ],
+          "practical_examples": [
+            "Mutual information calculation: Gaussian stimulus and response",
+            "Spike count coding: I(stimulus; spike count)",
+            "Temporal coding: I(stimulus; spike times)",
+            "Bias correction demonstration: finite sample effects",
+            "Comparing coding schemes: rate vs. temporal coding efficiency"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute mutual information analytically and from data, apply bias corrections, and compare neural coding schemes",
+            "success_indicators": [
+              "Correctly computes mutual information for joint distributions",
+              "Implements estimation from data with appropriate binning",
+              "Applies bias correction methods effectively",
+              "Interprets mutual information in terms of coding quality"
+            ],
+            "common_misconceptions": [
+              "Assuming mutual information measures correlation (it's more general)",
+              "Neglecting finite sample bias in estimation",
+              "Confusing mutual information with channel capacity",
+              "Misinterpreting I(X;Y) = 0 as independence without sufficient data"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_06_03",
+          "lesson_title": "Fisher Information: Parameter Estimation Bounds",
+          "key_insight": "Fisher information quantifies how much data reveals about parameters, providing the Cram\u00e9r-Rao bound on estimation accuracy and guiding optimal experimental design\u2014connecting information theory to statistical inference in neuroscience.",
+          "learning_objectives": [
+            "Derive Fisher information from likelihood functions",
+            "Apply Cram\u00e9r-Rao bound to parameter estimation problems",
+            "Compute Fisher information for neuronal models",
+            "Use Fisher information to design optimal experiments and priors"
+          ],
+          "warmup_callback": "Mutual information (lesson_06_02) measures stimulus-response information; Fisher information measures parameter information",
+          "content_outline": [
+            "Fisher information definition: I(\u03b8) = E[(\u2202log p(x;\u03b8)/\u2202\u03b8)\u00b2] = -E[\u2202\u00b2log p(x;\u03b8)/\u2202\u03b8\u00b2]",
+            "Cram\u00e9r-Rao bound: Var(\u03b8\u0302) \u2265 1/I(\u03b8)",
+            "Multi-parameter case: Fisher information matrix",
+            "Jeffreys prior: p(\u03b8) \u221d \u221aI(\u03b8), optimal non-informative prior",
+            "Application to neuronal models: estimating conductances, time constants",
+            "Experimental design: maximizing Fisher information",
+            "Relationship to mutual information: asymptotic equivalence",
+            "Efficient estimators: achieving Cram\u00e9r-Rao bound"
+          ],
+          "key_concepts": [
+            "Fisher information",
+            "Cram\u00e9r-Rao bound",
+            "Jeffreys prior",
+            "Efficient estimator",
+            "Fisher information matrix",
+            "Optimal experimental design"
+          ],
+          "practical_examples": [
+            "Fisher information for Gaussian: I(\u03bc) = 1/\u03c3\u00b2, I(\u03c3\u00b2) = 1/(2\u03c3\u2074)",
+            "Poisson neuron: Fisher information for rate parameter",
+            "Parameter estimation in IF model: computing I(\u03b8) for threshold",
+            "Jeffreys prior derivation for neuronal model parameters",
+            "Optimal stimulus design: maximizing information about parameter"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute Fisher information, apply Cram\u00e9r-Rao bound, derive Jeffreys priors, and design optimal experiments",
+            "success_indicators": [
+              "Correctly computes Fisher information from likelihood",
+              "Applies Cram\u00e9r-Rao bound to assess estimator quality",
+              "Derives Jeffreys prior from Fisher information",
+              "Designs experiments maximizing information gain"
+            ],
+            "common_misconceptions": [
+              "Confusing Fisher information with Shannon information",
+              "Assuming all estimators achieve Cram\u00e9r-Rao bound",
+              "Neglecting regularity conditions for Cram\u00e9r-Rao bound",
+              "Misapplying single-parameter formulas to multi-parameter cases"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_06_04",
+          "lesson_title": "Neural Complexity and Redundancy",
+          "key_insight": "Information theory reveals the balance between complexity (diverse, rich activity) and redundancy (correlated, overlapping information) in neural populations, with optimal coding requiring intermediate levels of both for robust, efficient representation.",
+          "learning_objectives": [
+            "Define and compute neural complexity measures",
+            "Quantify redundancy using synergy and redundancy decomposition",
+            "Analyze population coding efficiency",
+            "Relate complexity/redundancy to functional advantages"
+          ],
+          "warmup_callback": "Mutual information (lesson_06_02) for single neurons; now extend to population coding and interactions",
+          "content_outline": [
+            "Neural complexity: C = \u03a3_i H(X_i) - H(X\u2081,...,X_n)",
+            "Redundancy: information shared across neurons",
+            "Synergy: information present only in combinations",
+            "Partial information decomposition: unique, redundant, synergistic components",
+            "Population coding efficiency: total information vs. sum of individual",
+            "Correlation effects: positive (redundancy) vs. negative (synergy)",
+            "Optimal coding: balancing complexity and redundancy",
+            "Biological examples: retinal ganglion cells, cortical populations"
+          ],
+          "key_concepts": [
+            "Neural complexity",
+            "Redundancy",
+            "Synergy",
+            "Partial information decomposition",
+            "Population coding",
+            "Correlation structure"
+          ],
+          "practical_examples": [
+            "Complexity calculation for correlated Gaussian neurons",
+            "Redundancy quantification: overlapping receptive fields",
+            "Synergy demonstration: XOR-like population coding",
+            "Partial information decomposition for neuron pairs",
+            "Population coding efficiency: comparing independent vs. correlated"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute complexity and redundancy measures, perform information decomposition, and analyze population coding",
+            "success_indicators": [
+              "Correctly computes neural complexity from joint distributions",
+              "Quantifies redundancy and synergy in neural populations",
+              "Performs partial information decomposition",
+              "Explains functional advantages of redundancy and synergy"
+            ],
+            "common_misconceptions": [
+              "Assuming redundancy is always detrimental to coding",
+              "Confusing correlation with redundancy (correlation can create synergy)",
+              "Neglecting higher-order interactions in complexity measures",
+              "Misinterpreting complexity as always beneficial"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_07",
+      "module_title": "Optimal Control in Neuroscience",
+      "module_description": "Application of optimal control theory to neuronal systems and motor control, including Hamilton-Jacobi-Bellman equations, variance minimization, and frequency control.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_07_01",
+          "lesson_title": "Optimal Control Framework",
+          "key_insight": "Optimal control theory provides a principled framework to find inputs that drive neuronal systems to desired states while minimizing costs, revealing computational principles underlying motor control and potential therapeutic interventions.",
+          "learning_objectives": [
+            "Formulate optimal control problems with state dynamics and cost functionals",
+            "Derive necessary conditions using calculus of variations",
+            "Understand Hamilton-Jacobi-Bellman equation as optimality condition",
+            "Apply dynamic programming principle to neuronal control"
+          ],
+          "warmup_callback": "Dynamical systems (module_01) describe evolution; optimal control finds inputs steering evolution optimally",
+          "content_outline": [
+            "Optimal control problem: minimize J = \u222b L(x, u, t)dt subject to dx/dt = f(x, u, t)",
+            "Cost functional: terminal cost + running cost",
+            "Control constraints: bounded inputs, energy penalties",
+            "Calculus of variations: Euler-Lagrange equations",
+            "Hamiltonian formulation: H(x, p, u) = L(x, u) + p\u00b7f(x, u)",
+            "Hamilton-Jacobi-Bellman equation: -\u2202V/\u2202t = min_u[L(x,u) + \u2202V/\u2202x\u00b7f(x,u)]",
+            "Dynamic programming: principle of optimality",
+            "Numerical methods: shooting, collocation, direct transcription"
+          ],
+          "key_concepts": [
+            "Cost functional",
+            "Hamiltonian",
+            "Hamilton-Jacobi-Bellman equation",
+            "Dynamic programming",
+            "Calculus of variations",
+            "Optimal control"
+          ],
+          "practical_examples": [
+            "Linear-quadratic regulator (LQR): analytical solution",
+            "Minimum time control: bang-bang solutions",
+            "Energy-optimal control: smooth trajectories",
+            "Numerical solution: direct transcription with optimization",
+            "Neuronal application: driving IF neuron to target firing rate"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should formulate optimal control problems, derive optimality conditions, and solve numerically",
+            "success_indicators": [
+              "Correctly formulates cost functional and dynamics",
+              "Derives Euler-Lagrange or HJB equations",
+              "Implements numerical optimal control solver",
+              "Validates solutions satisfy necessary conditions"
+            ],
+            "common_misconceptions": [
+              "Confusing necessary and sufficient conditions for optimality",
+              "Assuming HJB equation is always solvable analytically",
+              "Neglecting control constraints in formulation",
+              "Misapplying linear methods to nonlinear problems"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_07_02",
+          "lesson_title": "Saccadic Eye Movements: Optimal Control Model",
+          "key_insight": "Saccadic eye movements exhibit stereotyped velocity profiles that emerge naturally from variance minimization in optimal control, demonstrating how the brain solves control problems under noise to achieve precise, rapid movements.",
+          "learning_objectives": [
+            "Derive saccadic movement model as second-order system",
+            "Formulate variance minimization optimal control problem",
+            "Solve for optimal control law and resulting trajectories",
+            "Compare model predictions with experimental saccade data"
+          ],
+          "warmup_callback": "Optimal control framework (lesson_07_01) applied to specific motor control problem: saccades",
+          "content_outline": [
+            "Saccadic dynamics: dx\u2081/dt = x\u2082, dx\u2082/dt = -(1/\u03c4\u2081\u03c4\u2082)x\u2081 - (1/\u03c4\u2082)x\u2082 + (1/\u03c4\u2081\u03c4\u2082)u",
+            "State variables: x\u2081 = position, x\u2082 = velocity",
+            "Control input: u = desired position command",
+            "Noise model: signal-dependent noise in control",
+            "Variance minimization: minimize E[x\u2081\u00b2(T)] subject to dynamics",
+            "Optimal control solution: feedback law u*(x, t)",
+            "Main sequence: peak velocity vs. amplitude relationship",
+            "Experimental validation: comparing with human/primate saccades"
+          ],
+          "key_concepts": [
+            "Saccadic movement",
+            "Variance minimization",
+            "Signal-dependent noise",
+            "Feedback control",
+            "Main sequence",
+            "Motor control"
+          ],
+          "practical_examples": [
+            "Numerical simulation of saccadic dynamics",
+            "Optimal control solution: Riccati equation for LQG problem",
+            "Main sequence generation: varying target amplitude",
+            "Noise effects: comparing deterministic vs. stochastic trajectories",
+            "Parameter fitting: matching model to experimental data"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive saccadic model, solve variance minimization problem, and validate against experimental data",
+            "success_indicators": [
+              "Correctly formulates saccadic dynamics and cost functional",
+              "Solves for optimal control law analytically or numerically",
+              "Generates main sequence matching experimental observations",
+              "Explains variance minimization as computational principle"
+            ],
+            "common_misconceptions": [
+              "Assuming saccades are purely ballistic (ignoring feedback)",
+              "Neglecting signal-dependent noise in control",
+              "Confusing position and velocity in state representation",
+              "Misinterpreting main sequence as purely kinematic constraint"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_07_03",
+          "lesson_title": "Frequency Control in Neuronal Models",
+          "key_insight": "Optimal control can find synaptic inputs that drive neurons to fire at precise target frequencies, with applications to treating neurological disorders by regulating pathological firing patterns through optimized stimulation.",
+          "learning_objectives": [
+            "Formulate frequency control as optimal control problem",
+            "Derive control laws for target firing rate achievement",
+            "Analyze robustness to noise and parameter uncertainty",
+            "Apply to neurological disorder models (epilepsy, Parkinson's)"
+          ],
+          "warmup_callback": "Neuronal models (module_01) with external input; optimal control designs input for desired firing",
+          "content_outline": [
+            "Frequency control objective: minimize |f(u) - f_target|\u00b2 + \u03b1\u222bu\u00b2dt",
+            "Firing rate f(u) as function of control input u",
+            "Constraints: physiological bounds on synaptic input",
+            "Gradient-based optimization: \u2202f/\u2202u from adjoint methods",
+            "Robustness analysis: sensitivity to noise and parameter variations",
+            "Application to epilepsy: suppressing pathological synchronization",
+            "Application to Parkinson's: regularizing basal ganglia firing",
+            "Deep brain stimulation: optimal waveform design"
+          ],
+          "key_concepts": [
+            "Frequency control",
+            "Target firing rate",
+            "Adjoint method",
+            "Robustness",
+            "Deep brain stimulation",
+            "Neurological disorders"
+          ],
+          "practical_examples": [
+            "Frequency control in IF model: analytical f-I curve inversion",
+            "Gradient computation: adjoint method for HH model",
+            "Optimal waveform design: periodic vs. irregular stimulation",
+            "Robustness testing: Monte Carlo with parameter variations",
+            "Epilepsy model: suppressing synchronization in coupled neurons"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should formulate frequency control problems, compute optimal inputs, and analyze robustness",
+            "success_indicators": [
+              "Correctly formulates frequency control cost functional",
+              "Computes optimal control achieving target frequency",
+              "Implements adjoint method for gradient computation",
+              "Demonstrates robustness to noise and parameter uncertainty"
+            ],
+            "common_misconceptions": [
+              "Assuming linear relationship between input and firing rate",
+              "Neglecting energy costs in control design",
+              "Misapplying open-loop control where feedback is needed",
+              "Ignoring physiological constraints on stimulation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_08",
+      "module_title": "Parameter Estimation and Model Validation",
+      "module_description": "Statistical methods for estimating neuronal model parameters from data, including maximum likelihood, Bayesian inference, and model comparison techniques.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_08_01",
+          "lesson_title": "Maximum Likelihood Estimation for Neuronal Models",
+          "key_insight": "Maximum likelihood provides a principled, general framework for fitting neuronal models to data by finding parameters that make observed data most probable, with Fisher information quantifying estimation accuracy.",
+          "learning_objectives": [
+            "Derive likelihood functions for neuronal models",
+            "Implement numerical optimization for maximum likelihood",
+            "Compute Fisher information and Cram\u00e9r-Rao bounds",
+            "Assess parameter identifiability and uncertainty"
+          ],
+          "warmup_callback": "Fisher information (lesson_06_03) bounds estimation accuracy; MLE achieves this bound asymptotically",
+          "content_outline": [
+            "Likelihood function: L(\u03b8|data) = P(data|\u03b8)",
+            "Log-likelihood: \u2113(\u03b8) = log L(\u03b8|data), easier to optimize",
+            "Maximum likelihood estimate: \u03b8\u0302_MLE = argmax_\u03b8 \u2113(\u03b8)",
+            "Numerical optimization: gradient descent, Newton-Raphson, BFGS",
+            "Fisher information from Hessian: I(\u03b8) = -E[\u2202\u00b2\u2113/\u2202\u03b8\u00b2]",
+            "Asymptotic normality: \u03b8\u0302_MLE ~ N(\u03b8_true, I(\u03b8)\u207b\u00b9)",
+            "Confidence intervals: using Fisher information",
+            "Identifiability analysis: when parameters can be uniquely determined"
+          ],
+          "key_concepts": [
+            "Likelihood function",
+            "Maximum likelihood estimate",
+            "Fisher information matrix",
+            "Cram\u00e9r-Rao bound",
+            "Identifiability",
+            "Asymptotic normality"
+          ],
+          "practical_examples": [
+            "MLE for Poisson neuron: rate parameter from spike counts",
+            "IF model parameter estimation: threshold and time constant from voltage traces",
+            "HH model fitting: conductances from voltage clamp data",
+            "Fisher information computation: numerical Hessian",
+            "Identifiability analysis: parameter correlation structure"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive likelihoods, implement MLE optimization, compute Fisher information, and assess identifiability",
+            "success_indicators": [
+              "Correctly derives likelihood for neuronal model",
+              "Implements numerical optimization achieving convergence",
+              "Computes Fisher information and confidence intervals",
+              "Identifies non-identifiable parameter combinations"
+            ],
+            "common_misconceptions": [
+              "Confusing likelihood with probability of parameters",
+              "Assuming MLE is always unbiased (true only asymptotically)",
+              "Neglecting local maxima in optimization",
+              "Misinterpreting confidence intervals as Bayesian credible intervals"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_08_02",
+          "lesson_title": "Bayesian Inference with Jeffreys Priors",
+          "key_insight": "Bayesian inference combines prior knowledge with data through Bayes' theorem, with Jeffreys priors derived from Fisher information providing optimal non-informative priors that are invariant under reparameterization.",
+          "learning_objectives": [
+            "Apply Bayes' theorem to parameter estimation",
+            "Derive Jeffreys priors from Fisher information",
+            "Implement Markov Chain Monte Carlo (MCMC) for posterior sampling",
+            "Compare Bayesian and frequentist approaches"
+          ],
+          "warmup_callback": "MLE (lesson_08_01) finds point estimates; Bayesian inference provides full posterior distributions",
+          "content_outline": [
+            "Bayes' theorem: P(\u03b8|data) \u221d P(data|\u03b8)P(\u03b8)",
+            "Prior distribution P(\u03b8): encoding prior knowledge",
+            "Jeffreys prior: P(\u03b8) \u221d \u221adet(I(\u03b8)), reparameterization invariant",
+            "Posterior distribution: combining prior and likelihood",
+            "Posterior mean, median, mode as point estimates",
+            "Credible intervals: Bayesian uncertainty quantification",
+            "MCMC methods: Metropolis-Hastings, Hamiltonian Monte Carlo",
+            "Model comparison: Bayes factors, DIC, WAIC"
+          ],
+          "key_concepts": [
+            "Bayes' theorem",
+            "Prior distribution",
+            "Jeffreys prior",
+            "Posterior distribution",
+            "Credible interval",
+            "MCMC"
+          ],
+          "practical_examples": [
+            "Jeffreys prior derivation for Gaussian parameters",
+            "Bayesian inference for IF model: MCMC sampling",
+            "Posterior visualization: marginal distributions and correlations",
+            "Credible interval computation: highest posterior density",
+            "Model comparison: comparing IF vs. FHN using Bayes factors"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive Jeffreys priors, implement MCMC, and perform Bayesian model comparison",
+            "success_indicators": [
+              "Correctly derives Jeffreys prior from Fisher information",
+              "Implements MCMC achieving convergence (Gelman-Rubin diagnostic)",
+              "Computes credible intervals from posterior samples",
+              "Performs model comparison using appropriate metrics"
+            ],
+            "common_misconceptions": [
+              "Confusing credible intervals with confidence intervals",
+              "Assuming Jeffreys prior is always appropriate",
+              "Neglecting MCMC convergence diagnostics",
+              "Misinterpreting Bayes factors as posterior probabilities"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_08_03",
+          "lesson_title": "Model Selection and Validation",
+          "key_insight": "Selecting among competing neuronal models requires balancing goodness-of-fit with complexity, using information criteria (AIC, BIC) and cross-validation to avoid overfitting while ensuring predictive power on new data.",
+          "learning_objectives": [
+            "Apply information criteria (AIC, BIC, DIC) for model selection",
+            "Implement cross-validation for predictive performance assessment",
+            "Perform residual analysis to diagnose model inadequacies",
+            "Use posterior predictive checks for Bayesian model validation"
+          ],
+          "warmup_callback": "Parameter estimation (lessons 08_01-02) fits models; now assess which model is best",
+          "content_outline": [
+            "Bias-variance tradeoff: underfitting vs. overfitting",
+            "Akaike Information Criterion: AIC = -2\u2113(\u03b8\u0302) + 2k",
+            "Bayesian Information Criterion: BIC = -2\u2113(\u03b8\u0302) + k log(n)",
+            "Cross-validation: k-fold, leave-one-out",
+            "Residual analysis: checking model assumptions",
+            "Posterior predictive checks: P(y_rep|data)",
+            "Goodness-of-fit tests: Kolmogorov-Smirnov, chi-square",
+            "Practical considerations: computational cost, interpretability"
+          ],
+          "key_concepts": [
+            "Model selection",
+            "AIC/BIC",
+            "Cross-validation",
+            "Overfitting",
+            "Residual analysis",
+            "Posterior predictive check"
+          ],
+          "practical_examples": [
+            "AIC/BIC comparison: IF vs. FHN vs. HH models",
+            "Cross-validation: predicting held-out spike trains",
+            "Residual analysis: checking for autocorrelation and heteroscedasticity",
+            "Posterior predictive checks: comparing simulated to observed data",
+            "Practical model selection: balancing accuracy and interpretability"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should compute information criteria, perform cross-validation, and conduct model validation",
+            "success_indicators": [
+              "Correctly computes AIC/BIC for competing models",
+              "Implements cross-validation with proper data splitting",
+              "Performs residual analysis identifying model deficiencies",
+              "Conducts posterior predictive checks validating model"
+            ],
+            "common_misconceptions": [
+              "Assuming lower AIC/BIC always means better model",
+              "Neglecting to validate on held-out data",
+              "Confusing in-sample fit with out-of-sample prediction",
+              "Misinterpreting residual patterns without statistical tests"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_09",
+      "module_title": "Advanced Topics and Research Frontiers",
+      "module_description": "Cutting-edge topics in computational neuroscience including advanced network models, learning and plasticity, and connections to machine learning.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_09_01",
+          "lesson_title": "Spike-Timing-Dependent Plasticity (STDP)",
+          "key_insight": "STDP implements a local, temporally asymmetric learning rule where synaptic strength changes depend on precise spike timing, providing a biologically plausible mechanism for learning temporal sequences and causal relationships.",
+          "learning_objectives": [
+            "Derive STDP learning rules from experimental data",
+            "Implement STDP in network simulations",
+            "Analyze stability and competition in STDP learning",
+            "Relate STDP to computational learning theories"
+          ],
+          "warmup_callback": "Synaptic transmission (module_03) with fixed weights; STDP makes weights plastic based on timing",
+          "content_outline": [
+            "STDP experimental observations: timing-dependent weight changes",
+            "STDP window: \u0394w = A_+ exp(-\u0394t/\u03c4_+) for \u0394t > 0, \u0394w = -A_- exp(\u0394t/\u03c4_-) for \u0394t < 0",
+            "Temporal asymmetry: causality detection",
+            "Additive vs. multiplicative STDP",
+            "Weight dynamics: dw/dt = \u03a3_spikes STDP_window(\u0394t)",
+            "Stability analysis: weight competition and normalization",
+            "Computational functions: sequence learning, temporal coding",
+            "Relationship to reinforcement learning and temporal difference learning"
+          ],
+          "key_concepts": [
+            "STDP",
+            "Temporal asymmetry",
+            "Synaptic plasticity",
+            "Weight competition",
+            "Sequence learning",
+            "Causality detection"
+          ],
+          "practical_examples": [
+            "STDP window implementation: exponential kernels",
+            "Network simulation: STDP in recurrent network",
+            "Sequence learning: training network to replay temporal patterns",
+            "Weight distribution evolution: competition and stabilization",
+            "Comparison with Hebbian learning: advantages of temporal precision"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement STDP rules, simulate network learning, and analyze stability",
+            "success_indicators": [
+              "Correctly implements STDP window with temporal asymmetry",
+              "Demonstrates sequence learning in network simulation",
+              "Analyzes weight competition and stability",
+              "Relates STDP to computational learning principles"
+            ],
+            "common_misconceptions": [
+              "Assuming STDP always leads to stable weight distributions",
+              "Neglecting weight normalization mechanisms",
+              "Confusing STDP with rate-based Hebbian learning",
+              "Misinterpreting temporal asymmetry as purely causal"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_09_02",
+          "lesson_title": "Reservoir Computing and Liquid State Machines",
+          "key_insight": "Recurrent neural networks with fixed random connectivity (reservoirs) can perform complex temporal computations through high-dimensional transient dynamics, requiring training only readout weights\u2014a paradigm bridging neuroscience and machine learning.",
+          "learning_objectives": [
+            "Understand reservoir computing principles and echo state property",
+            "Implement liquid state machines with spiking neurons",
+            "Train readout layers for temporal pattern recognition",
+            "Analyze computational capacity and memory of reservoirs"
+          ],
+          "warmup_callback": "Recurrent networks from synchronization (module_05); reservoir computing exploits rich dynamics without training recurrent weights",
+          "content_outline": [
+            "Reservoir computing paradigm: fixed recurrent network + trained readout",
+            "Echo state property: fading memory of inputs",
+            "Liquid state machine: spiking neuron reservoir",
+            "Reservoir dynamics: dx/dt = f(x, u, W_rec) with fixed W_rec",
+            "Readout training: linear regression on reservoir states",
+            "Computational capacity: memory and nonlinear transformations",
+            "Network topology effects: small-world, scale-free",
+            "Applications: speech recognition, time series prediction"
+          ],
+          "key_concepts": [
+            "Reservoir computing",
+            "Echo state property",
+            "Liquid state machine",
+            "Readout layer",
+            "Computational capacity",
+            "Fading memory"
+          ],
+          "practical_examples": [
+            "Echo state network implementation: rate-based reservoir",
+            "Liquid state machine: spiking neuron reservoir with IF neurons",
+            "Temporal pattern classification: training readout with ridge regression",
+            "Memory capacity analysis: testing recall of past inputs",
+            "Topology effects: comparing random vs. structured connectivity"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement reservoir computing systems, train readouts, and analyze computational properties",
+            "success_indicators": [
+              "Correctly implements reservoir with echo state property",
+              "Trains readout achieving good performance on temporal tasks",
+              "Analyzes memory capacity quantitatively",
+              "Explains computational advantages of reservoir approach"
+            ],
+            "common_misconceptions": [
+              "Assuming all recurrent networks are reservoirs",
+              "Neglecting echo state property requirements",
+              "Confusing reservoir computing with deep learning",
+              "Misinterpreting fixed weights as limitation rather than feature"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_09_03",
+          "lesson_title": "Neural Manifolds and Dimensionality Reduction",
+          "key_insight": "High-dimensional neural population activity often lies on low-dimensional manifolds, revealing computational structure and enabling dimensionality reduction techniques to uncover latent dynamics underlying behavior and cognition.",
+          "learning_objectives": [
+            "Apply PCA and other dimensionality reduction to neural data",
+            "Identify neural manifolds and their geometric properties",
+            "Use dynamical systems analysis on reduced representations",
+            "Relate manifold structure to behavioral variables and computations"
+          ],
+          "warmup_callback": "Multi-dimensional neuronal models (modules 01-04); population recordings are even higher-dimensional",
+          "content_outline": [
+            "High-dimensional neural recordings: population activity",
+            "Principal Component Analysis (PCA): linear dimensionality reduction",
+            "Nonlinear methods: Isomap, LLE, t-SNE, UMAP",
+            "Neural manifolds: low-dimensional subspaces of activity",
+            "Dynamical systems on manifolds: flow analysis",
+            "Behavioral decoding from manifold coordinates",
+            "Manifold geometry: curvature, topology",
+            "Applications: motor cortex, decision-making, memory"
+          ],
+          "key_concepts": [
+            "Dimensionality reduction",
+            "Neural manifold",
+            "PCA",
+            "Latent dynamics",
+            "Behavioral decoding",
+            "Manifold geometry"
+          ],
+          "practical_examples": [
+            "PCA on simulated population activity: identifying principal components",
+            "Nonlinear dimensionality reduction: comparing methods on neural data",
+            "Manifold visualization: 2D/3D projections of high-dimensional activity",
+            "Dynamical analysis: flow fields on neural manifolds",
+            "Behavioral decoding: predicting movement from manifold coordinates"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should apply dimensionality reduction, identify manifolds, and relate to behavior",
+            "success_indicators": [
+              "Correctly applies PCA and nonlinear methods to neural data",
+              "Identifies low-dimensional manifolds in population activity",
+              "Performs dynamical analysis on reduced representations",
+              "Decodes behavioral variables from manifold coordinates"
+            ],
+            "common_misconceptions": [
+              "Assuming linear methods always suffice for neural data",
+              "Confusing dimensionality reduction with feature selection",
+              "Neglecting to validate manifold structure statistically",
+              "Misinterpreting manifold dimensions as having direct biological meaning"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_09_04",
+          "lesson_title": "Bridging to Deep Learning: Biological Plausibility",
+          "key_insight": "While artificial neural networks achieve remarkable performance, understanding their relationship to biological neurons\u2014through biologically plausible learning rules, spiking networks, and energy constraints\u2014remains a frontier connecting neuroscience and AI.",
+          "learning_objectives": [
+            "Compare artificial and biological neural networks",
+            "Analyze biological plausibility of backpropagation",
+            "Explore alternative learning algorithms (feedback alignment, predictive coding)",
+            "Understand energy efficiency constraints in biological computation"
+          ],
+          "warmup_callback": "Neuronal models (modules 01-04) are biologically grounded; deep learning uses simplified abstractions",
+          "content_outline": [
+            "Artificial neurons vs. biological neurons: activation functions, dynamics",
+            "Backpropagation: weight transport problem, biological implausibility",
+            "Feedback alignment: random feedback weights for learning",
+            "Predictive coding: hierarchical prediction and error correction",
+            "Spiking neural networks for deep learning: conversion and training",
+            "Energy efficiency: biological neurons vs. artificial neurons",
+            "Sparse coding and metabolic constraints",
+            "Future directions: neuromorphic computing, brain-inspired AI"
+          ],
+          "key_concepts": [
+            "Biological plausibility",
+            "Backpropagation",
+            "Feedback alignment",
+            "Predictive coding",
+            "Spiking neural networks",
+            "Energy efficiency"
+          ],
+          "practical_examples": [
+            "Backpropagation implementation and biological critique",
+            "Feedback alignment: training network with random feedback",
+            "Predictive coding network: hierarchical error minimization",
+            "Spiking network conversion: ANN to SNN",
+            "Energy analysis: comparing biological and artificial computation costs"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should critique biological plausibility, implement alternative learning rules, and analyze energy efficiency",
+            "success_indicators": [
+              "Articulates biological implausibility of backpropagation",
+              "Implements and compares alternative learning algorithms",
+              "Converts and trains spiking neural networks",
+              "Analyzes energy efficiency of different computational approaches"
+            ],
+            "common_misconceptions": [
+              "Assuming backpropagation is how brains learn",
+              "Confusing biological inspiration with biological accuracy",
+              "Neglecting energy constraints in biological systems",
+              "Misinterpreting spiking networks as always more efficient"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "assessment_strategy": {
+    "formative": "Each lesson includes: (1) Conceptual MCQs testing understanding of key principles, (2) Derivation problems requiring mathematical proofs with LaTeX, (3) Computational exercises implementing models and algorithms, (4) Cloze deletions for key equations and definitions, (5) Pair matching connecting concepts to applications",
+    "summative": "Module-level assessments include: (1) Research-style problem sets requiring integration across lessons, (2) Computational projects implementing complete modeling pipelines from data to analysis, (3) Literature review assignments connecting course material to primary research papers, (4) Final project: original research proposal or implementation addressing open problem in computational neuroscience"
+  },
+  "verification_plan": {
+    "lesson_quality_criteria": [
+      "Each lesson has clear key insight answering 'why this matters'",
+      "Learning objectives are specific, measurable, and research-grade",
+      "Content outline progresses logically from foundations to applications",
+      "Mathematical rigor maintained: derivations, proofs, and formal definitions included",
+      "Computational implementations specified with algorithms and validation",
+      "Connections to experimental neuroscience and primary literature explicit",
+      "Verification criteria include both conceptual understanding and technical skills",
+      "Common misconceptions identified from pedagogical research and teaching experience"
+    ],
+    "content_accuracy_checks": [
+      "Mathematical equations verified against primary sources (Hodgkin-Huxley 1952, Kuramoto 1984, etc.)",
+      "Model implementations validated against published results and standard software (NEURON, Brian2)",
+      "Information-theoretic formulas checked against Cover & Thomas and neuroscience applications",
+      "Optimal control formulations verified against control theory texts and motor control literature",
+      "Statistical methods validated against standard references (Casella & Berger, Gelman et al.)",
+      "Biological facts cross-referenced with neuroscience textbooks (Dayan & Abbott, Gerstner et al.)",
+      "Parameter values and units checked for physiological realism",
+      "Code examples tested for correctness and numerical stability"
+    ],
+    "pedagogical_alignment": [
+      "Scaffolding: each lesson builds on previous material with explicit callbacks",
+      "Spaced repetition: key concepts revisited across modules in different contexts",
+      "Active recall: verification criteria require students to reproduce derivations and implementations",
+      "Worked examples: each lesson includes 4-5 concrete applications with solutions",
+      "Interdisciplinary connections: biology-math-computation integrated throughout",
+      "Research preparation: lessons include references to primary literature and open problems",
+      "Assessment alignment: verification criteria match learning objectives and key insights",
+      "Cognitive load management: complex topics broken into digestible sub-lessons with clear structure"
+    ]
+  }
+}
