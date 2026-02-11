@@ -1,0 +1,736 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:owl="http://www.w3.org/2002/07/owl#"
+         xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+         xmlns:neuro="http://example.org/20260206054453neurocompressed2352#">
+
+  <owl:Ontology rdf:about="http://example.org/20260206054453neurocompressed2352"/>
+
+  <!-- Classes -->
+  <owl:Class rdf:about="neuro:DynamicalSystem">
+    <rdfs:label>Dynamical System</rdfs:label>
+    <rdfs:comment>A mathematical system that describes how states evolve over time according to specific rules. Used as the foundation for modeling neuronal behavior and computational neuroscience.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:DeterministicDynamicalSystem">
+    <rdfs:label>Deterministic Dynamical System</rdfs:label>
+    <rdfs:comment>A dynamical system where future states are completely determined by initial conditions without random variation. Forms the basis for classical neuronal models like Hodgkin-Huxley.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:DynamicalSystem"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:StochasticDynamicalSystem">
+    <rdfs:label>Stochastic Dynamical System</rdfs:label>
+    <rdfs:comment>A dynamical system that incorporates random processes and noise into its evolution. Essential for modeling realistic neuronal behavior where noise is prevalent in real-world scenarios.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:DynamicalSystem"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:NeuronalModel">
+    <rdfs:label>Neuronal Model</rdfs:label>
+    <rdfs:comment>A mathematical representation of neuronal behavior and dynamics. Used to simulate and predict how neurons respond to various inputs and conditions.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:PointModel">
+    <rdfs:label>Point Model</rdfs:label>
+    <rdfs:comment>A simplified neuronal model that treats the neuron as a single point without spatial extent. Examples include the integrate-and-fire model which simplifies complex neuronal dynamics.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:NeuronalModel"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:CableModel">
+    <rdfs:label>Cable Model</rdfs:label>
+    <rdfs:comment>A neuronal model that treats cell segments as cylinders to include geometric properties. Accounts for spatial distribution of electrical properties along dendrites and axons.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:NeuronalModel"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:MultiCompartmentModel">
+    <rdfs:label>Multi-compartment Model</rdfs:label>
+    <rdfs:comment>A neuronal model that includes cell morphology with multiple compartments representing different parts of the neuron. Provides detailed spatial representation of neuronal structure and function.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:NeuronalModel"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:PhaseModel">
+    <rdfs:label>Phase Model</rdfs:label>
+    <rdfs:comment>A model that describes the periodic output of a neuron using a single variable known as the phase. Simplifies analysis of oscillatory neuronal behavior and synchronization phenomena.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:NeuronalModel"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:Attractor">
+    <rdfs:label>Attractor</rdfs:label>
+    <rdfs:comment>A set of states to which a dynamical system converges over time. In neurons, the resting potential represents a fixed point attractor to which the membrane potential returns.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:AttractiveBasin">
+    <rdfs:label>Attractive Basin</rdfs:label>
+    <rdfs:comment>The set of initial values from which a dynamical system will converge to a specific attractor. Defines the region of state space that leads to particular stable behaviors.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:BifurcationPoint">
+    <rdfs:label>Bifurcation Point</rdfs:label>
+    <rdfs:comment>Critical parameter values at which a dynamical system's behavior changes significantly. Represents qualitative transitions in neuronal dynamics such as from quiescence to oscillation.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:StochasticProcess">
+    <rdfs:label>Stochastic Process</rdfs:label>
+    <rdfs:comment>A mathematical object describing random evolution over time. Used to model neuronal activity incorporating inherent biological noise and variability.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:JumpProcess">
+    <rdfs:label>Jump Process</rdfs:label>
+    <rdfs:comment>A stochastic process characterized by sudden discrete changes in state. Models sudden changes in neuronal potentials such as synaptic inputs or action potentials.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:StochasticProcess"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:DiffusionProcess">
+    <rdfs:label>Diffusion Process</rdfs:label>
+    <rdfs:comment>A continuous stochastic process driven by Brownian motion. The Ornstein-Uhlenbeck process is a key example used for modeling continuous neuronal noise.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:StochasticProcess"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:JumpDiffusionModel">
+    <rdfs:label>Jump-Diffusion Model</rdfs:label>
+    <rdfs:comment>A combined model integrating both jump and diffusion processes. Models neuronal activity more accurately by capturing both continuous noise and discrete synaptic events.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:StochasticProcess"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:InformationMeasure">
+    <rdfs:label>Information Measure</rdfs:label>
+    <rdfs:comment>A quantitative measure of information content in random variables or events. Used to analyze complexity and redundancy in neural coding and communication.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:ShannonInformation">
+    <rdfs:label>Shannon Information</rdfs:label>
+    <rdfs:comment>A measure of the information content of an event defined as negative logarithm of probability. Fundamental to understanding information transmission in neural systems.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:InformationMeasure"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:MutualInformation">
+    <rdfs:label>Mutual Information</rdfs:label>
+    <rdfs:comment>A measure of information content of one random variable not contained in another. Quantifies the amount of information shared between neural signals or stimulus and response.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:InformationMeasure"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:FisherInformation">
+    <rdfs:label>Fisher Information</rdfs:label>
+    <rdfs:comment>An information measure related to the variance of an estimate and parameter sensitivity. Used in optimal estimation and deriving the Jeffreys prior for maximum likelihood estimates.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:InformationMeasure"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:OptimalControl">
+    <rdfs:label>Optimal Control</rdfs:label>
+    <rdfs:comment>A mathematical framework for finding control strategies that optimize system performance. Applied to neurological disorders treatment and understanding motor control in neuroscience.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:ControlProblem">
+    <rdfs:label>Control Problem</rdfs:label>
+    <rdfs:comment>A specific optimization problem seeking to minimize or maximize an objective function. In neuroscience, used to find optimal synaptic inputs or movement trajectories.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:StabilityMeasure">
+    <rdfs:label>Stability Measure</rdfs:label>
+    <rdfs:comment>A quantitative measure characterizing the stability properties of dynamical systems. Essential for understanding whether neuronal states are stable or chaotic.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:MathematicalFunction">
+    <rdfs:label>Mathematical Function</rdfs:label>
+    <rdfs:comment>A mathematical relationship between variables used in modeling and analysis. Forms the basis for describing neuronal dynamics and system behavior.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:DifferentialEquation">
+    <rdfs:label>Differential Equation</rdfs:label>
+    <rdfs:comment>An equation involving derivatives that describes how quantities change over time. Central to all neuronal models from simple integrate-and-fire to complex Hodgkin-Huxley equations.</rdfs:comment>
+    <rdfs:subClassOf rdf:resource="neuro:MathematicalFunction"/>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:Movement">
+    <rdfs:label>Movement</rdfs:label>
+    <rdfs:comment>Physical motion controlled by neural systems. Saccadic eye movements are modeled using optimal control to minimize variance and achieve desired positions.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="neuro:NeurologicalDisorder">
+    <rdfs:label>Neurological Disorder</rdfs:label>
+    <rdfs:comment>A disease or dysfunction of the nervous system. Optimal control techniques can be applied to treat such disorders by controlling neuronal firing rates.</rdfs:comment>
+  </owl:Class>
+
+  <!-- Object Properties -->
+  <owl:ObjectProperty rdf:about="neuro:convergesTo">
+    <rdfs:label>converges to</rdfs:label>
+    <rdfs:comment>Indicates that a dynamical system converges to a specific attractor state over time.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:DynamicalSystem"/>
+    <rdfs:range rdf:resource="neuro:Attractor"/>
+    <owl:inverseOf rdf:resource="neuro:attractsFrom"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:attractsFrom">
+    <rdfs:label>attracts from</rdfs:label>
+    <rdfs:comment>Indicates that an attractor draws the system from certain initial states.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:Attractor"/>
+    <rdfs:range rdf:resource="neuro:DynamicalSystem"/>
+    <owl:inverseOf rdf:resource="neuro:convergesTo"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:hasAttractiveBasin">
+    <rdfs:label>has attractive basin</rdfs:label>
+    <rdfs:comment>Relates an attractor to its basin of attraction containing initial states that converge to it.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:Attractor"/>
+    <rdfs:range rdf:resource="neuro:AttractiveBasin"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:exhibitsBifurcation">
+    <rdfs:label>exhibits bifurcation</rdfs:label>
+    <rdfs:comment>Indicates that a dynamical system undergoes qualitative behavioral changes at specific parameter values.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:DynamicalSystem"/>
+    <rdfs:range rdf:resource="neuro:BifurcationPoint"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:isModeledBy">
+    <rdfs:label>is modeled by</rdfs:label>
+    <rdfs:comment>Relates a neuronal system or phenomenon to the mathematical model representing it.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:DynamicalSystem"/>
+    <rdfs:range rdf:resource="neuro:NeuronalModel"/>
+    <owl:inverseOf rdf:resource="neuro:models"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:models">
+    <rdfs:label>models</rdfs:label>
+    <rdfs:comment>Indicates that a neuronal model represents a specific dynamical system or phenomenon.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="neuro:DynamicalSystem"/>
+    <owl:inverseOf rdf:resource="neuro:isModeledBy"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:incorporatesProcess">
+    <rdfs:label>incorporates process</rdfs:label>
+    <rdfs:comment>Indicates that a model includes a specific stochastic process in its formulation.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:StochasticDynamicalSystem"/>
+    <rdfs:range rdf:resource="neuro:StochasticProcess"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:measuresInformationOf">
+    <rdfs:label>measures information of</rdfs:label>
+    <rdfs:comment>Relates an information measure to the system or variable it quantifies.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:InformationMeasure"/>
+    <rdfs:range rdf:resource="neuro:DynamicalSystem"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:optimizes">
+    <rdfs:label>optimizes</rdfs:label>
+    <rdfs:comment>Indicates that an optimal control strategy optimizes a specific control problem.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:OptimalControl"/>
+    <rdfs:range rdf:resource="neuro:ControlProblem"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:appliesTo">
+    <rdfs:label>applies to</rdfs:label>
+    <rdfs:comment>Indicates that a control strategy or technique applies to a specific system or disorder.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:OptimalControl"/>
+    <rdfs:range rdf:resource="neuro:NeuronalModel"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:characterizedBy">
+    <rdfs:label>characterized by</rdfs:label>
+    <rdfs:comment>Relates a dynamical system to stability measures that characterize its behavior.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:DynamicalSystem"/>
+    <rdfs:range rdf:resource="neuro:StabilityMeasure"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:governedBy">
+    <rdfs:label>governed by</rdfs:label>
+    <rdfs:comment>Indicates that a dynamical system is governed by specific differential equations.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:DynamicalSystem"/>
+    <rdfs:range rdf:resource="neuro:DifferentialEquation"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:controls">
+    <rdfs:label>controls</rdfs:label>
+    <rdfs:comment>Indicates that a neuronal system controls a specific movement or behavior.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="neuro:Movement"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:treats">
+    <rdfs:label>treats</rdfs:label>
+    <rdfs:comment>Indicates that an optimal control technique is used to treat a neurological disorder.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:OptimalControl"/>
+    <rdfs:range rdf:resource="neuro:NeurologicalDisorder"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:derivesFrom">
+    <rdfs:label>derives from</rdfs:label>
+    <rdfs:comment>Indicates that one mathematical concept or measure is derived from another.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:range rdf:resource="neuro:MathematicalFunction"/>
+  </owl:ObjectProperty>
+
+  <owl:ObjectProperty rdf:about="neuro:simplifies">
+    <rdfs:label>simplifies</rdfs:label>
+    <rdfs:comment>Indicates that one model is a simplified version of another more complex model.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="neuro:NeuronalModel"/>
+  </owl:ObjectProperty>
+
+  <!-- Data Properties -->
+  <owl:DatatypeProperty rdf:about="neuro:lyapunovExponent">
+    <rdfs:label>Lyapunov exponent</rdfs:label>
+    <rdfs:comment>A quantity characterizing the stability of a dynamical system where positive values indicate chaos.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:StabilityMeasure"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:restingPotential">
+    <rdfs:label>resting potential</rdfs:label>
+    <rdfs:comment>The baseline membrane potential of a neuron at rest, typically around -70mV.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:threshold">
+    <rdfs:label>threshold</rdfs:label>
+    <rdfs:comment>The membrane potential value at which an action potential is triggered.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:timeConstant">
+    <rdfs:label>time constant</rdfs:label>
+    <rdfs:comment>A parameter characterizing the temporal dynamics of neuronal processes, denoted as gamma or tau.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:frequency">
+    <rdfs:label>frequency</rdfs:label>
+    <rdfs:comment>The rate at which a neuron fires action potentials, measured in Hz.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:phaseValue">
+    <rdfs:label>phase value</rdfs:label>
+    <rdfs:comment>The single variable theta describing the periodic output of a neuron in phase models.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:PhaseModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:couplingStrength">
+    <rdfs:label>coupling strength</rdfs:label>
+    <rdfs:comment>The parameter K/N in the Kuramoto model representing interaction strength between oscillators.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:PhaseModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:noiseAmplitude">
+    <rdfs:label>noise amplitude</rdfs:label>
+    <rdfs:comment>The parameter sigma characterizing the strength of stochastic fluctuations in diffusion processes.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:DiffusionProcess"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:jumpAmplitude">
+    <rdfs:label>jump amplitude</rdfs:label>
+    <rdfs:comment>The parameter a epsilon characterizing the size of discrete jumps in jump processes.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:JumpProcess"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:meanValue">
+    <rdfs:label>mean value</rdfs:label>
+    <rdfs:comment>The parameter mu representing the mean or drift term in stochastic processes.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:StochasticProcess"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:probability">
+    <rdfs:label>probability</rdfs:label>
+    <rdfs:comment>The likelihood of an event occurring, fundamental to information theory measures.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:InformationMeasure"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:entropy">
+    <rdfs:label>entropy</rdfs:label>
+    <rdfs:comment>The measure H(Y) of uncertainty or information content in Shannon information theory.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:ShannonInformation"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:variance">
+    <rdfs:label>variance</rdfs:label>
+    <rdfs:comment>A measure of dispersion related to Fisher information and estimation accuracy.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:FisherInformation"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:conductance">
+    <rdfs:label>conductance</rdfs:label>
+    <rdfs:comment>The parameter g representing ion channel conductance in Hodgkin-Huxley type models.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <owl:DatatypeProperty rdf:about="neuro:capacitance">
+    <rdfs:label>capacitance</rdfs:label>
+    <rdfs:comment>The membrane capacitance C in neuronal models determining voltage response to current.</rdfs:comment>
+    <rdfs:domain rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:range rdf:resource="xsd:float"/>
+  </owl:DatatypeProperty>
+
+  <!-- Individuals - Specific Models -->
+  <owl:NamedIndividual rdf:about="neuro:IntegrateAndFireModel">
+    <rdf:type rdf:resource="neuro:PointModel"/>
+    <rdfs:label>Integrate-and-Fire Model</rdfs:label>
+    <rdfs:comment>A simplified point model where the membrane potential integrates input current and fires when reaching threshold. Described by the equation dV/dt = (V - V_rest) / gamma + I / gamma.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:HodgkinHuxleyModel">
+    <rdf:type rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:label>Hodgkin-Huxley Model</rdfs:label>
+    <rdfs:comment>A detailed biophysical model describing action potential generation through voltage-gated ion channels. Includes equations for sodium, potassium, and leak currents with gating variables n, m, and h.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:FitzHughNagumoModel">
+    <rdf:type rdf:resource="neuro:NeuronalModel"/>
+    <rdfs:label>FitzHugh-Nagumo Model</rdfs:label>
+    <rdfs:comment>A simplified two-dimensional model capturing essential dynamics of excitable systems. Described by equations dv/dt = K[-v(v - alpha)(v - 1) - w] + I and dw/dt = b(v - c w).</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:KuramotoModel">
+    <rdf:type rdf:resource="neuro:PhaseModel"/>
+    <rdfs:label>Kuramoto Model</rdfs:label>
+    <rdfs:comment>A simplified phase model for studying synchronization in coupled oscillators. Uses the coupling function Gamma_ij(theta_j - theta_i) = (K/N) sin(theta_j - theta_i).</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:OrnsteinUhlenbeckProcess">
+    <rdf:type rdf:resource="neuro:DiffusionProcess"/>
+    <rdfs:label>Ornstein-Uhlenbeck Process</rdfs:label>
+    <rdfs:comment>A diffusion model for neuronal dynamics with mean reversion. Described by the equation dV = (-V + mu) / gamma dt + sigma dW where dW is Brownian motion.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Stability Measures -->
+  <owl:NamedIndividual rdf:about="neuro:LyapunovExponents">
+    <rdf:type rdf:resource="neuro:StabilityMeasure"/>
+    <rdfs:label>Lyapunov Exponents</rdfs:label>
+    <rdfs:comment>Quantities used to characterize the stability of a dynamical system. A positive largest Lyapunov exponent indicates chaotic behavior and sensitivity to initial conditions.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:LyapunovFunctions">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Lyapunov Functions</rdfs:label>
+    <rdfs:comment>Functions that move downwards along the trajectory of a dynamical system, indicating stability. Used to prove convergence to attractors and analyze system stability.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Attractors -->
+  <owl:NamedIndividual rdf:about="neuro:FixedPointAttractor">
+    <rdf:type rdf:resource="neuro:Attractor"/>
+    <rdfs:label>Fixed Point Attractor</rdfs:label>
+    <rdfs:comment>An attractor consisting of a single equilibrium state. The neuronal resting potential is an example of a fixed point attractor to which the system returns.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:RestingPotentialAttractor">
+    <rdf:type rdf:resource="neuro:Attractor"/>
+    <rdfs:label>Resting Potential Attractor</rdfs:label>
+    <rdfs:comment>The fixed point attractor corresponding to the resting membrane potential of a neuron. Represents the stable state to which neurons return between action potentials.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Stochastic Differential Equations -->
+  <owl:NamedIndividual rdf:about="neuro:StochasticDifferentialEquation">
+    <rdf:type rdf:resource="neuro:DifferentialEquation"/>
+    <rdfs:label>Stochastic Differential Equation</rdfs:label>
+    <rdfs:comment>A differential equation incorporating random noise terms to model sudden changes in neuronal potentials. Takes the form dV = -(V - V_rest) / gamma dt + a epsilon dN for jump processes.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Information Theory Concepts -->
+  <owl:NamedIndividual rdf:about="neuro:ShannonInformationMeasure">
+    <rdf:type rdf:resource="neuro:ShannonInformation"/>
+    <rdfs:label>Shannon Information Measure</rdfs:label>
+    <rdfs:comment>The information measure defined as S(A) = -log2(P(A)) quantifying the information content of an event. Fundamental to understanding information transmission in neural systems.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:MutualInformationMeasure">
+    <rdf:type rdf:resource="neuro:MutualInformation"/>
+    <rdfs:label>Mutual Information Measure</rdfs:label>
+    <rdfs:comment>The measure I(X,Y) = H(Y) - H_X(Y) quantifying shared information between variables. Calculated as the integral of f(x,y) log(f(x,y) / (f_X(x) f_Y(y))) dx dy.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:FisherInformationMeasure">
+    <rdf:type rdf:resource="neuro:FisherInformation"/>
+    <rdfs:label>Fisher Information Measure</rdfs:label>
+    <rdfs:comment>The information measure I(theta) = integral of (partial p(x;theta)/partial theta)^2 p(x;theta) dx. Related to the variance of an estimate and used to derive the Jeffreys prior.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:JeffreysPrior">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Jeffreys Prior</rdfs:label>
+    <rdfs:comment>An optimal prior for maximum likelihood estimates derived from Fisher information. Provides a non-informative prior distribution for Bayesian inference in parameter estimation.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Optimal Control -->
+  <owl:NamedIndividual rdf:about="neuro:SaccadicMovementModel">
+    <rdf:type rdf:resource="neuro:Movement"/>
+    <rdfs:label>Saccadic Movement Model</rdfs:label>
+    <rdfs:comment>A model of rapid eye movements described by dx_1/dt = x_2 and dx_2/dt = -(1/tau_1 tau_2) x_1 - (1/tau_2) x_2 + (1/tau_1 tau_2) u. Used to study optimal control of eye movements.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:SaccadicControlProblem">
+    <rdf:type rdf:resource="neuro:ControlProblem"/>
+    <rdfs:label>Saccadic Control Problem</rdfs:label>
+    <rdfs:comment>A control problem that minimizes the variance of saccadic movement to achieve a desired eye position. Demonstrates application of optimal control theory to motor systems.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:NeuronalFiringControlProblem">
+    <rdf:type rdf:resource="neuro:ControlProblem"/>
+    <rdfs:label>Neuronal Firing Control Problem</rdfs:label>
+    <rdfs:comment>A control problem finding synaptic inputs that drive a neuron to fire with a fixed frequency. Applied to integrate-and-fire models with equation dV = -(V - V_rest) / gamma dt + dI_syn(t).</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:HamiltonJacobiBellmanEquation">
+    <rdf:type rdf:resource="neuro:DifferentialEquation"/>
+    <rdfs:label>Hamilton-Jacobi-Bellman Equation</rdfs:label>
+    <rdfs:comment>A partial differential equation central to optimal control theory. Though difficult to solve, it provides the theoretical foundation for finding optimal control strategies.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Advanced Topics -->
+  <owl:NamedIndividual rdf:about="neuro:LargeDeviationTheory">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Large Deviation Theory</rdfs:label>
+    <rdfs:comment>A mathematical framework for analyzing rare events in stochastic systems. Provides tools for understanding unlikely but important events in neuronal dynamics.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:MaximumLikelihoodEstimate">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Maximum Likelihood Estimate</rdfs:label>
+    <rdfs:comment>A statistical estimation method that uses the Jeffreys prior derived from Fisher information. Provides optimal parameter estimates from observed data.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Gating Variables -->
+  <owl:NamedIndividual rdf:about="neuro:GatingVariableN">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Gating Variable n</rdfs:label>
+    <rdfs:comment>A gating variable in the Hodgkin-Huxley model controlling potassium channel activation. Evolves according to dn/dt = alpha_n (1 - n) - beta_n n.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:GatingVariableM">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Gating Variable m</rdfs:label>
+    <rdfs:comment>A gating variable in the Hodgkin-Huxley model controlling sodium channel activation. Evolves according to dm/dt = alpha_m m - beta_m m.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:GatingVariableH">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Gating Variable h</rdfs:label>
+    <rdfs:comment>A gating variable in the Hodgkin-Huxley model controlling sodium channel inactivation. Evolves according to dh/dt = alpha_h h - beta_h h.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Ion Currents -->
+  <owl:NamedIndividual rdf:about="neuro:SodiumCurrent">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Sodium Current</rdfs:label>
+    <rdfs:comment>The ionic current through sodium channels in the Hodgkin-Huxley model. Described by g_Na m^3 h (V - V_Na) where m and h are gating variables.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:PotassiumCurrent">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Potassium Current</rdfs:label>
+    <rdfs:comment>The ionic current through potassium channels in the Hodgkin-Huxley model. Described by g_K n^4 (V - V_K) where n is the gating variable.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:LeakCurrent">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Leak Current</rdfs:label>
+    <rdfs:comment>The passive leak current in the Hodgkin-Huxley model. Described by g_L (V - V_L) representing non-specific ion flow across the membrane.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Noise Types -->
+  <owl:NamedIndividual rdf:about="neuro:GaussianWhiteNoise">
+    <rdf:type rdf:resource="neuro:StochasticProcess"/>
+    <rdfs:label>Gaussian White Noise</rdfs:label>
+    <rdfs:comment>Small random fluctuations with Gaussian distribution used in perturbation analysis. Affects the stability and behavior of deterministic dynamical systems.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:BrownianMotion">
+    <rdf:type rdf:resource="neuro:DiffusionProcess"/>
+    <rdfs:label>Brownian Motion</rdfs:label>
+    <rdfs:comment>A continuous-time stochastic process denoted dW representing random walk. Fundamental to diffusion processes like the Ornstein-Uhlenbeck process.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Phase Dynamics Components -->
+  <owl:NamedIndividual rdf:about="neuro:PhaseVariable">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Phase Variable</rdfs:label>
+    <rdfs:comment>The single variable theta describing the periodic output of a neuron in phase models. Evolves according to dtheta_i/dt = omega_i + sum Gamma_ij (theta_j - theta_i).</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:CouplingFunction">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Coupling Function</rdfs:label>
+    <rdfs:comment>The function Gamma_ij describing interaction between oscillators in phase models. In the Kuramoto model, takes the form (K/N) sin(theta_j - theta_i).</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:IntrinsicFrequency">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Intrinsic Frequency</rdfs:label>
+    <rdfs:comment>The natural oscillation frequency omega_i of an individual oscillator in phase models. Determines the baseline firing rate without coupling.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Synaptic Components -->
+  <owl:NamedIndividual rdf:about="neuro:SynapticInput">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Synaptic Input</rdfs:label>
+    <rdfs:comment>The input current I_syn(t) from synaptic connections in neuronal models. Used as control signals in optimal control problems to drive desired firing patterns.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:SynapticConductance">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Synaptic Conductance</rdfs:label>
+    <rdfs:comment>The time-varying conductance of synaptic channels determining synaptic current strength. Critical for modeling network interactions and information transfer.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - References -->
+  <owl:NamedIndividual rdf:about="neuro:AbelesCorticonics">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Abeles Corticonics</rdfs:label>
+    <rdfs:comment>Reference work by Abeles (1990) on cortical network theory published by Cambridge University Press. Foundational text for understanding cortical computation.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:AlbevariaNoiseInNeuralNetworks">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Albevario Noise in Neural Networks</rdfs:label>
+    <rdfs:comment>Research by Albevario, Feng, and Qian (1995) on the role of noise in neural networks published in Physical Review E. Analyzes stochastic effects on network dynamics.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:ArnoldRandomDynamicalSystems">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Arnold Random Dynamical Systems</rdfs:label>
+    <rdfs:comment>Comprehensive text by Arnold (1998) on random dynamical systems published by Springer-Verlag. Provides mathematical foundations for stochastic dynamics.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:ApplebaumProbabilityAndInformation">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Applebaum Probability and Information</rdfs:label>
+    <rdfs:comment>Reference work by Applebaum (1996) on probability theory and information published by Cambridge University Press. Covers theoretical foundations of information measures.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:VanSteveninckInformationTransfer">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>van Steveninck Information Transfer</rdfs:label>
+    <rdfs:comment>Research by van Steveninck and Laughlin (1996) on information transfer rates at graded-potential synapses published in Nature. Demonstrates practical application of information theory to synapses.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Model Parameters -->
+  <owl:NamedIndividual rdf:about="neuro:MembraneTimeConstantGamma">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Membrane Time Constant Gamma</rdfs:label>
+    <rdfs:comment>The time constant gamma characterizing membrane potential decay in integrate-and-fire and other simplified models. Determines the temporal integration properties of the neuron.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:TimeConstantTau1">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Time Constant Tau 1</rdfs:label>
+    <rdfs:comment>The first time constant tau_1 in the saccadic movement model. Characterizes one aspect of the temporal dynamics of eye movement control.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:TimeConstantTau2">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Time Constant Tau 2</rdfs:label>
+    <rdfs:comment>The second time constant tau_2 in the saccadic movement model. Works with tau_1 to determine the complete temporal dynamics of movement.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:FHNParameterK">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>FHN Parameter K</rdfs:label>
+    <rdfs:comment>The scaling parameter K in the FitzHugh-Nagumo model affecting the speed of voltage dynamics. Controls the timescale separation between fast and slow variables.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:FHNParameterAlpha">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>FHN Parameter Alpha</rdfs:label>
+    <rdfs:comment>The threshold parameter alpha in the FitzHugh-Nagumo cubic nonlinearity. Determines the excitation threshold and shape of the nullcline.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:FHNParameterB">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>FHN Parameter b</rdfs:label>
+    <rdfs:comment>The parameter b in the FitzHugh-Nagumo recovery variable equation. Controls the rate of recovery after excitation.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:FHNParameterC">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>FHN Parameter c</rdfs:label>
+    <rdfs:comment>The coupling parameter c in the FitzHugh-Nagumo recovery variable equation. Determines how the recovery variable responds to voltage changes.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Voltage Parameters -->
+  <owl:NamedIndividual rdf:about="neuro:SodiumReversalPotential">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Sodium Reversal Potential</rdfs:label>
+    <rdfs:comment>The reversal potential V_Na for sodium ions in the Hodgkin-Huxley model, typically around +50mV. Determines the driving force for sodium current.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:PotassiumReversalPotential">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Potassium Reversal Potential</rdfs:label>
+    <rdfs:comment>The reversal potential V_K for potassium ions in the Hodgkin-Huxley model, typically around -77mV. Determines the driving force for potassium current.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:LeakReversalPotential">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Leak Reversal Potential</rdfs:label>
+    <rdfs:comment>The reversal potential V_L for leak current in the Hodgkin-Huxley model. Represents the equilibrium potential for non-specific ion channels.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Conductance Parameters -->
+  <owl:NamedIndividual rdf:about="neuro:SodiumConductance">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Sodium Conductance</rdfs:label>
+    <rdfs:comment>The maximum conductance g_Na for sodium channels in the Hodgkin-Huxley model. Determines the maximum strength of sodium current during action potentials.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:PotassiumConductance">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Potassium Conductance</rdfs:label>
+    <rdfs:comment>The maximum conductance g_K for potassium channels in the Hodgkin-Huxley model. Determines the maximum strength of potassium current during repolarization.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:LeakConductance">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Leak Conductance</rdfs:label>
+    <rdfs:comment>The conductance g_L for leak channels in the Hodgkin-Huxley model. Represents the passive membrane conductance at rest.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <!-- Individuals - Rate Functions -->
+  <owl:NamedIndividual rdf:about="neuro:AlphaN">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Alpha n</rdfs:label>
+    <rdfs:comment>The voltage-dependent rate function alpha_n for potassium channel activation in the Hodgkin-Huxley model. Determines the opening rate of potassium channels.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:BetaN">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Beta n</rdfs:label>
+    <rdfs:comment>The voltage-dependent rate function beta_n for potassium channel deactivation in the Hodgkin-Huxley model. Determines the closing rate of potassium channels.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:AlphaM">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Alpha m</rdfs:label>
+    <rdfs:comment>The voltage-dependent rate function alpha_m for sodium channel activation in the Hodgkin-Huxley model. Determines the opening rate of sodium channels.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:BetaM">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Beta m</rdfs:label>
+    <rdfs:comment>The voltage-dependent rate function beta_m for sodium channel deactivation in the Hodgkin-Huxley model. Determines the closing rate of sodium channel activation.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:AlphaH">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Alpha h</rdfs:label>
+    <rdfs:comment>The voltage-dependent rate function alpha_h for sodium channel inactivation in the Hodgkin-Huxley model. Determines the rate of sodium channel inactivation.</rdfs:comment>
+  </owl:NamedIndividual>
+
+  <owl:NamedIndividual rdf:about="neuro:BetaH">
+    <rdf:type rdf:resource="neuro:MathematicalFunction"/>
+    <rdfs:label>Beta h</rdfs:label>
+    <rdfs:comment>The voltage-dependent rate function beta_h for sodium channel recovery from inactivation. Determines the rate at which sodium channels recover from inactivation.</rdfs:comment>
+  </owl:NamedIndividual>
+
+</rdf:RDF>
