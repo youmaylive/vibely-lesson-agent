@@ -1,0 +1,521 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-01</Id>
+    <Title>Dynamical Systems Framework for Neuroscience</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>dynamical-systems</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>attractors</Tag>
+      <Tag>phase-space</Tag>
+      <Tag>neuronal-modeling</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Dynamical Systems Framework for Neuroscience</H1>
+
+  <Body>Neuronal behavior can be precisely characterized as trajectories in state space, where understanding attractors and basins reveals how neurons respond to stimuli and return to rest. This lesson establishes the mathematical foundation that underlies all subsequent neuronal modeling in this course.</Body>
+
+  <H2>What is a Dynamical System?</H2>
+
+  <Body>A dynamical system is a mathematical framework that describes how the state of a system evolves over time according to fixed rules. In the context of neuroscience, dynamical systems provide the language to describe how membrane potentials, ion channel states, and other neuronal variables change moment by moment.</Body>
+
+  <Body>Formally, a continuous-time dynamical system is defined by an ordinary differential equation (ODE) of the form:</Body>
+
+  <Code lang="plaintext">
+dx/dt = f(x, t)
+  </Code>
+
+  <Body>Here, x represents the state vector (which could include membrane voltage, gating variables, calcium concentrations, etc.), t is time, and f is a function that specifies the instantaneous rate of change of the state. The function f encapsulates all the biophysical rules governing the system.</Body>
+
+  <Body>When f does not depend explicitly on time (only on x), we call the system autonomous:</Body>
+
+  <Code lang="plaintext">
+dx/dt = f(x)
+  </Code>
+
+  <Body>Autonomous systems are particularly important in neuroscience because they capture intrinsic neuronal dynamics independent of time-varying external inputs.</Body>
+
+  <FlashCard id="fc-dynamical-system">
+    <Front>What is a dynamical system in mathematical terms?</Front>
+    <Back>A system described by dx/dt = f(x, t), where x is the state vector and f specifies how the state evolves over time according to fixed rules.</Back>
+  </FlashCard>
+
+  <H2>State Space and Trajectories</H2>
+
+  <Body>The state space (or phase space) is the set of all possible states a system can occupy. Each dimension of the state space corresponds to one state variable. For a neuron described by its membrane voltage V alone, the state space is one-dimensional (the real line). For the Hodgkin-Huxley model with voltage V and three gating variables m, h, n, the state space is four-dimensional.</Body>
+
+  <Body>A trajectory (or orbit) is the path traced out in state space as time progresses from some initial condition x(0) = x_0. Mathematically, a trajectory is the solution x(t) to the differential equation with specified initial conditions.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+# Simple 1D linear system: dV/dt = -(V - V_rest) / tau
+def membrane_dynamics(V, t, V_rest, tau):
+    return -(V - V_rest) / tau
+
+# Parameters
+V_rest = -70  # mV (resting potential)
+tau = 10      # ms (membrane time constant)
+
+# Simulate trajectories from different initial conditions
+t = np.linspace(0, 50, 500)
+initial_conditions = [-90, -80, -60, -50, -40]
+
+plt.figure(figsize=(10, 6))
+for V0 in initial_conditions:
+    V = odeint(membrane_dynamics, V0, t, args=(V_rest, tau))
+    plt.plot(t, V, label=f'V(0) = {V0} mV')
+
+plt.axhline(y=V_rest, color='k', linestyle='--', label='V_rest')
+plt.xlabel('Time (ms)')
+plt.ylabel('Membrane Voltage (mV)')
+plt.title('Trajectories Converging to Resting Potential')
+plt.legend()
+plt.grid(True)
+plt.show()
+  </Code>
+
+  <Body>The code above demonstrates trajectories in a one-dimensional state space. Regardless of initial condition, all trajectories converge to the resting potential V_rest. This convergence behavior is the hallmark of a stable attractor.</Body>
+
+  <FlashCard id="fc-state-space">
+    <Front>What is state space (phase space)?</Front>
+    <Back>The set of all possible states a system can occupy, with each dimension corresponding to one state variable. A trajectory is the path traced through this space as time evolves.</Back>
+  </FlashCard>
+
+  <H2>Deterministic vs. Stochastic Dynamical Systems</H2>
+
+  <Body>Deterministic dynamical systems follow exact, repeatable rules: given the same initial condition, the system always follows the same trajectory. The ODE dx/dt = f(x) is deterministic because f uniquely specifies the future evolution.</Body>
+
+  <Body>Stochastic dynamical systems incorporate randomness, typically modeled as noise terms. A stochastic differential equation (SDE) takes the form:</Body>
+
+  <Code lang="plaintext">
+dx = f(x)dt + g(x)dW
+  </Code>
+
+  <Body>Here, dW represents a Wiener process (Brownian motion), and g(x) scales the noise intensity. In neurons, stochasticity arises from channel noise (random opening/closing of ion channels), synaptic noise (random neurotransmitter release), and thermal fluctuations.</Body>
+
+  <Body>When does noise matter? The answer depends on the relationship between noise magnitude and the system's deterministic dynamics:</Body>
+
+  <Body>1. Near bifurcation points (transitions between qualitative behaviors), even small noise can trigger large effects.</Body>
+
+  <Body>2. In systems with multiple attractors, noise can cause switching between states.</Body>
+
+  <Body>3. For neurons near firing threshold, channel noise can determine whether a spike occurs.</Body>
+
+  <Body>4. In coherence resonance, intermediate noise levels actually regularize firing patterns.</Body>
+
+  <FlashCard id="fc-deterministic-stochastic">
+    <Front>What distinguishes deterministic from stochastic dynamical systems?</Front>
+    <Back>Deterministic systems follow exact rules (dx/dt = f(x)) with repeatable trajectories. Stochastic systems include random noise (dx = f(x)dt + g(x)dW), making trajectories probabilistic.</Back>
+  </FlashCard>
+
+  <H2>Attractors: Where Dynamics Settle</H2>
+
+  <Body>An attractor is a set of states toward which nearby trajectories converge as time approaches infinity. Attractors represent the long-term behavior of a dynamical system and are fundamental to understanding neuronal dynamics.</Body>
+
+  <H3>Types of Attractors</H3>
+
+  <Body>FIXED POINT ATTRACTOR: A single point in state space where the system remains stationary. Mathematically, x* is a fixed point if f(x*) = 0. A fixed point is attracting if nearby trajectories converge to it. The resting potential of a neuron is a classic example of a stable fixed point attractor.</Body>
+
+  <Body>LIMIT CYCLE ATTRACTOR: A closed periodic orbit in state space. Trajectories nearby spiral toward the cycle and then follow it indefinitely. Rhythmic firing patterns, pacemaker neurons, and neural oscillations correspond to limit cycle attractors.</Body>
+
+  <Body>STRANGE ATTRACTOR: A fractal set with chaotic dynamics. Trajectories on a strange attractor are sensitive to initial conditions (nearby trajectories diverge exponentially) yet remain bounded. Strange attractors may appear in networks of neurons and potentially in certain irregular firing patterns.</Body>
+
+  <Code lang="python">
+# Analytical solution for 1D linear system
+# dV/dt = -(V - V_rest) / tau
+# Solution: V(t) = V_rest + (V_0 - V_rest) * exp(-t/tau)
+
+import numpy as np
+
+def analytical_solution(t, V0, V_rest, tau):
+    """
+    Analytical solution for passive membrane equation.
+    Shows exponential convergence to fixed point V_rest.
+    """
+    return V_rest + (V0 - V_rest) * np.exp(-t / tau)
+
+# Verify convergence to fixed point
+t = np.linspace(0, 50, 100)
+V0 = -50  # Initial condition away from rest
+V_rest = -70
+tau = 10
+
+V_trajectory = analytical_solution(t, V0, V_rest, tau)
+# As t -&gt; infinity, V(t) -&gt; V_rest (the fixed point attractor)
+  </Code>
+
+  <FlashCard id="fc-attractor-types">
+    <Front>Name three types of attractors in dynamical systems.</Front>
+    <Back>1) Fixed point: single stationary state (e.g., resting potential). 2) Limit cycle: closed periodic orbit (e.g., rhythmic firing). 3) Strange attractor: fractal set with chaotic dynamics and sensitive dependence on initial conditions.</Back>
+  </FlashCard>
+
+  <H2>Finding Fixed Points</H2>
+
+  <Body>To find fixed points, we solve f(x*) = 0. For the passive membrane equation dV/dt = -(V - V_rest)/tau, setting the right-hand side to zero gives:</Body>
+
+  <Code lang="plaintext">
+-(V* - V_rest) / tau = 0
+V* - V_rest = 0
+V* = V_rest
+  </Code>
+
+  <Body>The resting potential V_rest is the unique fixed point. To determine if this fixed point is stable (attracting), we examine the derivative of f at V*:</Body>
+
+  <Code lang="plaintext">
+f(V) = -(V - V_rest) / tau
+f'(V) = -1/tau
+
+Since tau &gt; 0, we have f'(V*) = -1/tau &lt; 0
+  </Code>
+
+  <Body>A negative derivative indicates stability: perturbations decay exponentially. The magnitude |f'(V*)| = 1/tau determines the rate of convergence, with time constant tau.</Body>
+
+  <H2>Attractive Basins and Initial Conditions</H2>
+
+  <Body>The basin of attraction (or attractive basin) of an attractor is the set of all initial conditions whose trajectories converge to that attractor. Understanding basins is crucial because it tells us which states lead to which long-term behaviors.</Body>
+
+  <Body>For a globally attracting fixed point like the resting potential in the passive membrane equation, the basin of attraction is the entire state space. Every initial voltage eventually returns to rest.</Body>
+
+  <Body>However, many neuronal systems have multiple attractors with distinct basins. For example:</Body>
+
+  <Body>1. A neuron with bistable dynamics might have two stable fixed points (resting and depolarized), each with its own basin.</Body>
+
+  <Body>2. Near a firing threshold, initial conditions on one side lead to rest, while those on the other side lead to a spike (or sustained oscillation).</Body>
+
+  <Body>3. The boundary between basins (the separatrix) determines the effective threshold for neuronal responses.</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Example: 1D system with multiple fixed points
+# dx/dt = x - x^3 (has fixed points at x = -1, 0, +1)
+
+def bistable_dynamics(x):
+    return x - x**3
+
+x_range = np.linspace(-1.5, 1.5, 100)
+dxdt = bistable_dynamics(x_range)
+
+plt.figure(figsize=(10, 6))
+plt.plot(x_range, dxdt, 'b-', linewidth=2)
+plt.axhline(y=0, color='k', linestyle='-')
+plt.axvline(x=-1, color='g', linestyle='--', label='Stable fixed point (x=-1)')
+plt.axvline(x=0, color='r', linestyle='--', label='Unstable fixed point (x=0)')
+plt.axvline(x=1, color='g', linestyle='--', label='Stable fixed point (x=+1)')
+plt.xlabel('x')
+plt.ylabel('dx/dt')
+plt.title('Flow diagram: dx/dt = x - x^3')
+plt.legend()
+
+# Basin of attraction for x=-1: (-infinity, 0)
+# Basin of attraction for x=+1: (0, +infinity)
+# x=0 is unstable (separatrix point in 1D)
+plt.show()
+  </Code>
+
+  <FlashCard id="fc-basin">
+    <Front>What is the basin of attraction?</Front>
+    <Back>The set of all initial conditions whose trajectories converge to a particular attractor. It defines which starting states lead to which long-term behavior.</Back>
+  </FlashCard>
+
+  <H2>Biological Interpretation: Resting Potential as Attractor</H2>
+
+  <Body>The resting membrane potential of a neuron provides a perfect biological example of a stable fixed point attractor. At rest, the membrane voltage settles to approximately -70 mV (varying by neuron type) due to the balance of ionic currents.</Body>
+
+  <Body>The passive membrane equation captures this behavior:</Body>
+
+  <Code lang="plaintext">
+C * dV/dt = -g_L * (V - V_rest) + I_ext
+
+where:
+C = membrane capacitance
+g_L = leak conductance
+V_rest = reversal potential for leak current
+I_ext = external input current
+  </Code>
+
+  <Body>In the absence of external input (I_ext = 0), this simplifies to our canonical form with time constant tau = C/g_L. The resting potential V_rest is a globally stable fixed point: any perturbation (such as a brief synaptic input) causes the voltage to deviate, but it returns exponentially to rest.</Body>
+
+  <Body>This dynamical systems perspective illuminates several biological phenomena:</Body>
+
+  <Body>1. RETURN TO REST: After subthreshold synaptic input, the membrane voltage returns to V_rest with time constant tau. This is trajectory convergence to the fixed point attractor.</Body>
+
+  <Body>2. TIME CONSTANT: The membrane time constant tau = C/g_L determines how quickly the neuron responds. Larger capacitance means slower responses (more charge needed); larger conductance means faster responses (current flows more easily).</Body>
+
+  <Body>3. THRESHOLD BEHAVIOR: When additional voltage-dependent conductances are included (Na+, K+ channels), the system gains new fixed points and bifurcations, enabling action potential generation.</Body>
+
+  <H2>Phase Portraits and Geometric Analysis</H2>
+
+  <Body>A phase portrait is a geometric representation of a dynamical system showing fixed points, trajectories, and flow direction in state space. For 2D systems, phase portraits provide powerful visual insight into system behavior.</Body>
+
+  <Body>Key elements of a phase portrait include:</Body>
+
+  <Body>1. Fixed points marked as dots (stable: filled, unstable: open)</Body>
+
+  <Body>2. Nullclines: curves where dx/dt = 0 or dy/dt = 0</Body>
+
+  <Body>3. Vector field or flow arrows showing direction of motion</Body>
+
+  <Body>4. Representative trajectories from various initial conditions</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 2D linear system approaching a stable node
+# dx/dt = -x
+# dy/dt = -2y
+
+def linear_2d(state, t):
+    x, y = state
+    dxdt = -x
+    dydt = -2*y
+    return [dxdt, dydt]
+
+# Create phase portrait
+x_range = np.linspace(-2, 2, 20)
+y_range = np.linspace(-2, 2, 20)
+X, Y = np.meshgrid(x_range, y_range)
+
+# Vector field
+U = -X       # dx/dt
+V = -2*Y     # dy/dt
+
+plt.figure(figsize=(10, 8))
+
+# Plot vector field (normalized for visibility)
+magnitude = np.sqrt(U**2 + V**2)
+U_norm = U / magnitude
+V_norm = V / magnitude
+plt.quiver(X, Y, U_norm, V_norm, magnitude, cmap='viridis', alpha=0.7)
+
+# Mark the fixed point at origin
+plt.plot(0, 0, 'ro', markersize=12, label='Stable fixed point')
+
+# Nullclines
+plt.axhline(y=0, color='blue', linestyle='--', label='y-nullcline (dy/dt=0)')
+plt.axvline(x=0, color='green', linestyle='--', label='x-nullcline (dx/dt=0)')
+
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Phase Portrait: Stable Node')
+plt.legend()
+plt.axis('equal')
+plt.grid(True)
+plt.show()
+  </Code>
+
+  <Body>For the 2D linear system shown above, both eigenvalues are negative (-1 and -2), making the origin a stable node. All trajectories converge to the origin, with faster decay along the y-direction (eigenvalue -2) than the x-direction (eigenvalue -1).</Body>
+
+  <FlashCard id="fc-phase-portrait">
+    <Front>What is a phase portrait and what does it show?</Front>
+    <Back>A geometric representation of a dynamical system in state space, showing fixed points, nullclines, vector fields (flow direction), and representative trajectories. It visualizes the qualitative behavior of the system.</Back>
+  </FlashCard>
+
+  <H2>Summary: Core Concepts</H2>
+
+  <Body>This lesson established the dynamical systems framework essential for computational neuroscience:</Body>
+
+  <Body>1. Dynamical systems describe state evolution via dx/dt = f(x, t)</Body>
+
+  <Body>2. State space contains all possible states; trajectories trace evolution over time</Body>
+
+  <Body>3. Deterministic systems have repeatable trajectories; stochastic systems include noise</Body>
+
+  <Body>4. Attractors (fixed points, limit cycles, strange attractors) represent long-term behavior</Body>
+
+  <Body>5. Basins of attraction partition initial conditions by their asymptotic fate</Body>
+
+  <Body>6. The resting potential is a stable fixed point attractor with exponential convergence</Body>
+
+  <Body>7. Phase portraits provide geometric insight into multi-dimensional dynamics</Body>
+
+  <H1>Knowledge Assessment</H1>
+
+  <H2>Concept Checks</H2>
+
+  <SingleSelect id="q1-autonomous">
+    <Prompt>A dynamical system is called "autonomous" when:</Prompt>
+    <Options>
+      <Option correct="true">The function f does not depend explicitly on time: dx/dt = f(x)</Option>
+      <Option>The system has no external inputs</Option>
+      <Option>The system has exactly one attractor</Option>
+      <Option>All trajectories converge to a fixed point</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2-fixed-point">
+    <Prompt>For the passive membrane equation dV/dt = -(V - V_rest)/tau, what determines the stability of the fixed point V_rest?</Prompt>
+    <Options>
+      <Option>The value of V_rest itself</Option>
+      <Option correct="true">The sign of the derivative df/dV at the fixed point, which equals -1/tau</Option>
+      <Option>Whether V_rest is positive or negative</Option>
+      <Option>The initial condition V(0)</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3-stochastic">
+    <Prompt>In a stochastic differential equation dx = f(x)dt + g(x)dW, what does dW represent?</Prompt>
+    <Options>
+      <Option>The deterministic driving force</Option>
+      <Option>The time derivative</Option>
+      <Option correct="true">A Wiener process (Brownian motion) representing random fluctuations</Option>
+      <Option>The state variable derivative</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4-attractor-characteristics">
+    <Prompt>Which of the following are TRUE about attractors in dynamical systems? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">An attractor is a set of states toward which nearby trajectories converge</Option>
+      <Option correct="true">Limit cycles are attractors representing periodic oscillatory behavior</Option>
+      <Option>All equilibrium points are attractors</Option>
+      <Option correct="true">Strange attractors exhibit sensitive dependence on initial conditions</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5-noise-effects">
+    <Prompt>When does noise become particularly important in neuronal dynamics? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Near bifurcation points where qualitative transitions can be triggered</Option>
+      <Option correct="true">In systems with multiple attractors where noise can cause switching</Option>
+      <Option>When the membrane time constant is very large</Option>
+      <Option correct="true">When neurons are near firing threshold</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6-convergence-order">
+    <Prompt>Order the following from FASTEST convergence to the resting potential to SLOWEST (assuming equal distance from rest initially):</Prompt>
+    <SortedItems>
+      <Item>Membrane with tau = 5 ms</Item>
+      <Item>Membrane with tau = 10 ms</Item>
+      <Item>Membrane with tau = 20 ms</Item>
+      <Item>Membrane with tau = 50 ms</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <SortQuiz id="q7-stability-analysis">
+    <Prompt>Order the steps for analyzing the stability of a fixed point in a 1D system:</Prompt>
+    <SortedItems>
+      <Item>Write down the ODE: dx/dt = f(x)</Item>
+      <Item>Find fixed points by solving f(x*) = 0</Item>
+      <Item>Compute the derivative f'(x) at each fixed point</Item>
+      <Item>Classify stability: f'(x*) &lt; 0 implies stable, f'(x*) &gt; 0 implies unstable</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q8-concepts-examples">
+    <Prompt>Match each dynamical systems concept with its neurobiological example:</Prompt>
+    <Pairs>
+      <Pair><Left>Fixed point attractor</Left><Right>Resting membrane potential</Right></Pair>
+      <Pair><Left>Limit cycle attractor</Left><Right>Rhythmic pacemaker firing</Right></Pair>
+      <Pair><Left>Basin of attraction</Left><Right>Subthreshold voltage region</Right></Pair>
+      <Pair><Left>Trajectory in state space</Left><Right>Membrane voltage time course</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Action potential threshold</Distractor>
+      <Distractor>Synaptic weight</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q9-math-biology">
+    <Prompt>Match the mathematical term with its biological interpretation in the passive membrane model:</Prompt>
+    <Pairs>
+      <Pair><Left>tau = C/g_L</Left><Right>Membrane time constant</Right></Pair>
+      <Pair><Left>V_rest</Left><Right>Leak reversal potential</Right></Pair>
+      <Pair><Left>g_L</Left><Right>Leak conductance</Right></Pair>
+      <Pair><Left>C</Left><Right>Membrane capacitance</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Firing rate</Distractor>
+      <Distractor>Synaptic delay</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q10-fixed-point-definition">
+    <Prompt>A point x* is called a <Blank>fixed point</Blank> (or equilibrium) if <Blank>f(x*) = 0</Blank>, meaning the system remains <Blank>stationary</Blank> at that state. The fixed point is stable if nearby <Blank>trajectories</Blank> converge to it over time.</Prompt>
+    <Distractors>
+      <Distractor>attractor</Distractor>
+      <Distractor>f(x*) = 1</Distractor>
+      <Distractor>oscillating</Distractor>
+      <Distractor>nullclines</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q11-basin-definition">
+    <Prompt>The <Blank>basin of attraction</Blank> is the set of all <Blank>initial conditions</Blank> whose trajectories converge to a particular attractor. In a bistable system, the boundary between basins is called a <Blank>separatrix</Blank>.</Prompt>
+    <Distractors>
+      <Distractor>phase portrait</Distractor>
+      <Distractor>fixed points</Distractor>
+      <Distractor>nullcline</Distractor>
+      <Distractor>limit cycle</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q12-biological-significance">
+    <Prompt>Explain why the concept of a stable fixed point attractor is essential for understanding neuronal resting potential. In your answer, discuss: (1) what happens biologically when a neuron is perturbed from rest, (2) how the mathematical framework captures this behavior, and (3) why this stability is functionally important for neural computation.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that perturbations from resting potential decay back to rest due to passive membrane properties and ionic currents</Requirement>
+        <Indicators>perturbation, return to rest, decay, leak current, passive membrane, exponential, ion channels</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Connects biological behavior to mathematical framework: fixed point where dV/dt = 0, negative derivative implying stability, trajectory convergence</Requirement>
+        <Indicators>fixed point, dV/dt = 0, derivative, negative, stable, trajectory, converge, equilibrium</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses functional importance: stable baseline for signal detection, reliable reference point, enables threshold-based computation</Requirement>
+        <Indicators>baseline, signal, threshold, reliable, reference, computation, detection, encode</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Uses precise mathematical or biological terminology appropriately</Requirement>
+        <Indicators>membrane, time constant, tau, conductance, capacitance, state space, attractor, basin</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q13-attractor-types">
+    <Prompt>Compare and contrast fixed point attractors and limit cycle attractors. For each type, provide: (1) a mathematical characterization, (2) a neurobiological example, and (3) the qualitative nature of trajectories near the attractor.</Prompt>
+    <Rubric>
+      <Criterion points="2" required="true">
+        <Requirement>Correctly characterizes fixed point: single point where f(x*) = 0, trajectories converge to stationary state</Requirement>
+        <Indicators>fixed point, f(x) = 0, stationary, converge, point, equilibrium</Indicators>
+      </Criterion>
+      <Criterion points="2" required="true">
+        <Requirement>Correctly characterizes limit cycle: closed periodic orbit, trajectories spiral toward cycle</Requirement>
+        <Indicators>limit cycle, periodic, closed orbit, spiral, oscillation, cycle</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides appropriate neurobiological example for fixed point (resting potential, stable membrane state)</Requirement>
+        <Indicators>resting potential, rest, subthreshold, membrane, V_rest</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides appropriate neurobiological example for limit cycle (rhythmic firing, pacemaker neurons, oscillations)</Requirement>
+        <Indicators>rhythmic, pacemaker, oscillation, firing, bursting, periodic firing</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Describes trajectory behavior near each attractor type (exponential decay vs. spiral approach)</Requirement>
+        <Indicators>exponential, spiral, converge, approach, decay, trajectory</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="350" />
+  </Subjective>
+
+  <FlashCard id="fc-equilibrium-vs-attractor">
+    <Front>What is the difference between an equilibrium point and an attractor?</Front>
+    <Back>An equilibrium (fixed point) is any state where f(x*) = 0. An attractor is an equilibrium (or limit cycle, strange attractor) that nearby trajectories converge to. Not all equilibria are attractors - unstable equilibria repel nearby trajectories.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc-time-constant">
+    <Front>In the passive membrane model, what is the membrane time constant tau and what does it determine?</Front>
+    <Back>tau = C/g_L where C is membrane capacitance and g_L is leak conductance. It determines how quickly the membrane voltage responds to perturbations - larger tau means slower exponential return to rest.</Back>
+  </FlashCard>
+
+</Lesson>

@@ -1,0 +1,780 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-02-02</Id>
+    <Title>Bifurcation Theory in Neuronal Excitability</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>bifurcation</Tag>
+      <Tag>neuronal-excitability</Tag>
+      <Tag>dynamical-systems</Tag>
+      <Tag>saddle-node</Tag>
+      <Tag>hopf</Tag>
+      <Tag>SNIC</Tag>
+      <Tag>continuation-methods</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Bifurcation Theory in Neuronal Excitability</H1>
+
+  <Body>Bifurcations mark qualitative transitions in neuronal behavior - from silence to firing, from tonic to bursting - and understanding bifurcation structure reveals how neurons switch between computational modes as parameters vary. In this lesson, we develop a systematic classification of bifurcations relevant to neuronal dynamics and connect them to the fundamental distinction between Type I and Type II excitability.</Body>
+
+  <Body>Recall from our study of the FitzHugh-Nagumo model that increasing the applied current can drive a transition from an excitable fixed point to sustained oscillations via a Hopf bifurcation. This was our first encounter with bifurcation phenomena, but the Hopf bifurcation is just one member of a family of bifurcations that govern neuronal dynamics. Here we provide a comprehensive classification.</Body>
+
+  <H2>What is a Bifurcation?</H2>
+
+  <Body>A bifurcation occurs when a small, smooth change in a parameter causes a qualitative change in the dynamics of a system. The critical parameter value at which this transition occurs is called the bifurcation point. Unlike gradual quantitative changes (such as a fixed point smoothly shifting position), bifurcations represent topological changes in the phase portrait: fixed points may appear, disappear, or change stability; limit cycles may be born or destroyed.</Body>
+
+  <Body>Mathematically, consider a parametrized dynamical system dx/dt = f(x, mu), where mu is the bifurcation parameter. At a bifurcation point mu = mu_c, the number or stability of equilibria changes. The study of bifurcations involves characterizing these transitions and their consequences for system behavior.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is a bifurcation in dynamical systems?</Front>
+    <Back>A qualitative change in the dynamics of a system that occurs at a critical parameter value (bifurcation point), such as the creation/destruction of fixed points or changes in their stability.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What is the bifurcation parameter?</Front>
+    <Back>A system parameter (often denoted mu) whose variation drives the system through a bifurcation. In neuronal models, common bifurcation parameters include injected current I, conductances, or time constants.</Back>
+  </FlashCard>
+
+  <H2>Saddle-Node Bifurcation</H2>
+
+  <Body>The saddle-node bifurcation (also called fold bifurcation or tangent bifurcation) is the most basic mechanism for creating or destroying fixed points. As a parameter varies, two fixed points - one stable (node) and one unstable (saddle) - approach each other, coalesce at the bifurcation point, and annihilate.</Body>
+
+  <Body>The canonical one-dimensional form is:</Body>
+
+  <Code lang="python">
+# Normal form of saddle-node bifurcation
+# dx/dt = mu + x^2
+# For mu &lt; 0: two fixed points at x = +/- sqrt(-mu)
+# For mu = 0: one fixed point at x = 0 (non-hyperbolic)
+# For mu &gt; 0: no fixed points
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def saddle_node_rhs(x, mu):
+    """Right-hand side of saddle-node normal form."""
+    return mu + x**2
+
+# Bifurcation diagram
+mu_values = np.linspace(-1, 0.5, 100)
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# Stable branch (exists for mu &lt; 0)
+mu_neg = mu_values[mu_values &lt; 0]
+x_stable = -np.sqrt(-mu_neg)
+x_unstable = np.sqrt(-mu_neg)
+
+ax.plot(mu_neg, x_stable, 'b-', linewidth=2, label='Stable')
+ax.plot(mu_neg, x_unstable, 'r--', linewidth=2, label='Unstable')
+ax.axvline(x=0, color='k', linestyle=':', alpha=0.5)
+ax.set_xlabel('Parameter mu')
+ax.set_ylabel('Fixed point x*')
+ax.set_title('Saddle-Node Bifurcation Diagram')
+ax.legend()
+plt.show()
+</Code>
+
+  <Body>In neuronal models, saddle-node bifurcations often correspond to the appearance of a firing threshold. Below the bifurcation, the neuron has a stable resting state. As injected current increases past a critical value, the resting state collides with an unstable fixed point (the threshold) and both disappear, forcing the system into repetitive firing.</Body>
+
+  <H2>Hopf Bifurcation</H2>
+
+  <Body>The Hopf bifurcation occurs when a fixed point changes stability and simultaneously gives birth to a limit cycle. This requires at least a two-dimensional system, as the mechanism involves a pair of complex conjugate eigenvalues crossing the imaginary axis.</Body>
+
+  <Body>At a Hopf bifurcation, the Jacobian has eigenvalues lambda = alpha(mu) +/- i*omega(mu), where alpha(mu_c) = 0 and omega(mu_c) is not equal to 0. The fixed point stability changes as alpha crosses zero, and a limit cycle appears with angular frequency approximately omega(mu_c).</Body>
+
+  <Code lang="python">
+# Hopf bifurcation in FitzHugh-Nagumo model
+# dv/dt = v - v^3/3 - w + I
+# dw/dt = epsilon * (v + a - b*w)
+
+import numpy as np
+from scipy.integrate import odeint
+
+def fhn_system(state, t, I, a, b, epsilon):
+    """FitzHugh-Nagumo equations."""
+    v, w = state
+    dvdt = v - (v**3)/3 - w + I
+    dwdt = epsilon * (v + a - b*w)
+    return [dvdt, dwdt]
+
+def compute_jacobian(v_star, w_star, b, epsilon):
+    """Jacobian at fixed point."""
+    J = np.array([
+        [1 - v_star**2, -1],
+        [epsilon, -epsilon*b]
+    ])
+    return J
+
+def analyze_hopf(I_values, a=0.7, b=0.8, epsilon=0.08):
+    """Find Hopf bifurcation by tracking eigenvalues."""
+    results = []
+
+    for I in I_values:
+        # Find fixed point numerically (approximate)
+        # v-nullcline: w = v - v^3/3 + I
+        # w-nullcline: w = (v + a)/b
+        # At intersection: v - v^3/3 + I = (v + a)/b
+
+        from scipy.optimize import fsolve
+        def fixed_point_eq(v):
+            return v - v**3/3 + I - (v + a)/b
+
+        v_star = fsolve(fixed_point_eq, 0.0)[0]
+        w_star = (v_star + a)/b
+
+        J = compute_jacobian(v_star, w_star, b, epsilon)
+        eigenvalues = np.linalg.eigvals(J)
+
+        results.append({
+            'I': I,
+            'v_star': v_star,
+            'eigenvalues': eigenvalues,
+            'real_part': np.max(eigenvalues.real)
+        })
+
+    return results
+
+# Scan through I values to find Hopf bifurcation
+I_scan = np.linspace(0, 1, 100)
+analysis = analyze_hopf(I_scan)
+
+# Find where real part crosses zero
+for i in range(1, len(analysis)):
+    if analysis[i-1]['real_part'] &lt; 0 and analysis[i]['real_part'] &gt; 0:
+        print(f"Hopf bifurcation near I = {analysis[i]['I']:.3f}")
+</Code>
+
+  <Body>There are two types of Hopf bifurcation: supercritical and subcritical. In a SUPERCRITICAL Hopf bifurcation, a small stable limit cycle emerges as the parameter crosses the bifurcation point. In a SUBCRITICAL Hopf bifurcation, an unstable limit cycle exists before the bifurcation and shrinks to zero amplitude at the bifurcation point, leading to a sudden jump to large-amplitude oscillations.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What distinguishes supercritical from subcritical Hopf bifurcations?</Front>
+    <Back>Supercritical: a stable limit cycle grows smoothly from zero amplitude after bifurcation. Subcritical: an unstable limit cycle shrinks to zero at bifurcation, causing an abrupt jump to large-amplitude oscillations. Subcritical bifurcations exhibit hysteresis.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc4">
+    <Front>What eigenvalue condition indicates a Hopf bifurcation?</Front>
+    <Back>A pair of complex conjugate eigenvalues crosses the imaginary axis: lambda = alpha(mu) +/- i*omega, where alpha(mu_c) = 0 and omega(mu_c) is not equal to 0. The imaginary part determines the frequency of the emerging oscillation.</Back>
+  </FlashCard>
+
+  <H2>Saddle-Node on Invariant Circle (SNIC) Bifurcation</H2>
+
+  <Body>The SNIC bifurcation (also called saddle-node infinite period bifurcation) is particularly important for neuronal excitability. It occurs when a saddle-node bifurcation happens on a limit cycle, combining features of both bifurcation types.</Body>
+
+  <Body>Below the SNIC bifurcation, the system has a stable fixed point and an unstable fixed point connected by a heteroclinic orbit forming a closed curve (the invariant circle). At the bifurcation, the two fixed points collide and annihilate on the circle, leaving behind a limit cycle. Crucially, near the bifurcation, the period of the limit cycle approaches infinity, allowing arbitrarily slow oscillations.</Body>
+
+  <Code lang="python">
+# Theta neuron model exhibiting SNIC bifurcation
+# d(theta)/dt = (1 - cos(theta)) + (1 + cos(theta)) * I
+# This is equivalent to quadratic integrate-and-fire model
+
+import numpy as np
+from scipy.integrate import odeint
+
+def theta_neuron(theta, t, I):
+    """Theta neuron equation."""
+    return (1 - np.cos(theta)) + (1 + np.cos(theta)) * I
+
+def compute_firing_rate(I, T_max=1000, dt=0.01):
+    """Compute firing rate by counting threshold crossings."""
+    if I &lt;= 0:
+        return 0.0  # Below SNIC bifurcation
+
+    t = np.arange(0, T_max, dt)
+    theta0 = 0.0
+
+    theta = odeint(theta_neuron, theta0, t, args=(I,))[:, 0]
+
+    # Count spikes (threshold crossings at theta = pi)
+    # Unwrap theta to count full cycles
+    crossings = np.sum(np.diff(np.floor(theta / (2*np.pi))) &gt; 0)
+
+    return crossings / T_max
+
+# f-I curve near SNIC bifurcation
+I_values = np.linspace(-0.1, 0.5, 50)
+firing_rates = [compute_firing_rate(I) for I in I_values]
+
+# Near I = 0 (SNIC bifurcation), firing rate approaches zero continuously
+# f ~ sqrt(I) for small positive I
+</Code>
+
+  <Body>The key signature of SNIC bifurcation is a continuous frequency-current (f-I) curve starting from zero frequency at the bifurcation point. Near the bifurcation, the firing rate follows a square-root scaling: f ~ sqrt(I - I_c), where I_c is the critical current. This allows neurons with SNIC dynamics to encode arbitrarily low firing rates, giving them excellent dynamic range for rate coding.</Body>
+
+  <FlashCard id="fc5">
+    <Front>What is the defining characteristic of SNIC bifurcation?</Front>
+    <Back>A saddle-node bifurcation occurring on an invariant circle (limit cycle). The period becomes infinite at the bifurcation, yielding a continuous f-I curve starting from zero frequency. Near bifurcation: f ~ sqrt(I - I_c).</Back>
+  </FlashCard>
+
+  <H2>Type I vs. Type II Neuronal Excitability</H2>
+
+  <Body>The bifurcation structure at firing onset determines the excitability class of a neuron, with profound consequences for neural coding:</Body>
+
+  <Body>TYPE I EXCITABILITY: Firing onset via SNIC bifurcation. Key features include: (1) continuous f-I curve starting from zero, (2) arbitrarily low firing rates achievable, (3) no subthreshold oscillations, (4) integrator behavior - spike threshold is an applied current level, and (5) good for rate coding due to wide dynamic range.</Body>
+
+  <Body>TYPE II EXCITABILITY: Firing onset via Hopf bifurcation. Key features include: (1) discontinuous f-I curve starting at non-zero frequency, (2) minimum firing rate exists (cannot fire arbitrarily slowly), (3) subthreshold oscillations near threshold, (4) resonator behavior - responds preferentially to inputs at characteristic frequency, and (5) good for temporal coding and synchronization.</Body>
+
+  <Code lang="python">
+# Comparing Type I and Type II f-I curves
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Type I (SNIC): f ~ sqrt(I - I_c) for I &gt; I_c
+def type_I_fi(I, I_c=0.5, k=5.0):
+    """Type I f-I curve (SNIC onset)."""
+    f = np.zeros_like(I)
+    mask = I &gt; I_c
+    f[mask] = k * np.sqrt(I[mask] - I_c)
+    return f
+
+# Type II (Hopf): discontinuous jump to f_min at I_c
+def type_II_fi(I, I_c=0.5, f_min=10.0, slope=20.0):
+    """Type II f-I curve (Hopf onset)."""
+    f = np.zeros_like(I)
+    mask = I &gt; I_c
+    f[mask] = f_min + slope * (I[mask] - I_c)
+    return f
+
+I = np.linspace(0, 2, 200)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+# Type I
+axes[0].plot(I, type_I_fi(I), 'b-', linewidth=2)
+axes[0].axvline(x=0.5, color='r', linestyle='--', label='Bifurcation')
+axes[0].set_xlabel('Applied Current I')
+axes[0].set_ylabel('Firing Rate f (Hz)')
+axes[0].set_title('Type I Excitability (SNIC)')
+axes[0].set_xlim([0, 2])
+axes[0].set_ylim([0, 40])
+axes[0].legend()
+
+# Type II
+axes[1].plot(I, type_II_fi(I), 'b-', linewidth=2)
+axes[1].axvline(x=0.5, color='r', linestyle='--', label='Bifurcation')
+axes[1].axhline(y=10, color='g', linestyle=':', alpha=0.7, label='f_min')
+axes[1].set_xlabel('Applied Current I')
+axes[1].set_ylabel('Firing Rate f (Hz)')
+axes[1].set_title('Type II Excitability (Hopf)')
+axes[1].set_xlim([0, 2])
+axes[1].set_ylim([0, 40])
+axes[1].legend()
+
+plt.tight_layout()
+plt.show()
+</Code>
+
+  <FlashCard id="fc6">
+    <Front>How do Type I and Type II neurons differ in their f-I curves?</Front>
+    <Back>Type I (SNIC): Continuous f-I curve starting from zero, with f ~ sqrt(I - I_c). Type II (Hopf): Discontinuous jump to minimum frequency f_min at onset. Type I can fire arbitrarily slowly; Type II has a minimum firing rate.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>A neuron shows subthreshold oscillations before reaching firing threshold. When it begins firing, the minimum achievable firing rate is approximately 40 Hz. What type of excitability does this neuron exhibit?</Prompt>
+    <Options>
+      <Option correct="true">Type II excitability via Hopf bifurcation</Option>
+      <Option>Type I excitability via SNIC bifurcation</Option>
+      <Option>Type I excitability via saddle-node bifurcation</Option>
+      <Option>Mixed Type I/II excitability</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>In the normal form of a saddle-node bifurcation dx/dt = mu + x^2, what happens as mu increases through zero?</Prompt>
+    <Options>
+      <Option correct="true">Two fixed points (one stable, one unstable) collide and annihilate</Option>
+      <Option>A stable fixed point becomes unstable and spawns a limit cycle</Option>
+      <Option>A limit cycle shrinks to zero amplitude and disappears</Option>
+      <Option>Two unstable fixed points merge into one stable fixed point</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Subcritical vs. Supercritical Bifurcations</H2>
+
+  <Body>The distinction between subcritical and supercritical bifurcations has important dynamical consequences, particularly regarding hysteresis and the abruptness of transitions.</Body>
+
+  <Body>In a SUPERCRITICAL bifurcation, the amplitude of the emerging dynamics (limit cycle, etc.) grows continuously from zero at the bifurcation point. The transition is smooth and reversible.</Body>
+
+  <Body>In a SUBCRITICAL bifurcation, an unstable structure (e.g., unstable limit cycle) exists before the bifurcation and disappears at the bifurcation point. This creates a discontinuous jump to a distant attractor, and the system exhibits HYSTERESIS: the forward and backward transitions occur at different parameter values.</Body>
+
+  <Code lang="python">
+# Illustration of hysteresis in subcritical Hopf bifurcation
+# Normal form: dz/dt = (mu + i*omega)*z + c*|z|^2*z - |z|^4*z
+# For c &gt; 0 (subcritical), there's a region of bistability
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def subcritical_hopf_amplitude(mu, c=1.0):
+    """
+    Steady-state amplitude for subcritical Hopf normal form.
+    |z|^2 satisfies: mu + c*r - r^2 = 0, where r = |z|^2
+    Solutions: r = (c +/- sqrt(c^2 + 4*mu)) / 2
+    """
+    discriminant = c**2 + 4*mu
+
+    amplitudes = {'stable_fp': [], 'unstable_lc': [], 'stable_lc': []}
+
+    if discriminant &lt; 0:
+        # Only stable fixed point at origin
+        amplitudes['stable_fp'] = [0.0]
+    elif mu &lt; 0:
+        # Bistability region: stable FP, unstable LC, stable LC
+        r_minus = (c - np.sqrt(discriminant)) / 2
+        r_plus = (c + np.sqrt(discriminant)) / 2
+        amplitudes['stable_fp'] = [0.0]
+        if r_minus &gt; 0:
+            amplitudes['unstable_lc'] = [np.sqrt(r_minus)]
+        amplitudes['stable_lc'] = [np.sqrt(r_plus)]
+    else:
+        # mu &gt; 0: only stable large LC
+        r_plus = (c + np.sqrt(discriminant)) / 2
+        amplitudes['stable_lc'] = [np.sqrt(r_plus)]
+
+    return amplitudes
+
+# Bifurcation diagram
+mu_range = np.linspace(-1.5, 0.5, 200)
+c = 1.0
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+for mu in mu_range:
+    amps = subcritical_hopf_amplitude(mu, c)
+    for A in amps['stable_fp']:
+        ax.plot(mu, A, 'b.', markersize=1)
+    for A in amps['unstable_lc']:
+        ax.plot(mu, A, 'r.', markersize=1)
+    for A in amps['stable_lc']:
+        ax.plot(mu, A, 'g.', markersize=1)
+
+ax.axvline(x=0, color='k', linestyle='--', alpha=0.5, label='Hopf point')
+ax.axvline(x=-c**2/4, color='m', linestyle=':', alpha=0.5, label='Saddle-node of cycles')
+ax.set_xlabel('Parameter mu')
+ax.set_ylabel('Amplitude |z|')
+ax.set_title('Subcritical Hopf Bifurcation with Hysteresis')
+ax.legend()
+plt.show()
+
+# Hysteresis: increasing mu, system jumps up at mu=0
+# Decreasing mu, system jumps down at mu=-c^2/4
+</Code>
+
+  <Body>For subcritical Hopf bifurcations in neurons, hysteresis manifests as different firing onset and offset currents. A neuron may start firing at one current level but continue firing even when current is reduced below that level, only returning to rest at a significantly lower current. This bistability can have functional significance in neural circuits.</Body>
+
+  <MultiSelect id="q3">
+    <Prompt>Which of the following are characteristic features of subcritical bifurcations? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Hysteresis between forward and backward transitions</Option>
+      <Option correct="true">Discontinuous jump in state variables at the bifurcation</Option>
+      <Option>Amplitude grows continuously from zero after bifurcation</Option>
+      <Option correct="true">Existence of an unstable structure before the bifurcation point</Option>
+      <Option>Identical parameter values for onset and offset transitions</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Continuation Methods for Bifurcation Analysis</H2>
+
+  <Body>While bifurcation analysis can sometimes be performed analytically, complex models like Hodgkin-Huxley require numerical approaches. Continuation methods (also called path-following methods) provide a systematic way to track how equilibria and limit cycles depend on parameters.</Body>
+
+  <Body>The basic idea is to follow a solution branch as a parameter varies, using predictor-corrector algorithms. Starting from a known equilibrium at parameter value mu_0, the algorithm predicts the new equilibrium location at mu_0 + delta_mu, then corrects this prediction using Newton-Raphson iteration.</Body>
+
+  <Code lang="python">
+# Simplified continuation algorithm for tracking equilibria
+import numpy as np
+from scipy.optimize import fsolve
+from scipy.linalg import eig
+
+def simple_continuation(f, x0, mu_start, mu_end, num_points=100):
+    """
+    Track equilibrium of dx/dt = f(x, mu) as mu varies.
+
+    Parameters:
+    -----------
+    f : callable
+        Right-hand side function f(x, mu) returning derivative
+    x0 : ndarray
+        Initial equilibrium at mu_start
+    mu_start, mu_end : float
+        Parameter range
+    num_points : int
+        Number of continuation steps
+
+    Returns:
+    --------
+    mus : array of parameter values
+    xs : array of equilibrium states
+    stabilities : list of stability classifications
+    """
+    mus = np.linspace(mu_start, mu_end, num_points)
+    xs = np.zeros((num_points, len(x0)))
+    stabilities = []
+
+    x_current = x0.copy()
+
+    for i, mu in enumerate(mus):
+        # Find equilibrium: f(x, mu) = 0
+        def equilibrium_condition(x):
+            return f(x, mu)
+
+        x_eq = fsolve(equilibrium_condition, x_current)
+        xs[i] = x_eq
+
+        # Compute Jacobian numerically for stability
+        eps = 1e-6
+        n = len(x_eq)
+        J = np.zeros((n, n))
+        for j in range(n):
+            x_plus = x_eq.copy()
+            x_plus[j] += eps
+            x_minus = x_eq.copy()
+            x_minus[j] -= eps
+            J[:, j] = (f(x_plus, mu) - f(x_minus, mu)) / (2*eps)
+
+        eigenvalues = np.linalg.eigvals(J)
+        max_real = np.max(eigenvalues.real)
+
+        if max_real &lt; 0:
+            stabilities.append('stable')
+        elif max_real &gt; 0:
+            stabilities.append('unstable')
+        else:
+            stabilities.append('marginal')
+
+        # Update initial guess for next step
+        x_current = x_eq
+
+    return mus, xs, stabilities
+
+# Example: FitzHugh-Nagumo equilibria vs. applied current I
+def fhn_equilibrium(state, I, a=0.7, b=0.8, epsilon=0.08):
+    """FHN equilibrium condition."""
+    v, w = state
+    return np.array([
+        v - v**3/3 - w + I,
+        epsilon * (v + a - b*w)
+    ])
+
+# Track equilibrium
+x0 = np.array([-1.2, -0.6])  # Initial guess
+mus, xs, stab = simple_continuation(
+    lambda x, mu: fhn_equilibrium(x, mu),
+    x0, mu_start=0, mu_end=1.5, num_points=150
+)
+</Code>
+
+  <Body>Professional continuation software like AUTO, MATCONT, and PyDSTool extends these basic ideas with sophisticated algorithms for detecting and classifying bifurcations, tracking limit cycles, computing Floquet multipliers, and handling special cases like fold points where simple continuation fails.</Body>
+
+  <FlashCard id="fc7">
+    <Front>What is a continuation method in bifurcation analysis?</Front>
+    <Back>A numerical technique that tracks solution branches (equilibria or limit cycles) as a parameter varies, using predictor-corrector algorithms. It enables systematic construction of bifurcation diagrams for complex models where analytical solutions are unavailable.</Back>
+  </FlashCard>
+
+  <H2>Bifurcation Diagrams</H2>
+
+  <Body>A bifurcation diagram plots the state of equilibria or limit cycles (e.g., membrane potential, oscillation amplitude) against the bifurcation parameter. Stable solutions are typically shown as solid lines, unstable as dashed. Bifurcation points are marked where branches change stability or where branches meet.</Body>
+
+  <Code lang="python">
+# Constructing bifurcation diagram for HH model (simplified illustration)
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+from scipy.signal import find_peaks
+
+# Simplified HH-like model for illustration
+def hh_simplified(state, t, I):
+    """
+    Simplified 2D reduction of HH model.
+    V: membrane potential
+    n: potassium activation (slow variable)
+    """
+    V, n = state
+
+    # Fast sodium current (instantaneous m)
+    m_inf = 1 / (1 + np.exp(-(V + 40)/10))
+    h_inf = 1 / (1 + np.exp((V + 60)/10))
+
+    # Potassium activation
+    n_inf = 1 / (1 + np.exp(-(V + 50)/10))
+    tau_n = 5.0  # ms
+
+    # Currents
+    g_Na, g_K, g_L = 120, 36, 0.3
+    E_Na, E_K, E_L = 50, -77, -54.4
+
+    I_Na = g_Na * m_inf**3 * h_inf * (V - E_Na)
+    I_K = g_K * n**4 * (V - E_K)
+    I_L = g_L * (V - E_L)
+
+    dVdt = (-I_Na - I_K - I_L + I)
+    dndt = (n_inf - n) / tau_n
+
+    return [dVdt, dndt]
+
+def find_oscillation_range(I, T_total=500, T_transient=200):
+    """Find min and max V during steady-state oscillation."""
+    t = np.linspace(0, T_total, 10000)
+    state0 = [-65, 0.3]
+
+    solution = odeint(hh_simplified, state0, t, args=(I,))
+    V = solution[:, 0]
+
+    # Remove transient
+    t_mask = t &gt; T_transient
+    V_steady = V[t_mask]
+
+    # Check for oscillations
+    peaks, _ = find_peaks(V_steady, height=-30)
+
+    if len(peaks) &gt; 2:
+        return np.min(V_steady), np.max(V_steady), True
+    else:
+        return np.mean(V_steady[-100:]), np.mean(V_steady[-100:]), False
+
+# Build bifurcation diagram
+I_values = np.linspace(0, 20, 100)
+V_mins, V_maxs, oscillating = [], [], []
+
+for I in I_values:
+    v_min, v_max, osc = find_oscillation_range(I)
+    V_mins.append(v_min)
+    V_maxs.append(v_max)
+    oscillating.append(osc)
+
+# Plot bifurcation diagram
+fig, ax = plt.subplots(figsize=(10, 6))
+
+for i, I in enumerate(I_values):
+    if oscillating[i]:
+        ax.plot([I, I], [V_mins[i], V_maxs[i]], 'b-', linewidth=0.5)
+    else:
+        ax.plot(I, V_mins[i], 'k.', markersize=2)
+
+ax.set_xlabel('Applied Current I (uA/cm^2)')
+ax.set_ylabel('Membrane Potential V (mV)')
+ax.set_title('Bifurcation Diagram: HH Model')
+plt.show()
+</Code>
+
+  <Body>For the Hodgkin-Huxley model, the bifurcation diagram with respect to applied current I reveals a subcritical Hopf bifurcation: there is a range of bistability where both a stable fixed point (resting state) and a stable limit cycle (repetitive firing) coexist. This explains the experimentally observed phenomenon that some neurons can exhibit bistability between resting and firing states.</Body>
+
+  <SortQuiz id="q4">
+    <Prompt>Order the following steps for performing numerical bifurcation analysis on a neuronal model, from first to last:</Prompt>
+    <SortedItems>
+      <Item>Choose the bifurcation parameter and its range</Item>
+      <Item>Find an initial equilibrium or limit cycle at the starting parameter value</Item>
+      <Item>Apply predictor-corrector continuation to track the solution branch</Item>
+      <Item>Compute eigenvalues (for equilibria) or Floquet multipliers (for limit cycles) at each point</Item>
+      <Item>Detect and classify bifurcations where stability changes</Item>
+      <Item>Construct the bifurcation diagram from the collected data</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q5">
+    <Prompt>Match each bifurcation type to its characteristic feature:</Prompt>
+    <Pairs>
+      <Pair><Left>Saddle-node bifurcation</Left><Right>Two fixed points collide and annihilate</Right></Pair>
+      <Pair><Left>Supercritical Hopf</Left><Right>Stable limit cycle grows from zero amplitude</Right></Pair>
+      <Pair><Left>Subcritical Hopf</Left><Right>Discontinuous jump with hysteresis</Right></Pair>
+      <Pair><Left>SNIC bifurcation</Left><Right>Period approaches infinity at threshold</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Eigenvalues become purely real</Distractor>
+      <Distractor>Strange attractor emerges from limit cycle</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Eigenvalue Analysis for Bifurcation Classification</H2>
+
+  <Body>The type of bifurcation can often be determined from how the eigenvalues of the Jacobian matrix change at the critical parameter value:</Body>
+
+  <Body>SADDLE-NODE BIFURCATION: A single real eigenvalue crosses zero. The eigenvector associated with this eigenvalue points along the direction in which the two fixed points approach each other.</Body>
+
+  <Body>HOPF BIFURCATION: A complex conjugate pair of eigenvalues crosses the imaginary axis. The real parts change sign while the imaginary parts remain non-zero, determining the frequency of the emerging oscillation.</Body>
+
+  <Body>TRANSCRITICAL BIFURCATION: A real eigenvalue crosses zero, but instead of fixed points disappearing, two branches exchange stability. This occurs when a fixed point exists for all parameter values.</Body>
+
+  <Body>PITCHFORK BIFURCATION: A real eigenvalue crosses zero with special symmetry conditions, leading to one fixed point becoming three (or vice versa).</Body>
+
+  <Code lang="python">
+# Eigenvalue analysis at bifurcation
+import numpy as np
+from scipy.linalg import eig
+
+def classify_bifurcation(eigenvalues_before, eigenvalues_after):
+    """
+    Classify bifurcation based on eigenvalue changes.
+
+    Parameters:
+    -----------
+    eigenvalues_before : array
+        Eigenvalues just before critical parameter
+    eigenvalues_after : array
+        Eigenvalues just after critical parameter
+
+    Returns:
+    --------
+    str : bifurcation classification
+    """
+    # Check for real eigenvalue crossing zero (saddle-node, transcritical, pitchfork)
+    real_before = eigenvalues_before[np.abs(eigenvalues_before.imag) &lt; 1e-10]
+    real_after = eigenvalues_after[np.abs(eigenvalues_after.imag) &lt; 1e-10]
+
+    # Sort by real part
+    real_before_sorted = np.sort(real_before.real)
+    real_after_sorted = np.sort(real_after.real)
+
+    # Check for sign change in real eigenvalue
+    for i, (rb, ra) in enumerate(zip(real_before_sorted, real_after_sorted)):
+        if rb * ra &lt; 0:
+            return "Saddle-node, transcritical, or pitchfork (real eigenvalue crossing)"
+
+    # Check for complex pair crossing imaginary axis (Hopf)
+    complex_before = eigenvalues_before[np.abs(eigenvalues_before.imag) &gt; 1e-10]
+    complex_after = eigenvalues_after[np.abs(eigenvalues_after.imag) &gt; 1e-10]
+
+    if len(complex_before) &gt;= 2 and len(complex_after) &gt;= 2:
+        # Find conjugate pairs and check real part sign change
+        max_real_before = np.max(complex_before.real)
+        max_real_after = np.max(complex_after.real)
+
+        if max_real_before * max_real_after &lt; 0:
+            return "Hopf bifurcation (complex pair crossing imaginary axis)"
+
+    return "No bifurcation detected or classification uncertain"
+
+# Example: FHN model eigenvalues
+# Before Hopf (stable FP): eigenvalues have negative real parts
+# After Hopf (unstable FP): eigenvalues have positive real parts
+
+eig_before = np.array([-0.05 + 0.5j, -0.05 - 0.5j])  # Stable spiral
+eig_after = np.array([0.05 + 0.5j, 0.05 - 0.5j])      # Unstable spiral
+
+print(classify_bifurcation(eig_before, eig_after))
+# Output: Hopf bifurcation (complex pair crossing imaginary axis)
+</Code>
+
+  <FillBlanks id="q6">
+    <Prompt>In a Hopf bifurcation, a pair of <Blank>complex conjugate</Blank> eigenvalues crosses the <Blank>imaginary axis</Blank>. The <Blank>real</Blank> part of these eigenvalues changes sign, while the <Blank>imaginary</Blank> part determines the frequency of the emerging oscillation.</Prompt>
+    <Distractors>
+      <Distractor>purely real</Distractor>
+      <Distractor>real axis</Distractor>
+      <Distractor>magnitude</Distractor>
+      <Distractor>phase</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Practical Application: Classifying Neuron Types</H2>
+
+  <Body>The bifurcation structure at firing onset provides a principled way to classify neurons into computational types. This classification has functional significance for neural coding.</Body>
+
+  <Body>Type I neurons (SNIC onset) act as INTEGRATORS: they sum inputs over time and fire when the integral exceeds threshold. They show no frequency preference and can represent graded information through firing rate. Examples include many cortical pyramidal neurons.</Body>
+
+  <Body>Type II neurons (Hopf onset) act as RESONATORS: they respond preferentially to inputs at their characteristic frequency and show bandpass filtering properties. They are better suited for temporal coding and tend to synchronize more readily. Examples include fast-spiking interneurons.</Body>
+
+  <Code lang="python">
+# Comparing Type I and Type II responses to oscillatory input
+
+import numpy as np
+from scipy.integrate import odeint
+from scipy.signal import find_peaks
+
+def type_I_model(state, t, I_dc, I_ac, freq):
+    """Quadratic IF (Type I) with oscillatory input."""
+    v = state[0]
+    I = I_dc + I_ac * np.sin(2 * np.pi * freq * t)
+    dvdt = v**2 + I  # Theta neuron near SNIC
+    return [dvdt]
+
+def type_II_model(state, t, I_dc, I_ac, freq):
+    """FHN-like (Type II) with oscillatory input."""
+    v, w = state
+    I = I_dc + I_ac * np.sin(2 * np.pi * freq * t)
+
+    # Parameters tuned for Type II behavior
+    dvdt = v - v**3/3 - w + I
+    dwdt = 0.08 * (v + 0.7 - 0.8*w)
+    return [dvdt, dwdt]
+
+def count_spikes(solution, V_threshold=0):
+    """Count threshold crossings."""
+    V = solution[:, 0] if solution.ndim &gt; 1 else solution
+    crossings = np.diff(V &gt; V_threshold).astype(int)
+    return np.sum(crossings == 1)
+
+# Frequency response comparison
+freqs = np.logspace(-1, 2, 30)  # 0.1 to 100 Hz
+T = 1000  # ms
+dt = 0.1
+
+type_I_response = []
+type_II_response = []
+
+for freq in freqs:
+    t = np.arange(0, T, dt)
+
+    # Type I response
+    # (simplified - actual implementation would handle resets)
+
+    # Type II response
+    sol_II = odeint(type_II_model, [-1, -0.5], t, args=(0.4, 0.3, freq/1000))
+    type_II_response.append(count_spikes(sol_II))
+
+# Type II shows resonance peak; Type I shows broadband response
+</Code>
+
+  <SingleSelect id="q7">
+    <Prompt>A researcher records from a neuron and observes: (1) the f-I curve is continuous starting from zero frequency, (2) there are no subthreshold oscillations, and (3) the neuron responds equally well to inputs at different frequencies. This neuron is most likely:</Prompt>
+    <Options>
+      <Option correct="true">A Type I integrator with SNIC bifurcation at firing onset</Option>
+      <Option>A Type II resonator with Hopf bifurcation at firing onset</Option>
+      <Option>A mixed-mode oscillator with complex bifurcation structure</Option>
+      <Option>A bursting neuron with homoclinic bifurcation</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Summary and Key Takeaways</H2>
+
+  <Body>Bifurcation theory provides a rigorous mathematical framework for understanding qualitative transitions in neuronal dynamics. The key bifurcations for neuronal excitability are:</Body>
+
+  <Body>1. SADDLE-NODE BIFURCATION: Creation/annihilation of fixed points. Relevant for threshold phenomena.</Body>
+
+  <Body>2. HOPF BIFURCATION: Birth of limit cycle from fixed point. Defines Type II excitability with minimum firing frequency and resonance properties.</Body>
+
+  <Body>3. SNIC BIFURCATION: Saddle-node on invariant circle. Defines Type I excitability with continuous f-I curve and integrator properties.</Body>
+
+  <Body>4. SUBCRITICAL vs. SUPERCRITICAL: Determines whether transitions are smooth or exhibit hysteresis.</Body>
+
+  <Body>Continuation methods enable numerical bifurcation analysis of complex models like Hodgkin-Huxley, producing bifurcation diagrams that reveal the complete parameter-dependent structure of neuronal dynamics. Understanding this structure is essential for predicting how neurons respond to changing conditions and for designing neural circuits with desired computational properties.</Body>
+
+  <Subjective id="q8">
+    <Prompt>Explain why understanding the bifurcation structure at firing onset is important for predicting a neuron's computational properties. In your answer, compare how Type I (SNIC) and Type II (Hopf) neurons would respond differently to the same time-varying input signal, and discuss the implications for neural coding.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly identifies that bifurcation type determines excitability class (Type I vs Type II)</Requirement>
+        <Indicators>bifurcation, excitability, Type I, Type II, SNIC, Hopf, firing onset</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Accurately describes the different responses: Type I as integrator (broadband), Type II as resonator (frequency-selective)</Requirement>
+        <Indicators>integrator, resonator, broadband, frequency, selective, filter, response</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses f-I curve differences: continuous from zero (Type I) vs discontinuous with minimum frequency (Type II)</Requirement>
+        <Indicators>f-I curve, continuous, discontinuous, minimum frequency, zero, firing rate</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains implications for neural coding: rate coding advantage for Type I, temporal coding and synchronization for Type II</Requirement>
+        <Indicators>rate coding, temporal coding, synchronization, dynamic range, precision</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+  <FlashCard id="fc8">
+    <Front>What software packages are commonly used for numerical bifurcation analysis?</Front>
+    <Back>AUTO (Fortran-based, industry standard), MATCONT (MATLAB toolbox), PyDSTool (Python), and XPPAUT (XPP with AUTO interface). These implement continuation methods to track equilibria, limit cycles, and detect bifurcations automatically.</Back>
+  </FlashCard>
+
+</Lesson>

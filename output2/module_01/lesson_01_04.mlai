@@ -1,0 +1,597 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-04</Id>
+    <Title>FitzHugh-Nagumo Model: Reduced Excitable Dynamics</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>dynamical-systems</Tag>
+      <Tag>FitzHugh-Nagumo</Tag>
+      <Tag>excitability</Tag>
+      <Tag>nullclines</Tag>
+      <Tag>bifurcation</Tag>
+      <Tag>phase-plane</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>FitzHugh-Nagumo Model: Reduced Excitable Dynamics</H1>
+
+  <Body>The four-dimensional Hodgkin-Huxley model captures the biophysical mechanisms of action potential generation with remarkable fidelity, but its complexity can obscure the fundamental geometric principles underlying neuronal excitability. In this lesson, we explore the FitzHugh-Nagumo (FHN) model, a two-dimensional reduction that preserves the essential qualitative features of excitability while enabling powerful phase plane analysis techniques.</Body>
+
+  <Body>Richard FitzHugh (1961) and Jin-ichi Nagumo (1962) independently developed this reduced model, recognizing that the four HH variables could be collapsed based on timescale separation. The resulting two-variable system reveals the geometric structure of threshold behavior, recovery dynamics, and the transition between excitable and oscillatory regimes through nullcline analysis.</Body>
+
+  <FlashCard id="fc-fhn-definition">
+    <Front>What is the FitzHugh-Nagumo model?</Front>
+    <Back>A two-dimensional reduction of the Hodgkin-Huxley model that preserves essential excitability features. It consists of a fast voltage-like variable v and a slow recovery variable w, enabling phase plane analysis of neuronal dynamics.</Back>
+  </FlashCard>
+
+  <H2>Connection to Hodgkin-Huxley: Dimensional Reduction</H2>
+
+  <Body>Recall from the previous lesson that the Hodgkin-Huxley model involves four dynamical variables: the membrane voltage V, sodium activation m, sodium inactivation h, and potassium activation n. The key insight enabling reduction is timescale separation.</Body>
+
+  <Body>The sodium activation variable m responds very rapidly to voltage changes, equilibrating almost instantaneously compared to other variables. This allows us to replace m with its steady-state value m_infinity(V). Furthermore, h and n evolve on similar timescales and are approximately linearly related during the action potential. These observations suggest we can capture the essential dynamics with just two variables: one fast (voltage-like) and one slow (recovery).</Body>
+
+  <H2>The FitzHugh-Nagumo Equations</H2>
+
+  <Body>The FitzHugh-Nagumo model is defined by the following coupled ordinary differential equations:</Body>
+
+  <Code lang="plaintext">
+dv/dt = K[-v(v - alpha)(v - 1) - w] + I
+
+dw/dt = b(v - c*w)
+  </Code>
+
+  <Body>Here v represents the membrane voltage (fast variable), w represents recovery (slow variable), I is the applied current, and K, alpha, b, and c are parameters controlling the dynamics. The parameter K scales the timescale of voltage dynamics, alpha determines the threshold, b controls the timescale separation between v and w, and c affects the slope of the w-nullcline.</Body>
+
+  <Body>A common alternative parameterization uses epsilon = b for the small timescale parameter:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def fhn_system(state, t, I_ext, K=1.0, alpha=0.1, b=0.01, c=0.5):
+    """
+    FitzHugh-Nagumo model equations.
+
+    Parameters:
+    -----------
+    state : array [v, w]
+        Current state (voltage, recovery)
+    t : float
+        Time (for time-varying input)
+    I_ext : float
+        External applied current
+    K : float
+        Voltage timescale parameter
+    alpha : float
+        Threshold parameter (0 &lt; alpha &lt; 1)
+    b : float
+        Recovery timescale (small for timescale separation)
+    c : float
+        w-nullcline slope parameter
+
+    Returns:
+    --------
+    array : [dv/dt, dw/dt]
+    """
+    v, w = state
+
+    # Cubic nonlinearity for voltage dynamics
+    dv_dt = K * (-v * (v - alpha) * (v - 1) - w) + I_ext
+
+    # Linear recovery dynamics
+    dw_dt = b * (v - c * w)
+
+    return np.array([dv_dt, dw_dt])
+  </Code>
+
+  <FlashCard id="fc-variables">
+    <Front>What do the variables v and w represent in the FitzHugh-Nagumo model?</Front>
+    <Back>v represents the membrane voltage (fast variable, analogous to V in HH). w represents the recovery variable (slow variable, combining the effects of sodium inactivation h and potassium activation n from HH).</Back>
+  </FlashCard>
+
+  <SingleSelect id="q-fhn-reduction">
+    <Prompt>Why can the 4D Hodgkin-Huxley model be reduced to the 2D FitzHugh-Nagumo model?</Prompt>
+    <Options>
+      <Option correct="true">The sodium activation variable m equilibrates almost instantaneously, and the h and n variables evolve on similar timescales with approximate linear relationship</Option>
+      <Option>The sodium and potassium currents cancel out, leaving only the leak current</Option>
+      <Option>The voltage variable can be eliminated by assuming it tracks the equilibrium potential</Option>
+      <Option>The gating variables m, h, and n are all linearly dependent on each other</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Nullcline Analysis: The Geometric Foundation</H2>
+
+  <Body>The power of the FitzHugh-Nagumo model lies in its amenability to phase plane analysis. The nullclines are curves in the (v, w) plane where one variable has zero rate of change.</Body>
+
+  <Body>The v-nullcline is found by setting dv/dt = 0:</Body>
+
+  <Code lang="plaintext">
+K[-v(v - alpha)(v - 1) - w] + I = 0
+
+Solving for w:
+w = -v(v - alpha)(v - 1) + I/K
+  </Code>
+
+  <Body>This is a CUBIC function of v, with the characteristic N-shape that is crucial for excitability. The cubic has local minimum and maximum, creating the possibility for threshold behavior.</Body>
+
+  <Body>The w-nullcline is found by setting dw/dt = 0:</Body>
+
+  <Code lang="plaintext">
+b(v - c*w) = 0
+
+Solving for w:
+w = v/c
+  </Code>
+
+  <Body>This is a simple LINEAR function passing through the origin with slope 1/c.</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_nullclines(I_ext=0.0, K=1.0, alpha=0.1, c=0.5, v_range=(-0.5, 1.5)):
+    """
+    Plot the nullclines of the FitzHugh-Nagumo model.
+    """
+    v = np.linspace(v_range[0], v_range[1], 500)
+
+    # v-nullcline: w = -v(v - alpha)(v - 1) + I/K
+    w_v_nullcline = -v * (v - alpha) * (v - 1) + I_ext / K
+
+    # w-nullcline: w = v/c
+    w_w_nullcline = v / c
+
+    plt.figure(figsize=(10, 8))
+    plt.plot(v, w_v_nullcline, 'b-', linewidth=2, label='v-nullcline (dv/dt=0)')
+    plt.plot(v, w_w_nullcline, 'r-', linewidth=2, label='w-nullcline (dw/dt=0)')
+
+    # Find intersection (fixed point)
+    # At intersection: v/c = -v(v - alpha)(v - 1) + I/K
+
+    plt.xlabel('v (voltage)', fontsize=12)
+    plt.ylabel('w (recovery)', fontsize=12)
+    plt.title(f'FitzHugh-Nagumo Nullclines (I = {I_ext})', fontsize=14)
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3)
+    plt.axhline(y=0, color='k', linestyle='-', linewidth=0.5)
+    plt.axvline(x=0, color='k', linestyle='-', linewidth=0.5)
+
+    return plt.gcf()
+  </Code>
+
+  <FlashCard id="fc-nullclines">
+    <Front>What are nullclines and why are they important in phase plane analysis?</Front>
+    <Back>Nullclines are curves where one variable has zero rate of change (dv/dt = 0 or dw/dt = 0). They are important because: (1) fixed points occur at nullcline intersections, (2) they divide the phase plane into regions with predictable flow directions, and (3) their shape reveals qualitative system behavior.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc-cubic-shape">
+    <Front>Why is the cubic N-shape of the v-nullcline crucial for excitability?</Front>
+    <Back>The N-shape creates a region where small perturbations return to equilibrium while large perturbations trigger excursions around the nullcline. The middle branch with negative slope is unstable, creating a threshold that separates subthreshold from suprathreshold responses.</Back>
+  </FlashCard>
+
+  <MatchPairs id="q-nullcline-shapes">
+    <Prompt>Match each nullcline with its mathematical form and geometric shape:</Prompt>
+    <Pairs>
+      <Pair><Left>v-nullcline (dv/dt = 0)</Left><Right>Cubic N-shaped curve</Right></Pair>
+      <Pair><Left>w-nullcline (dw/dt = 0)</Left><Right>Linear through origin</Right></Pair>
+      <Pair><Left>Fixed point location</Left><Right>Intersection of nullclines</Right></Pair>
+      <Pair><Left>Flow direction on v-nullcline</Left><Right>Purely vertical</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Sinusoidal wave</Distractor>
+      <Distractor>Exponential decay curve</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Fixed Point Analysis and Stability</H2>
+
+  <Body>Fixed points (equilibria) of the FitzHugh-Nagumo system occur where both nullclines intersect, i.e., where dv/dt = 0 and dw/dt = 0 simultaneously. The stability of these fixed points is determined by linearizing the system and computing eigenvalues of the Jacobian matrix.</Body>
+
+  <Body>The Jacobian matrix for the FHN system is:</Body>
+
+  <Code lang="plaintext">
+J = | df/dv   df/dw |   =   | K[-3v^2 + 2(1+alpha)v - alpha]    -K |
+    | dg/dv   dg/dw |       |              b                  -bc |
+
+where f(v,w) = dv/dt and g(v,w) = dw/dt
+  </Code>
+
+  <Body>At a fixed point (v*, w*), the eigenvalues lambda satisfy:</Body>
+
+  <Code lang="plaintext">
+det(J - lambda*I) = 0
+
+lambda^2 - (trace J)*lambda + (det J) = 0
+
+trace J = K[-3v*^2 + 2(1+alpha)v* - alpha] - bc
+det J = -bcK[-3v*^2 + 2(1+alpha)v* - alpha] + bK
+  </Code>
+
+  <Code lang="python">
+import numpy as np
+
+def compute_jacobian_fhn(v, w, K=1.0, alpha=0.1, b=0.01, c=0.5):
+    """
+    Compute the Jacobian matrix at a point (v, w).
+    """
+    # Partial derivatives
+    df_dv = K * (-3*v**2 + 2*(1 + alpha)*v - alpha)
+    df_dw = -K
+    dg_dv = b
+    dg_dw = -b * c
+
+    J = np.array([[df_dv, df_dw],
+                  [dg_dv, dg_dw]])
+    return J
+
+def analyze_stability(v_star, w_star, K=1.0, alpha=0.1, b=0.01, c=0.5):
+    """
+    Analyze stability of fixed point via eigenvalue analysis.
+    """
+    J = compute_jacobian_fhn(v_star, w_star, K, alpha, b, c)
+
+    eigenvalues = np.linalg.eigvals(J)
+
+    trace_J = np.trace(J)
+    det_J = np.linalg.det(J)
+
+    print(f"Jacobian at (v*, w*) = ({v_star:.4f}, {w_star:.4f}):")
+    print(f"  Trace = {trace_J:.4f}")
+    print(f"  Determinant = {det_J:.4f}")
+    print(f"  Eigenvalues: {eigenvalues}")
+
+    # Classify stability
+    if det_J &lt; 0:
+        return "Saddle point (unstable)"
+    elif trace_J &lt; 0:
+        if trace_J**2 - 4*det_J &gt;= 0:
+            return "Stable node"
+        else:
+            return "Stable spiral (focus)"
+    else:
+        if trace_J**2 - 4*det_J &gt;= 0:
+            return "Unstable node"
+        else:
+            return "Unstable spiral (focus)"
+  </Code>
+
+  <SingleSelect id="q-stability-criterion">
+    <Prompt>For a fixed point of a 2D system, which condition on the Jacobian eigenvalues indicates a stable spiral (damped oscillations)?</Prompt>
+    <Options>
+      <Option correct="true">Complex conjugate eigenvalues with negative real part</Option>
+      <Option>Real eigenvalues that are both negative</Option>
+      <Option>Complex conjugate eigenvalues with positive real part</Option>
+      <Option>One positive and one negative real eigenvalue</Option>
+    </Options>
+  </SingleSelect>
+
+  <FillBlanks id="q-jacobian-trace">
+    <Prompt>
+      For a 2D dynamical system, the fixed point is stable if the trace of the Jacobian is <Blank>negative</Blank> and the determinant is <Blank>positive</Blank>. When eigenvalues are complex conjugates, the system exhibits <Blank>oscillatory</Blank> behavior around the fixed point.
+    </Prompt>
+    <Distractors>
+      <Distractor>zero</Distractor>
+      <Distractor>monotonic</Distractor>
+      <Distractor>chaotic</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Excitability: The All-or-None Response</H2>
+
+  <Body>Excitability is the hallmark feature of neuronal dynamics: small perturbations decay back to rest, while perturbations exceeding a threshold trigger a large stereotyped response (the action potential) before returning to equilibrium. The FitzHugh-Nagumo model captures this beautifully through phase plane geometry.</Body>
+
+  <Body>In the excitable regime, the system has a single stable fixed point on the left branch of the cubic v-nullcline. Consider what happens when we apply a brief stimulus:</Body>
+
+  <Body>SUBTHRESHOLD STIMULUS: A small perturbation moves the state point slightly away from equilibrium. Because it remains in the basin of attraction of the fixed point, the trajectory returns directly without making a large excursion. This is the subthreshold response.</Body>
+
+  <Body>SUPRATHRESHOLD STIMULUS: A larger perturbation pushes the state point past the middle branch of the cubic. Now the trajectory must travel around the entire N-shaped nullcline before returning to rest. This large excursion corresponds to the action potential and is the suprathreshold (all-or-none) response.</Body>
+
+  <Code lang="python">
+from scipy.integrate import odeint
+import numpy as np
+
+def simulate_fhn_pulse(v0, w0, I_pulse, pulse_duration, t_total, dt=0.1,
+                       K=1.0, alpha=0.1, b=0.01, c=0.5):
+    """
+    Simulate FHN response to a brief current pulse.
+    """
+    t = np.arange(0, t_total, dt)
+
+    def fhn_with_pulse(state, t, I_pulse, pulse_duration):
+        v, w = state
+        # Apply current only during pulse
+        I_ext = I_pulse if t &lt; pulse_duration else 0.0
+        dv_dt = K * (-v * (v - alpha) * (v - 1) - w) + I_ext
+        dw_dt = b * (v - c * w)
+        return [dv_dt, dw_dt]
+
+    # Integrate
+    solution = odeint(fhn_with_pulse, [v0, w0], t, args=(I_pulse, pulse_duration))
+
+    return t, solution[:, 0], solution[:, 1]
+
+# Example: Compare subthreshold vs suprathreshold responses
+# Subthreshold: small pulse
+t_sub, v_sub, w_sub = simulate_fhn_pulse(0.0, 0.0, I_pulse=0.1, pulse_duration=1.0, t_total=100)
+
+# Suprathreshold: large pulse
+t_supra, v_supra, w_supra = simulate_fhn_pulse(0.0, 0.0, I_pulse=0.5, pulse_duration=1.0, t_total=100)
+  </Code>
+
+  <FlashCard id="fc-excitability">
+    <Front>What defines excitability in the FitzHugh-Nagumo model, and how does it relate to the phase plane?</Front>
+    <Back>Excitability is the all-or-none response property where subthreshold stimuli cause small returns to rest, while suprathreshold stimuli trigger large excursions. In phase plane terms, the N-shaped cubic nullcline creates a threshold: perturbations past the middle branch must travel around the entire nullcline before returning.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q-excitable-features">
+    <Prompt>Which features characterize an excitable system in the FitzHugh-Nagumo model? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Single stable fixed point at low voltage</Option>
+      <Option correct="true">All-or-none response to suprathreshold stimuli</Option>
+      <Option correct="true">Threshold separating qualitatively different responses</Option>
+      <Option>Continuous self-sustained oscillations</Option>
+      <Option correct="true">Return to resting state after perturbation</Option>
+      <Option>Multiple stable equilibria</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>The Recovery Variable and Timescale Separation</H2>
+
+  <Body>The parameter b (often written as epsilon in the literature) controls the timescale of the recovery variable w relative to the voltage v. When b is small (b much less than 1), there is strong timescale separation: v changes rapidly while w changes slowly.</Body>
+
+  <Body>This separation creates the characteristic features of the action potential:</Body>
+
+  <Body>1. RAPID DEPOLARIZATION: When perturbed past threshold, v quickly jumps to the right branch of the cubic (fast dynamics along quasi-horizontal trajectory)</Body>
+
+  <Body>2. SLOW RECOVERY: The system then drifts slowly upward along the right branch as w increases (slow dynamics along the nullcline)</Body>
+
+  <Body>3. RAPID REPOLARIZATION: When w reaches the local maximum of the cubic, v rapidly returns to the left branch</Body>
+
+  <Body>4. SLOW RETURN: The system drifts slowly back to the fixed point as w decreases</Body>
+
+  <Body>The recovery variable w can be understood as combining the effects of sodium channel inactivation (h in HH) and potassium channel activation (n in HH). During depolarization, w increases, representing both the inactivation of sodium channels and the activation of potassium channels that together terminate the action potential.</Body>
+
+  <SortQuiz id="q-ap-phases">
+    <Prompt>Order the phases of an action potential in the FitzHugh-Nagumo model from first to last:</Prompt>
+    <SortedItems>
+      <Item>Suprathreshold perturbation pushes v past threshold</Item>
+      <Item>Rapid depolarization: v jumps to right branch (fast)</Item>
+      <Item>Slow drift upward as w increases along right branch</Item>
+      <Item>Rapid repolarization: v returns to left branch (fast)</Item>
+      <Item>Slow return to fixed point as w decreases</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Hopf Bifurcation: From Excitability to Oscillations</H2>
+
+  <Body>One of the most important features of the FitzHugh-Nagumo model is its ability to transition between qualitatively different regimes as parameters change. The transition from excitable to oscillatory behavior occurs via a Hopf bifurcation.</Body>
+
+  <Body>Consider increasing the applied current I. As I increases:</Body>
+
+  <Body>1. The v-nullcline shifts upward (since w = -v(v-alpha)(v-1) + I/K)</Body>
+
+  <Body>2. The fixed point moves along the w-nullcline toward higher v values</Body>
+
+  <Body>3. At a critical current I_c, the fixed point crosses onto the middle (unstable) branch of the cubic</Body>
+
+  <Body>4. The eigenvalues of the Jacobian cross the imaginary axis with nonzero imaginary part</Body>
+
+  <Body>5. A stable limit cycle is born: the system now oscillates spontaneously</Body>
+
+  <Code lang="python">
+def hopf_bifurcation_analysis(I_range, K=1.0, alpha=0.1, b=0.01, c=0.5):
+    """
+    Analyze how stability changes with applied current I.
+    Track fixed point location and eigenvalues.
+    """
+    results = []
+
+    for I_ext in I_range:
+        # Find fixed point numerically
+        # At fixed point: v/c = -v(v-alpha)(v-1) + I/K
+        # Solve: v/c + v(v-alpha)(v-1) - I/K = 0
+
+        from scipy.optimize import fsolve
+
+        def fixed_point_equation(v):
+            return v/c + v*(v - alpha)*(v - 1) - I_ext/K
+
+        v_star = fsolve(fixed_point_equation, 0.0)[0]
+        w_star = v_star / c
+
+        # Compute Jacobian eigenvalues
+        J = compute_jacobian_fhn(v_star, w_star, K, alpha, b, c)
+        eigenvalues = np.linalg.eigvals(J)
+
+        results.append({
+            'I': I_ext,
+            'v_star': v_star,
+            'w_star': w_star,
+            'eigenvalues': eigenvalues,
+            'real_parts': [e.real for e in eigenvalues]
+        })
+
+    return results
+
+# Scan I from 0 to 0.5
+I_values = np.linspace(0, 0.5, 100)
+bifurcation_data = hopf_bifurcation_analysis(I_values)
+
+# Find critical I where real part crosses zero (Hopf bifurcation)
+  </Code>
+
+  <Body>The Hopf bifurcation in the FHN model is typically supercritical, meaning the limit cycle grows continuously from zero amplitude as I increases past I_c. This produces smooth onset of oscillations with frequency determined by the imaginary part of the eigenvalues at the bifurcation.</Body>
+
+  <FlashCard id="fc-hopf">
+    <Front>What is a Hopf bifurcation and how does it manifest in the FitzHugh-Nagumo model?</Front>
+    <Back>A Hopf bifurcation occurs when a fixed point changes stability as complex conjugate eigenvalues cross the imaginary axis. In FHN, increasing applied current I causes the fixed point to move onto the unstable middle branch of the cubic nullcline. At the critical current, the system transitions from excitable (stable fixed point) to oscillatory (stable limit cycle with spontaneous periodic firing).</Back>
+  </FlashCard>
+
+  <SingleSelect id="q-hopf-eigenvalues">
+    <Prompt>At a supercritical Hopf bifurcation, what happens to the eigenvalues of the Jacobian?</Prompt>
+    <Options>
+      <Option correct="true">Complex conjugate eigenvalues cross from negative to positive real part</Option>
+      <Option>Two real eigenvalues collide and become complex</Option>
+      <Option>One real eigenvalue crosses zero</Option>
+      <Option>Complex eigenvalues become purely imaginary permanently</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Parameter Interpretation and Biological Relevance</H2>
+
+  <Body>While the FitzHugh-Nagumo model is phenomenological rather than biophysically derived, its parameters have clear interpretations relating to neuronal properties:</Body>
+
+  <Body>PARAMETER K: Scales the overall timescale of voltage dynamics. Larger K means faster voltage changes. Related to membrane capacitance and maximal conductances in HH.</Body>
+
+  <Body>PARAMETER alpha: Controls the threshold for excitation. Must satisfy 0 less than alpha less than 1 for proper cubic shape. Smaller alpha means lower threshold (more excitable).</Body>
+
+  <Body>PARAMETER b (or epsilon): Sets the timescale separation between v and w. Small b means w is much slower than v, producing sharper action potential transients.</Body>
+
+  <Body>PARAMETER c: Affects the slope of the w-nullcline and thus the position of the fixed point. Also influences the stability boundary.</Body>
+
+  <Body>PARAMETER I: Applied current, directly analogous to injected current in experiments. Controls the transition between excitable and oscillatory regimes.</Body>
+
+  <MatchPairs id="q-parameter-effects">
+    <Prompt>Match each FitzHugh-Nagumo parameter with its primary effect on system dynamics:</Prompt>
+    <Pairs>
+      <Pair><Left>Parameter alpha</Left><Right>Controls excitation threshold</Right></Pair>
+      <Pair><Left>Parameter b (epsilon)</Left><Right>Sets timescale separation between v and w</Right></Pair>
+      <Pair><Left>Parameter I</Left><Right>Shifts v-nullcline vertically</Right></Pair>
+      <Pair><Left>Parameter c</Left><Right>Determines w-nullcline slope</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Changes the number of fixed points</Distractor>
+      <Distractor>Introduces stochastic noise</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Comparison with Hodgkin-Huxley Model</H2>
+
+  <Body>The FitzHugh-Nagumo model successfully captures several key features of the full Hodgkin-Huxley model:</Body>
+
+  <Body>PRESERVED FEATURES:</Body>
+  <Body>- Excitability with threshold behavior</Body>
+  <Body>- All-or-none action potential response</Body>
+  <Body>- Refractory period (trajectory must complete cycle)</Body>
+  <Body>- Transition to repetitive firing with sufficient input</Body>
+  <Body>- Qualitative phase plane structure</Body>
+
+  <Body>LOST FEATURES:</Body>
+  <Body>- Quantitative waveform accuracy (no sharp spike)</Body>
+  <Body>- Distinct sodium and potassium current timecourses</Body>
+  <Body>- Separation of absolute and relative refractory periods</Body>
+  <Body>- Accommodation and other higher-order effects</Body>
+  <Body>- Direct connection to ionic conductances</Body>
+
+  <Code lang="python">
+# Qualitative comparison: FHN produces smooth bump, HH produces sharp spike
+
+def compare_fhn_hh_waveforms():
+    """
+    Compare action potential waveforms (qualitative).
+
+    FHN: Smooth depolarization and repolarization
+    HH: Sharp spike with distinct ionic current phases
+
+    Both show:
+    - Threshold behavior
+    - Return to rest
+    - Refractory period
+    """
+    # FHN simulation
+    t_fhn, v_fhn, w_fhn = simulate_fhn_pulse(
+        v0=0.0, w0=0.0,
+        I_pulse=0.5,
+        pulse_duration=1.0,
+        t_total=100
+    )
+
+    # The FHN action potential is broader and smoother than HH
+    # but preserves the essential excitability dynamics
+
+    return t_fhn, v_fhn
+  </Code>
+
+  <MultiSelect id="q-fhn-preserves">
+    <Prompt>Which features of the Hodgkin-Huxley model are preserved in the FitzHugh-Nagumo reduction? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Excitability with threshold behavior</Option>
+      <Option correct="true">All-or-none action potential response</Option>
+      <Option>Quantitatively accurate spike waveform</Option>
+      <Option correct="true">Transition to oscillatory firing with increased input</Option>
+      <Option>Distinct sodium and potassium current timecourses</Option>
+      <Option correct="true">Refractory period following excitation</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Practical Applications and Extensions</H2>
+
+  <Body>The FitzHugh-Nagumo model, despite its simplicity, has found wide application:</Body>
+
+  <Body>1. THEORETICAL NEUROSCIENCE: Understanding fundamental principles of excitability, threshold, and bifurcations without computational complexity</Body>
+
+  <Body>2. CARDIAC MODELING: The FHN model applies to cardiac myocytes, which share excitability properties with neurons. Extended versions model cardiac arrhythmias.</Body>
+
+  <Body>3. PATTERN FORMATION: Spatially extended FHN systems (with diffusion) produce traveling waves and spiral patterns relevant to cortical dynamics and cardiac fibrillation.</Body>
+
+  <Body>4. NETWORK DYNAMICS: The computational simplicity allows simulation of large networks where full HH models would be prohibitive.</Body>
+
+  <Body>5. PEDAGOGICAL TOOL: The 2D structure enables complete geometric visualization of concepts that are harder to grasp in higher dimensions.</Body>
+
+  <H2>Common Misconceptions</H2>
+
+  <Body>When working with the FitzHugh-Nagumo model and phase plane analysis, students often encounter these pitfalls:</Body>
+
+  <Body>MISCONCEPTION 1: Confusing nullclines with trajectories. Nullclines show where rate of change is zero for ONE variable. Trajectories are actual paths the system follows and generally cross nullclines (except at fixed points).</Body>
+
+  <Body>MISCONCEPTION 2: Assuming fixed point stability without eigenvalue analysis. The position of the fixed point relative to nullcline branches suggests but does not prove stability. Eigenvalues must be computed.</Body>
+
+  <Body>MISCONCEPTION 3: Neglecting timescale separation. The dynamics critically depend on b being small. Without timescale separation, the clean separation of fast and slow phases breaks down.</Body>
+
+  <Body>MISCONCEPTION 4: Misinterpreting w as purely inhibitory. While w does slow and eventually reverse depolarization, it is better understood as a recovery variable representing slow adaptation processes.</Body>
+
+  <Subjective id="q-subjective-nullcline">
+    <Prompt>Explain why the FitzHugh-Nagumo model exhibits all-or-none excitability. In your answer, describe the role of the cubic v-nullcline shape, the concept of threshold, and how the phase plane geometry determines whether a stimulus produces a large excursion or a small return to rest.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Explains the N-shape of the cubic v-nullcline and its role in creating threshold behavior</Requirement>
+        <Indicators>cubic, N-shape, middle branch, unstable, threshold, separatrix</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes how small perturbations return directly to the fixed point while large perturbations must travel around the nullcline</Requirement>
+        <Indicators>subthreshold, suprathreshold, excursion, return, trajectory, all-or-none</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions the role of the fixed point location on the stable left branch of the cubic</Requirement>
+        <Indicators>fixed point, stable, left branch, equilibrium, intersection</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>References timescale separation or the slow-fast dynamics that create sharp transitions</Requirement>
+        <Indicators>timescale, slow, fast, separation, epsilon, recovery</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="75" maxWords="300" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>The FitzHugh-Nagumo model demonstrates that the essential features of neuronal excitability can be captured with remarkable economy. By reducing the four-dimensional Hodgkin-Huxley system to two variables through timescale separation arguments, we gain access to powerful phase plane techniques.</Body>
+
+  <Body>Key takeaways from this lesson:</Body>
+
+  <Body>1. The FHN model consists of a fast voltage-like variable v with cubic nonlinearity and a slow recovery variable w with linear dynamics.</Body>
+
+  <Body>2. Nullclines (where dv/dt=0 and dw/dt=0) organize the phase plane, with fixed points at their intersections.</Body>
+
+  <Body>3. The cubic N-shape of the v-nullcline creates threshold behavior: perturbations past the middle branch trigger large excursions.</Body>
+
+  <Body>4. Fixed point stability is determined by Jacobian eigenvalues, with complex eigenvalues indicating spiral behavior.</Body>
+
+  <Body>5. Hopf bifurcation marks the transition from excitable (stable fixed point) to oscillatory (limit cycle) regimes as parameters change.</Body>
+
+  <Body>6. Despite simplification, FHN preserves the qualitative excitability, threshold, and bifurcation structure of the full Hodgkin-Huxley model.</Body>
+
+  <Body>In subsequent lessons, we will build on these phase plane techniques to analyze more complex bifurcation structures and apply stability analysis methods to understand when neuronal dynamics become chaotic or unpredictable.</Body>
+
+</Lesson>

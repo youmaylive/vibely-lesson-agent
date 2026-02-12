@@ -1,0 +1,433 @@
+{
+  "course_title": "Mathematical Foundations of Computational Neuroscience",
+  "course_description": "A rigorous, research-grade course covering dynamical systems theory, stochastic processes, information theory, and optimal control as applied to neuronal modeling and neural coding. Emphasizes mathematical derivations, computational implementations, and connections to experimental neuroscience.",
+  "target_audience": "Master's and PhD students in Biotechnology, Cognitive Science, or Bio-Engineering with strong foundations in biology, mathematics, and programming, preparing for research in computational neuroscience.",
+  "prerequisites": [
+    "Multivariable calculus and differential equations",
+    "Linear algebra and matrix theory",
+    "Probability theory and stochastic processes (introductory)",
+    "Programming proficiency (Python/MATLAB/Julia)",
+    "Basic neurobiology (action potentials, synapses, ion channels)",
+    "Ordinary differential equations and phase plane analysis"
+  ],
+  "learning_objectives": [
+    "Derive and analyze deterministic and stochastic neuron models from biophysical principles",
+    "Apply dynamical systems theory to characterize neuronal excitability, stability, and bifurcations",
+    "Implement and simulate point models, conductance-based models, and network models computationally",
+    "Quantify neural coding using information-theoretic measures including Shannon information, mutual information, and Fisher information",
+    "Formulate and solve optimal control problems for neuronal systems and motor control",
+    "Analyze synchronization phenomena in coupled neuronal oscillators using phase reduction techniques",
+    "Estimate model parameters from data using maximum likelihood and Bayesian methods",
+    "Connect mathematical frameworks to experimental data and neurobiological mechanisms"
+  ],
+  "modules": [
+    {
+      "module_id": "module_01",
+      "module_title": "Foundations of Neuronal Dynamics",
+      "module_description": "Introduction to dynamical systems theory and its application to single neuron modeling, covering deterministic point models and their mathematical analysis.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_01_01",
+          "lesson_title": "Dynamical Systems Framework for Neuroscience",
+          "key_insight": "Neuronal behavior can be precisely characterized as trajectories in state space, where understanding attractors and basins reveals how neurons respond to stimuli and return to rest.",
+          "learning_objectives": [
+            "Define dynamical systems in the context of neuronal modeling",
+            "Distinguish between deterministic and stochastic dynamical systems",
+            "Identify fixed point attractors and their attractive basins in neuronal models",
+            "Relate mathematical concepts to biological phenomena (resting potential, firing patterns)"
+          ],
+          "warmup_callback": null,
+          "content_outline": [
+            "Mathematical definition of dynamical systems: dx/dt = f(x, t)",
+            "State space representation and trajectories",
+            "Deterministic vs. stochastic systems: when noise matters",
+            "Attractors: fixed points, limit cycles, and strange attractors",
+            "Attractive basins and initial condition sensitivity",
+            "Biological interpretation: resting potential as fixed point attractor",
+            "Phase portraits and geometric analysis"
+          ],
+          "key_concepts": [
+            "State space",
+            "Trajectory",
+            "Attractor",
+            "Fixed point",
+            "Attractive basin",
+            "Deterministic vs. stochastic dynamics"
+          ],
+          "practical_examples": [
+            "1D linear system: dV/dt = -(V - V_rest)/τ with analytical solution",
+            "Geometric analysis of resting potential as stable fixed point",
+            "Numerical simulation of trajectories from different initial conditions",
+            "Phase portrait construction for 2D neuronal models"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive equilibrium points analytically, classify stability, and simulate trajectories converging to attractors",
+            "success_indicators": [
+              "Correctly identifies fixed points from differential equations",
+              "Sketches accurate phase portraits showing flow directions",
+              "Explains biological meaning of attractors in neuronal context",
+              "Implements numerical integration to verify analytical predictions"
+            ],
+            "common_misconceptions": [
+              "Confusing equilibrium points with attractors (not all equilibria are attracting)",
+              "Assuming all neuronal models have unique attractors",
+              "Neglecting the role of initial conditions in determining long-term behavior"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_01_02",
+          "lesson_title": "Integrate-and-Fire Models: Minimal Neuronal Dynamics",
+          "key_insight": "The integrate-and-fire model captures essential neuronal excitability with minimal mathematical complexity, revealing how threshold dynamics and reset mechanisms generate discrete spiking from continuous input integration.",
+          "learning_objectives": [
+            "Derive the integrate-and-fire model from RC circuit principles",
+            "Analyze the role of threshold and reset in generating action potentials",
+            "Compute firing rates analytically for constant and time-varying inputs",
+            "Implement IF models computationally and validate against analytical solutions"
+          ],
+          "warmup_callback": "Recall fixed point attractors from lesson_01_01; IF model combines continuous dynamics with discrete reset",
+          "content_outline": [
+            "RC circuit analogy: C dV/dt = -g_L(V - V_rest) + I",
+            "Dimensionless form: dV/dt = (V - V_rest)/γ + I/γ",
+            "Threshold condition V ≥ V_thre triggers spike and reset",
+            "Analytical solution for constant input: V(t) = V_rest + (I/g_L)(1 - exp(-t/τ))",
+            "Firing rate calculation: f = 1/T where T is interspike interval",
+            "Time-varying inputs and numerical integration requirements",
+            "Limitations: no action potential shape, no refractoriness"
+          ],
+          "key_concepts": [
+            "Membrane time constant τ = C/g_L",
+            "Threshold potential V_thre",
+            "Reset mechanism",
+            "Interspike interval",
+            "Firing rate",
+            "Subthreshold integration"
+          ],
+          "practical_examples": [
+            "Analytical derivation of firing rate for constant suprathreshold input",
+            "Numerical simulation with Euler method: threshold detection and reset implementation",
+            "Response to step current: latency to first spike",
+            "Frequency-current (f-I) curve construction and interpretation"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should derive firing rates analytically, implement IF model with proper threshold handling, and generate f-I curves matching theoretical predictions",
+            "success_indicators": [
+              "Correctly derives time to threshold for constant input",
+              "Implements reset mechanism without numerical artifacts",
+              "Generates f-I curves showing linear regime and saturation",
+              "Explains biological significance of threshold and reset"
+            ],
+            "common_misconceptions": [
+              "Treating threshold crossing as continuous rather than discrete event",
+              "Forgetting to reset after spike detection in simulations",
+              "Assuming linear f-I relationship holds for all input ranges"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_01_03",
+          "lesson_title": "Hodgkin-Huxley Model: Biophysical Foundation",
+          "key_insight": "The Hodgkin-Huxley equations reveal how voltage-gated ion channels generate action potentials through a precise orchestration of sodium activation, sodium inactivation, and potassium activation—a mechanistic understanding that grounds all modern neuronal modeling.",
+          "learning_objectives": [
+            "Derive the HH equations from ionic current principles and gating kinetics",
+            "Analyze the roles of m, h, n gating variables in action potential generation",
+            "Implement the HH model numerically using appropriate integration methods",
+            "Characterize action potential waveform features (threshold, peak, undershoot, duration)"
+          ],
+          "warmup_callback": "IF model (lesson_01_02) abstracts threshold; HH model mechanistically explains threshold through channel dynamics",
+          "content_outline": [
+            "Ionic current formulation: I_ion = g_ion * (V - E_ion)",
+            "Full HH equation: C dV/dt = -g_Na m³h(V - V_Na) - g_K n⁴(V - V_K) - g_L(V - V_L) + I",
+            "Gating variable kinetics: dn/dt = α_n(V)(1 - n) - β_n(V)n",
+            "Voltage-dependent rate functions α(V) and β(V): empirical fits",
+            "Sodium channel: fast activation (m³), slower inactivation (h)",
+            "Potassium channel: delayed activation (n⁴)",
+            "Action potential phases: depolarization, repolarization, hyperpolarization",
+            "Numerical integration: stiff ODE considerations, adaptive timesteps"
+          ],
+          "key_concepts": [
+            "Voltage-gated channels",
+            "Gating variables (m, h, n)",
+            "Activation and inactivation",
+            "Reversal potentials (E_Na, E_K, E_L)",
+            "Conductances (g_Na, g_K, g_L)",
+            "Action potential waveform"
+          ],
+          "practical_examples": [
+            "Numerical simulation of single action potential with current pulse",
+            "Gating variable trajectories during action potential",
+            "Ionic current decomposition: I_Na, I_K, I_L contributions",
+            "Refractory period demonstration: response to paired pulses",
+            "Parameter sensitivity analysis: effect of g_Na, g_K on waveform"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should implement HH model producing physiological action potentials, decompose ionic currents, and explain each gating variable's role",
+            "success_indicators": [
+              "Generates action potentials with correct amplitude (~100 mV) and duration (~1 ms)",
+              "Plots gating variables showing proper activation/inactivation sequences",
+              "Explains threshold as balance between I_Na and I_K",
+              "Demonstrates absolute and relative refractory periods"
+            ],
+            "common_misconceptions": [
+              "Confusing activation (m, n) with inactivation (h)",
+              "Assuming gating variables respond instantaneously to voltage changes",
+              "Neglecting the importance of leak current in setting resting potential",
+              "Using inappropriate numerical methods for stiff HH equations"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_01_04",
+          "lesson_title": "FitzHugh-Nagumo Model: Reduced Excitable Dynamics",
+          "key_insight": "The FitzHugh-Nagumo reduction distills the essential excitability of the Hodgkin-Huxley model into two dimensions, revealing the geometric structure of threshold, excitability, and oscillations through nullcline analysis.",
+          "learning_objectives": [
+            "Derive the FHN model as a reduction of HH dynamics",
+            "Perform nullcline analysis to understand excitability and oscillations",
+            "Classify fixed points and determine stability via linearization",
+            "Relate FHN parameters to biological timescales and excitability properties"
+          ],
+          "warmup_callback": "HH model (lesson_01_03) has 4 dimensions; FHN reduces to 2D while preserving excitability",
+          "content_outline": [
+            "FHN equations: dv/dt = K[-v(v - α)(v - 1) - w] + I, dw/dt = b(v - cw)",
+            "Variable interpretation: v ~ voltage, w ~ recovery (combines h, n)",
+            "Nullcline analysis: dv/dt = 0 (cubic), dw/dt = 0 (linear)",
+            "Fixed point location: intersection of nullclines",
+            "Linearization and stability: Jacobian eigenvalues",
+            "Excitability: large response to suprathreshold, small response to subthreshold",
+            "Hopf bifurcation: transition from excitable to oscillatory regime",
+            "Geometric interpretation: phase plane trajectories"
+          ],
+          "key_concepts": [
+            "Nullclines",
+            "Fixed point stability",
+            "Excitability vs. oscillations",
+            "Recovery variable",
+            "Hopf bifurcation",
+            "Phase plane analysis"
+          ],
+          "practical_examples": [
+            "Nullcline plotting and fixed point identification",
+            "Trajectory simulation showing excitable response to brief pulse",
+            "Parameter variation: transition from excitable to oscillatory (vary I or b)",
+            "Comparison with HH model: matching action potential features",
+            "Linearization at fixed point: eigenvalue calculation for stability"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should construct nullclines, classify fixed points, and demonstrate excitability vs. oscillatory regimes through parameter variation",
+            "success_indicators": [
+              "Accurately plots cubic v-nullcline and linear w-nullcline",
+              "Identifies fixed point and determines stability from eigenvalues",
+              "Demonstrates all-or-none response characteristic of excitability",
+              "Shows transition to limit cycle oscillations via bifurcation"
+            ],
+            "common_misconceptions": [
+              "Confusing nullclines with trajectories",
+              "Assuming fixed point stability without eigenvalue analysis",
+              "Neglecting the role of timescale separation (fast v, slow w)",
+              "Misinterpreting recovery variable w as purely inhibitory"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "module_id": "module_02",
+      "module_title": "Stability, Bifurcations, and Chaos",
+      "module_description": "Advanced dynamical systems analysis including stability theory, bifurcation analysis, and characterization of chaotic dynamics in neuronal systems.",
+      "lessons": [
+        {
+          "lesson_id": "lesson_02_01",
+          "lesson_title": "Stability Analysis: Lyapunov Functions and Exponents",
+          "key_insight": "Lyapunov methods provide rigorous mathematical proofs of stability and detect chaos, enabling prediction of long-term neuronal behavior and identification of parameter regimes where dynamics become unpredictable.",
+          "learning_objectives": [
+            "Construct Lyapunov functions to prove stability of equilibria",
+            "Compute Lyapunov exponents numerically from trajectories",
+            "Interpret positive Lyapunov exponents as signatures of chaos",
+            "Apply stability analysis to neuronal models to predict response reliability"
+          ],
+          "warmup_callback": "Fixed point stability (lesson_01_04) via linearization; Lyapunov methods extend to nonlinear global analysis",
+          "content_outline": [
+            "Lyapunov function definition: V(x) > 0, dV/dt ≤ 0 along trajectories",
+            "Energy-like functions for neuronal models",
+            "Lyapunov's direct method: proving asymptotic stability",
+            "Lyapunov exponents: λ = lim(t→∞) (1/t)ln|δx(t)/δx(0)|",
+            "Numerical computation: trajectory separation method",
+            "Interpretation: λ > 0 (chaos), λ = 0 (marginal), λ < 0 (stable)",
+            "Spectrum of Lyapunov exponents for high-dimensional systems",
+            "Application to neuronal models: detecting chaotic firing patterns"
+          ],
+          "key_concepts": [
+            "Lyapunov function",
+            "Asymptotic stability",
+            "Lyapunov exponent",
+            "Chaotic dynamics",
+            "Trajectory separation",
+            "Sensitive dependence on initial conditions"
+          ],
+          "practical_examples": [
+            "Constructing quadratic Lyapunov function for linear system",
+            "Numerical computation of largest Lyapunov exponent for FHN model",
+            "Parameter scan: identifying chaotic regimes in modified HH model",
+            "Comparison of regular vs. chaotic firing patterns",
+            "Visualization: trajectory divergence in phase space"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should construct Lyapunov functions for simple systems, compute Lyapunov exponents numerically, and identify chaotic parameter regimes",
+            "success_indicators": [
+              "Successfully constructs Lyapunov function proving stability",
+              "Implements algorithm computing Lyapunov exponents from time series",
+              "Correctly identifies chaotic vs. regular dynamics from exponent sign",
+              "Relates chaos to unpredictability in neuronal firing"
+            ],
+            "common_misconceptions": [
+              "Assuming Lyapunov function existence is easy to establish",
+              "Confusing local (linearization) with global (Lyapunov function) stability",
+              "Interpreting irregular firing as necessarily chaotic without computing exponents",
+              "Neglecting finite-time effects in numerical Lyapunov exponent estimation"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_02_02",
+          "lesson_title": "Bifurcation Theory in Neuronal Excitability",
+          "key_insight": "Bifurcations mark qualitative transitions in neuronal behavior—from silence to firing, from tonic to bursting—and understanding bifurcation structure reveals how neurons switch between computational modes as parameters vary.",
+          "learning_objectives": [
+            "Classify common bifurcations: saddle-node, Hopf, saddle-node on invariant circle",
+            "Perform bifurcation analysis on neuronal models using continuation methods",
+            "Relate bifurcation types to neuronal excitability classes (Type I vs. Type II)",
+            "Predict firing onset and offset as bifurcation phenomena"
+          ],
+          "warmup_callback": "FHN Hopf bifurcation (lesson_01_04) introduced transition to oscillations; now systematic bifurcation classification",
+          "content_outline": [
+            "Bifurcation definition: qualitative change in dynamics at critical parameter",
+            "Saddle-node bifurcation: creation/annihilation of fixed points",
+            "Hopf bifurcation: birth of limit cycle from fixed point",
+            "Saddle-node on invariant circle (SNIC): continuous f-I curve",
+            "Subcritical vs. supercritical bifurcations",
+            "Neuronal excitability classes: Type I (SNIC) vs. Type II (Hopf)",
+            "Continuation methods: numerical tracking of equilibria and limit cycles",
+            "Bifurcation diagrams: parameter vs. state variable plots"
+          ],
+          "key_concepts": [
+            "Bifurcation point",
+            "Saddle-node bifurcation",
+            "Hopf bifurcation",
+            "SNIC bifurcation",
+            "Type I vs. Type II excitability",
+            "Continuation method"
+          ],
+          "practical_examples": [
+            "Saddle-node bifurcation in IF model: threshold appearance",
+            "Hopf bifurcation in FHN model: parameter scan showing onset",
+            "SNIC bifurcation in theta neuron model: arbitrarily low firing rates",
+            "Bifurcation diagram construction for HH model with varying I",
+            "Numerical continuation using AUTO or PyDSTool"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should identify bifurcation types from phase portraits, construct bifurcation diagrams, and relate bifurcations to neuronal excitability classes",
+            "success_indicators": [
+              "Correctly classifies bifurcations from eigenvalue analysis",
+              "Constructs bifurcation diagrams showing parameter-dependent transitions",
+              "Distinguishes Type I (continuous f-I) from Type II (discontinuous f-I)",
+              "Uses continuation software to track equilibria and limit cycles"
+            ],
+            "common_misconceptions": [
+              "Assuming all firing onset is via Hopf bifurcation",
+              "Confusing subcritical and supercritical bifurcations",
+              "Neglecting hysteresis in subcritical bifurcations",
+              "Misidentifying bifurcation type without eigenvalue calculation"
+            ]
+          }
+        },
+        {
+          "lesson_id": "lesson_02_03",
+          "lesson_title": "Perturbation Theory: Noise Effects on Stability",
+          "key_insight": "Small noise can qualitatively alter deterministic predictions—stabilizing unstable states, inducing transitions between attractors, and generating coherence resonance—requiring perturbation theory to predict noise-induced phenomena.",
+          "learning_objectives": [
+            "Apply perturbation theory to analyze weak noise effects on fixed points",
+            "Derive noise-induced transition rates using Kramers' formula",
+            "Understand coherence resonance: noise-optimized regularity",
+            "Distinguish parameter regimes where noise is perturbative vs. dominant"
+          ],
+          "warmup_callback": "Deterministic stability (lesson_02_01) assumes no noise; perturbation theory quantifies when noise matters",
+          "content_outline": [
+            "Perturbation expansion: x = x₀ + εx₁ + ε²x₂ + ...",
+            "Weak noise limit: σ → 0 analysis",
+            "Fokker-Planck equation for probability density evolution",
+            "Kramers' escape rate: r ∝ exp(-ΔV/σ²) for barrier crossing",
+            "Coherence resonance: optimal noise level for regular firing",
+            "Stochastic resonance: noise-enhanced signal detection",
+            "Validity limits: when perturbation theory breaks down",
+            "Numerical validation: comparing perturbative predictions with simulations"
+          ],
+          "key_concepts": [
+            "Perturbation expansion",
+            "Weak noise approximation",
+            "Fokker-Planck equation",
+            "Kramers' rate",
+            "Coherence resonance",
+            "Stochastic resonance"
+          ],
+          "practical_examples": [
+            "Perturbative correction to fixed point location with weak noise",
+            "Kramers' formula application: escape from potential well",
+            "Coherence resonance in FHN model: CV vs. noise intensity",
+            "Stochastic resonance demonstration: subthreshold signal detection",
+            "Numerical simulation validating perturbative predictions"
+          ],
+          "verification_criteria": {
+            "knowledge_check": "Students should apply perturbation expansions, compute Kramers' rates, and demonstrate coherence/stochastic resonance numerically",
+            "success_indicators": [
+              "Correctly performs perturbation expansion to first order",
+              "Computes escape rates matching Kramers' formula predictions",
+              "Demonstrates coherence resonance with optimal noise level",
+              "Identifies parameter regimes where perturbation theory fails"
+            ],
+            "common_misconceptions": [
+              "Assuming perturbation theory applies for arbitrary noise strength",
+              "Neglecting higher-order corrections when necessary",
+              "Confusing coherence resonance with stochastic resonance",
+              "Misapplying Kramers' formula outside weak noise regime"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "assessment_strategy": {
+    "formative": "Each lesson includes: (1) Conceptual MCQs testing understanding of key principles, (2) Derivation problems requiring mathematical proofs with LaTeX, (3) Computational exercises implementing models and algorithms, (4) Cloze deletions for key equations and definitions, (5) Pair matching connecting concepts to applications",
+    "summative": "Module-level assessments include: (1) Research-style problem sets requiring integration across lessons, (2) Computational projects implementing complete modeling pipelines from data to analysis, (3) Literature review assignments connecting course material to primary research papers, (4) Final project: original research proposal or implementation addressing open problem in computational neuroscience"
+  },
+  "verification_plan": {
+    "lesson_quality_criteria": [
+      "Each lesson has clear key insight answering 'why this matters'",
+      "Learning objectives are specific, measurable, and research-grade",
+      "Content outline progresses logically from foundations to applications",
+      "Mathematical rigor maintained: derivations, proofs, and formal definitions included",
+      "Computational implementations specified with algorithms and validation",
+      "Connections to experimental neuroscience and primary literature explicit",
+      "Verification criteria include both conceptual understanding and technical skills",
+      "Common misconceptions identified from pedagogical research and teaching experience"
+    ],
+    "content_accuracy_checks": [
+      "Mathematical equations verified against primary sources (Hodgkin-Huxley 1952, Kuramoto 1984, etc.)",
+      "Model implementations validated against published results and standard software (NEURON, Brian2)",
+      "Information-theoretic formulas checked against Cover & Thomas and neuroscience applications",
+      "Optimal control formulations verified against control theory texts and motor control literature",
+      "Statistical methods validated against standard references (Casella & Berger, Gelman et al.)",
+      "Biological facts cross-referenced with neuroscience textbooks (Dayan & Abbott, Gerstner et al.)",
+      "Parameter values and units checked for physiological realism",
+      "Code examples tested for correctness and numerical stability"
+    ],
+    "pedagogical_alignment": [
+      "Scaffolding: each lesson builds on previous material with explicit callbacks",
+      "Spaced repetition: key concepts revisited across modules in different contexts",
+      "Active recall: verification criteria require students to reproduce derivations and implementations",
+      "Worked examples: each lesson includes 4-5 concrete applications with solutions",
+      "Interdisciplinary connections: biology-math-computation integrated throughout",
+      "Research preparation: lessons include references to primary literature and open problems",
+      "Assessment alignment: verification criteria match learning objectives and key insights",
+      "Cognitive load management: complex topics broken into digestible sub-lessons with clear structure"
+    ]
+  }
+}

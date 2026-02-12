@@ -1,0 +1,612 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-02-01</Id>
+    <Title>Stability Analysis: Lyapunov Functions and Exponents</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>stability</Tag>
+      <Tag>lyapunov</Tag>
+      <Tag>chaos</Tag>
+      <Tag>dynamical-systems</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Stability Analysis: Lyapunov Functions and Exponents</H1>
+
+  <Body>In the previous module, we analyzed fixed point stability using linearization and eigenvalue analysis. While powerful, linearization only reveals local stability properties near equilibria. In this lesson, we develop Lyapunov methods that provide global stability guarantees and introduce Lyapunov exponents to characterize chaotic dynamics. These tools are essential for predicting long-term neuronal behavior and identifying parameter regimes where dynamics become unpredictable.</Body>
+
+  <Body>Key Insight: Lyapunov methods provide rigorous mathematical proofs of stability and detect chaos, enabling prediction of long-term neuronal behavior and identification of parameter regimes where dynamics become unpredictable.</Body>
+
+  <H2>Lyapunov Functions: Global Stability Analysis</H2>
+
+  <Body>Linearization tells us about stability near an equilibrium, but what about trajectories starting far from the fixed point? Lyapunov's direct method answers this question by constructing energy-like functions that decrease along system trajectories.</Body>
+
+  <H3>Definition of Lyapunov Functions</H3>
+
+  <Body>Consider a dynamical system dx/dt = f(x) with an equilibrium at x* (so f(x*) = 0). A Lyapunov function V(x) is a scalar function satisfying two key properties. First, V(x) must be positive definite: V(x*) = 0 and V(x) greater than 0 for all x not equal to x*. Second, the time derivative of V along trajectories must be non-positive: dV/dt must be less than or equal to 0. The time derivative is computed using the chain rule.</Body>
+
+  <Code lang="python">
+# The orbital derivative (time derivative along trajectories):
+# dV/dt = (∂V/∂x₁)(dx₁/dt) + (∂V/∂x₂)(dx₂/dt) + ...
+#       = ∇V · f(x)
+#
+# For a 2D system dx/dt = f(x,y), dy/dt = g(x,y):
+# dV/dt = (∂V/∂x)f(x,y) + (∂V/∂y)g(x,y)
+  </Code>
+
+  <Body>If dV/dt is strictly less than 0 for all x not equal to x*, the equilibrium is asymptotically stable: all trajectories converge to x* as time goes to infinity. If dV/dt is only less than or equal to 0, we have Lyapunov stability (trajectories stay close) but not necessarily convergence.</Body>
+
+  <FlashCard id="fc-lyapunov-function">
+    <Front>What are the two defining properties of a Lyapunov function V(x)?</Front>
+    <Back>1. Positive definiteness: V(x*) = 0 at the equilibrium and V(x) greater than 0 elsewhere. 2. Non-increasing along trajectories: dV/dt = nabla V dot f(x) less than or equal to 0.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc-asymptotic-stability">
+    <Front>What additional condition on dV/dt guarantees asymptotic stability (convergence to equilibrium)?</Front>
+    <Back>The orbital derivative must be strictly negative: dV/dt strictly less than 0 for all x not equal to x*. This ensures trajectories not only stay bounded but actually converge to the equilibrium.</Back>
+  </FlashCard>
+
+  <H3>Constructing Lyapunov Functions: Quadratic Forms</H3>
+
+  <Body>Finding Lyapunov functions is often more art than science, but for linear systems, we have systematic methods. For a linear system dx/dt = Ax, quadratic Lyapunov functions V(x) = x transpose P x work when P is a positive definite matrix satisfying the Lyapunov equation: A transpose P + P A = -Q for some positive definite Q.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import linalg
+
+def construct_lyapunov_matrix(A, Q=None):
+    """
+    Construct Lyapunov matrix P for linear system dx/dt = Ax.
+    Solves: A^T P + P A = -Q (continuous Lyapunov equation)
+
+    Parameters:
+    -----------
+    A : ndarray, shape (n, n)
+        System matrix
+    Q : ndarray, shape (n, n), optional
+        Positive definite matrix (default: identity)
+
+    Returns:
+    --------
+    P : ndarray, shape (n, n)
+        Positive definite Lyapunov matrix (if A is stable)
+    """
+    n = A.shape[0]
+    if Q is None:
+        Q = np.eye(n)  # Use identity matrix
+
+    # Solve continuous Lyapunov equation: A^T P + P A = -Q
+    # scipy.linalg.solve_continuous_lyapunov solves A X + X A^T = Q
+    # So we use: A^T P + P A = -Q, rearranged for scipy
+    P = linalg.solve_continuous_lyapunov(A.T, -Q)
+
+    return P
+
+# Example: 2D linear system with stable equilibrium
+A = np.array([[-1, 0.5],
+              [-0.5, -2]])
+
+# Check eigenvalues (should have negative real parts for stability)
+eigenvalues = np.linalg.eigvals(A)
+print(f"Eigenvalues: {eigenvalues}")
+print(f"System is stable: {all(np.real(eigenvalues) &lt; 0)}")
+
+# Construct Lyapunov matrix
+P = construct_lyapunov_matrix(A)
+print(f"\nLyapunov matrix P:\n{P}")
+
+# Verify P is positive definite (all eigenvalues positive)
+P_eigenvalues = np.linalg.eigvals(P)
+print(f"\nEigenvalues of P: {P_eigenvalues}")
+print(f"P is positive definite: {all(np.real(P_eigenvalues) &gt; 0)}")
+  </Code>
+
+  <H3>Energy Functions for Neuronal Models</H3>
+
+  <Body>For neuronal models, Lyapunov functions often have physical interpretations as energy-like quantities. Consider the leaky integrate-and-fire subthreshold dynamics: tau dV/dt = -(V - V_rest). A natural Lyapunov function is V_L(V) = (1/2)(V - V_rest)^2, representing the squared deviation from rest.</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def lif_subthreshold(V, V_rest=-65, tau=10):
+    """Subthreshold LIF dynamics: tau*dV/dt = -(V - V_rest)"""
+    return -(V - V_rest) / tau
+
+def lyapunov_lif(V, V_rest=-65):
+    """Quadratic Lyapunov function for LIF"""
+    return 0.5 * (V - V_rest)**2
+
+def lyapunov_derivative_lif(V, V_rest=-65, tau=10):
+    """Time derivative of Lyapunov function along trajectories"""
+    # dV_L/dt = (V - V_rest) * dV/dt = (V - V_rest) * (-(V-V_rest)/tau)
+    return -(V - V_rest)**2 / tau
+
+# Demonstrate Lyapunov function properties
+V_values = np.linspace(-80, -50, 100)
+V_rest = -65
+
+plt.figure(figsize=(12, 4))
+
+plt.subplot(131)
+plt.plot(V_values, lyapunov_lif(V_values, V_rest))
+plt.axvline(V_rest, color='r', linestyle='--', label='Equilibrium')
+plt.xlabel('V (mV)')
+plt.ylabel('V_L(V)')
+plt.title('Lyapunov Function (positive definite)')
+plt.legend()
+
+plt.subplot(132)
+plt.plot(V_values, lyapunov_derivative_lif(V_values, V_rest))
+plt.axvline(V_rest, color='r', linestyle='--')
+plt.axhline(0, color='k', linestyle='-', alpha=0.3)
+plt.xlabel('V (mV)')
+plt.ylabel('dV_L/dt')
+plt.title('Orbital Derivative (negative semi-definite)')
+
+plt.subplot(133)
+# Trajectory simulation
+t = np.linspace(0, 50, 500)
+V0_list = [-80, -75, -70, -60, -55, -50]
+for V0 in V0_list:
+    V_traj = V_rest + (V0 - V_rest) * np.exp(-t/10)
+    V_L_traj = lyapunov_lif(V_traj, V_rest)
+    plt.plot(t, V_L_traj, label=f'V0={V0}')
+plt.xlabel('Time (ms)')
+plt.ylabel('V_L(V(t))')
+plt.title('Lyapunov Function Decreases Along Trajectories')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+  </Code>
+
+  <SingleSelect id="q-lyapunov-stability">
+    <Prompt>A Lyapunov function V(x) satisfies V(x*) = 0, V(x) greater than 0 for x not equal to x*, and dV/dt less than or equal to 0. If dV/dt = 0 only at x = x*, what type of stability does this prove?</Prompt>
+    <Options>
+      <Option correct="true">Asymptotic stability (trajectories converge to x*)</Option>
+      <Option>Lyapunov stability (trajectories stay bounded but may not converge)</Option>
+      <Option>Marginal stability (eigenvalues on imaginary axis)</Option>
+      <Option>Instability (trajectories diverge from x*)</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Lyapunov Exponents: Quantifying Chaos</H2>
+
+  <Body>While Lyapunov functions analyze stability of equilibria, Lyapunov exponents characterize the long-term behavior of trajectories themselves, particularly distinguishing regular from chaotic dynamics. The key question is: how do infinitesimally close trajectories separate over time?</Body>
+
+  <H3>Definition and Interpretation</H3>
+
+  <Body>Consider two trajectories x(t) and x(t) + delta x(t) starting from nearby initial conditions. The Lyapunov exponent lambda measures the exponential rate of separation (or convergence) of these trajectories. Mathematically, lambda = lim as t approaches infinity of (1/t) times ln of the ratio of |delta x(t)| to |delta x(0)|. For an n-dimensional system, there are n Lyapunov exponents forming the Lyapunov spectrum {lambda_1, lambda_2, ..., lambda_n}, ordered from largest to smallest.</Body>
+
+  <FlashCard id="fc-lyapunov-exponent">
+    <Front>What is the mathematical definition of the largest Lyapunov exponent?</Front>
+    <Back>lambda = lim(t to infinity) (1/t) ln(|delta x(t)| / |delta x(0)|), measuring the exponential rate at which nearby trajectories separate (positive) or converge (negative) over time.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc-chaos-signature">
+    <Front>What is the signature of chaotic dynamics in terms of Lyapunov exponents?</Front>
+    <Back>Chaos is characterized by at least one positive Lyapunov exponent (lambda greater than 0), indicating exponential separation of nearby trajectories and sensitive dependence on initial conditions.</Back>
+  </FlashCard>
+
+  <Body>The interpretation is fundamental: lambda greater than 0 (chaos) means nearby trajectories separate exponentially, implying sensitive dependence on initial conditions and long-term unpredictability. Lambda = 0 (marginal) indicates neither exponential growth nor decay, typical of directions along limit cycles. Lambda less than 0 (stable) means trajectories converge, characteristic of dissipative systems approaching attractors.</Body>
+
+  <H3>Numerical Computation: Trajectory Separation Method</H3>
+
+  <Body>Computing Lyapunov exponents numerically requires careful handling of the exponential growth. The standard algorithm periodically renormalizes the separation vector to prevent numerical overflow while accumulating the growth rate.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import odeint
+
+def compute_largest_lyapunov(f, x0, t_total, dt, d0=1e-8, renorm_interval=1.0):
+    """
+    Compute largest Lyapunov exponent using trajectory separation method.
+
+    Parameters:
+    -----------
+    f : callable
+        System dynamics f(x, t) returning dx/dt
+    x0 : ndarray
+        Initial condition
+    t_total : float
+        Total integration time
+    dt : float
+        Integration timestep
+    d0 : float
+        Initial perturbation magnitude
+    renorm_interval : float
+        Time between renormalizations
+
+    Returns:
+    --------
+    lambda_max : float
+        Estimate of largest Lyapunov exponent
+    lambdas : ndarray
+        Running estimates over time
+    """
+    n = len(x0)
+    x = np.array(x0, dtype=float)
+
+    # Initialize perturbation in random direction
+    delta = np.random.randn(n)
+    delta = d0 * delta / np.linalg.norm(delta)
+
+    # Perturbed trajectory
+    x_pert = x + delta
+
+    sum_log = 0.0
+    n_renorm = 0
+    lambdas = []
+
+    t_current = 0.0
+    steps_per_renorm = int(renorm_interval / dt)
+
+    while t_current &lt; t_total:
+        # Integrate both trajectories
+        t_span = np.linspace(0, renorm_interval, steps_per_renorm + 1)
+
+        x_traj = odeint(f, x, t_span)
+        x_pert_traj = odeint(f, x_pert, t_span)
+
+        x = x_traj[-1]
+        x_pert = x_pert_traj[-1]
+
+        # Compute separation
+        delta = x_pert - x
+        d = np.linalg.norm(delta)
+
+        # Accumulate log of growth
+        sum_log += np.log(d / d0)
+        n_renorm += 1
+
+        # Renormalize perturbation
+        delta = d0 * delta / d
+        x_pert = x + delta
+
+        t_current += renorm_interval
+        lambdas.append(sum_log / t_current)
+
+    lambda_max = sum_log / t_total
+    return lambda_max, np.array(lambdas)
+
+
+# Example: Lorenz system (classic chaotic system)
+def lorenz(state, t, sigma=10, rho=28, beta=8/3):
+    x, y, z = state
+    return [sigma * (y - x),
+            x * (rho - z) - y,
+            x * y - beta * z]
+
+# Compute Lyapunov exponent for Lorenz system
+x0_lorenz = [1.0, 1.0, 1.0]
+lambda_lorenz, lambdas_lorenz = compute_largest_lyapunov(
+    lorenz, x0_lorenz, t_total=100, dt=0.01, renorm_interval=1.0
+)
+print(f"Lorenz system largest Lyapunov exponent: {lambda_lorenz:.4f}")
+print(f"(Theoretical value approximately 0.905)")
+
+
+# Example: Damped harmonic oscillator (stable, not chaotic)
+def damped_oscillator(state, t, gamma=0.5, omega=2.0):
+    x, v = state
+    return [v, -2*gamma*v - omega**2 * x]
+
+x0_osc = [1.0, 0.0]
+lambda_osc, lambdas_osc = compute_largest_lyapunov(
+    damped_oscillator, x0_osc, t_total=50, dt=0.01, renorm_interval=0.5
+)
+print(f"\nDamped oscillator largest Lyapunov exponent: {lambda_osc:.4f}")
+print(f"(Should be negative, approximately -gamma = -0.5)")
+  </Code>
+
+  <MultiSelect id="q-lyapunov-spectrum">
+    <Prompt>Which statements about the Lyapunov spectrum are correct? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">An n-dimensional system has n Lyapunov exponents</Option>
+      <Option correct="true">At least one positive exponent indicates chaos</Option>
+      <Option>All exponents must have the same sign for bounded dynamics</Option>
+      <Option correct="true">For a stable limit cycle, one exponent is zero (along the cycle)</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Application to Neuronal Models</H2>
+
+  <Body>Lyapunov analysis is particularly powerful for understanding neuronal dynamics, where the question of regular versus chaotic firing has significant implications for neural coding and information processing.</Body>
+
+  <H3>Lyapunov Exponents in the FitzHugh-Nagumo Model</H3>
+
+  <Body>The FitzHugh-Nagumo model can exhibit both regular oscillations and more complex dynamics depending on parameters. By computing Lyapunov exponents across parameter space, we can map out the transition between these regimes.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+def fhn(state, t, I=0.5, a=0.7, b=0.8, tau=12.5):
+    """
+    FitzHugh-Nagumo model equations.
+    dv/dt = v - v³/3 - w + I
+    dw/dt = (v + a - b*w) / tau
+    """
+    v, w = state
+    dv = v - v**3/3 - w + I
+    dw = (v + a - b*w) / tau
+    return [dv, dw]
+
+def fhn_jacobian(state, I=0.5, a=0.7, b=0.8, tau=12.5):
+    """Jacobian matrix of FHN system"""
+    v, w = state
+    J = np.array([[1 - v**2, -1],
+                  [1/tau, -b/tau]])
+    return J
+
+def compute_lyapunov_spectrum(f, jacobian, x0, t_total, dt,
+                               renorm_interval=1.0, **params):
+    """
+    Compute full Lyapunov spectrum using QR decomposition method.
+    """
+    n = len(x0)
+    x = np.array(x0, dtype=float)
+
+    # Initialize orthonormal perturbation vectors
+    Q = np.eye(n)
+
+    sum_logs = np.zeros(n)
+    n_renorm = 0
+
+    t_current = 0.0
+    steps = int(renorm_interval / dt)
+
+    while t_current &lt; t_total:
+        # Integrate reference trajectory
+        t_span = np.linspace(0, renorm_interval, steps + 1)
+        x_traj = odeint(lambda s, t: f(s, t, **params), x, t_span)
+
+        # Integrate variational equations (tangent vectors)
+        for i in range(steps):
+            x_mid = x_traj[i]
+            J = jacobian(x_mid, **params)
+            # Simple Euler step for tangent vectors
+            Q = Q + dt * J @ Q
+
+        x = x_traj[-1]
+
+        # QR decomposition to orthonormalize
+        Q, R = np.linalg.qr(Q)
+
+        # Accumulate logs of diagonal elements
+        sum_logs += np.log(np.abs(np.diag(R)))
+        n_renorm += 1
+        t_current += renorm_interval
+
+    lambdas = sum_logs / t_total
+    return np.sort(lambdas)[::-1]  # Sort descending
+
+# Compute Lyapunov spectrum for FHN model
+x0_fhn = [0.0, 0.0]
+
+# Regular oscillation regime
+lambdas_regular = compute_lyapunov_spectrum(
+    fhn, fhn_jacobian, x0_fhn,
+    t_total=200, dt=0.01, renorm_interval=2.0,
+    I=0.5, a=0.7, b=0.8, tau=12.5
+)
+print(f"FHN regular regime Lyapunov exponents: {lambdas_regular}")
+print(f"Largest exponent: {lambdas_regular[0]:.4f}")
+print(f"Sum (should be negative for dissipative): {sum(lambdas_regular):.4f}")
+  </Code>
+
+  <H3>Detecting Chaotic Firing Patterns</H3>
+
+  <Body>In certain parameter regimes, neuronal models can exhibit chaotic dynamics characterized by irregular, unpredictable firing patterns. This has profound implications: chaotic neurons cannot reliably encode information through precise spike timing.</Body>
+
+  <Code lang="python">
+def modified_hh_chaotic(state, t, I_ext):
+    """
+    Modified Hodgkin-Huxley with periodic forcing (can exhibit chaos).
+    """
+    V, m, h, n = state
+
+    # Standard HH parameters
+    C = 1.0  # uF/cm^2
+    g_Na, g_K, g_L = 120.0, 36.0, 0.3
+    E_Na, E_K, E_L = 50.0, -77.0, -54.4
+
+    # Rate functions (simplified)
+    alpha_m = 0.1 * (V + 40) / (1 - np.exp(-(V + 40) / 10)) if abs(V + 40) &gt; 1e-6 else 1.0
+    beta_m = 4.0 * np.exp(-(V + 65) / 18)
+    alpha_h = 0.07 * np.exp(-(V + 65) / 20)
+    beta_h = 1.0 / (1 + np.exp(-(V + 35) / 10))
+    alpha_n = 0.01 * (V + 55) / (1 - np.exp(-(V + 55) / 10)) if abs(V + 55) &gt; 1e-6 else 0.1
+    beta_n = 0.125 * np.exp(-(V + 65) / 80)
+
+    # Ionic currents
+    I_Na = g_Na * m**3 * h * (V - E_Na)
+    I_K = g_K * n**4 * (V - E_K)
+    I_L = g_L * (V - E_L)
+
+    # External current (can include periodic component for chaos)
+    I = I_ext(t)
+
+    dV = (I - I_Na - I_K - I_L) / C
+    dm = alpha_m * (1 - m) - beta_m * m
+    dh = alpha_h * (1 - h) - beta_h * h
+    dn = alpha_n * (1 - n) - beta_n * n
+
+    return [dV, dm, dh, dn]
+
+# Parameter scan for chaotic regimes
+def lyapunov_parameter_scan(I_base_values, transient=500, compute_time=200):
+    """
+    Scan parameter space to find chaotic regimes.
+    """
+    results = []
+
+    for I_base in I_base_values:
+        # Periodic forcing: I(t) = I_base + A*sin(omega*t)
+        I_ext = lambda t, I0=I_base: I0 + 5.0 * np.sin(0.3 * t)
+
+        # Initial conditions
+        x0 = [-65, 0.05, 0.6, 0.32]
+
+        # Skip transient
+        t_trans = np.linspace(0, transient, int(transient/0.01))
+        x_trans = odeint(lambda s, t: modified_hh_chaotic(s, t, I_ext), x0, t_trans)
+        x0_steady = x_trans[-1]
+
+        # Compute Lyapunov exponent (simplified)
+        lambda_max, _ = compute_largest_lyapunov(
+            lambda s, t: modified_hh_chaotic(s, t, I_ext),
+            x0_steady, t_total=compute_time, dt=0.01
+        )
+
+        results.append({'I_base': I_base, 'lambda': lambda_max})
+        print(f"I_base = {I_base:.1f}: lambda_max = {lambda_max:.4f}")
+
+    return results
+
+# Example scan (small range for demonstration)
+print("Scanning for chaotic regimes...")
+print("(Positive lambda indicates chaos)\n")
+  </Code>
+
+  <SortQuiz id="q-sort-dynamics">
+    <Prompt>Order the following system behaviors from most predictable (most negative Lyapunov exponent) to least predictable (most positive Lyapunov exponent):</Prompt>
+    <SortedItems>
+      <Item>Stable fixed point with strong damping (lambda much less than 0)</Item>
+      <Item>Weakly damped oscillation approaching limit cycle (lambda slightly less than 0)</Item>
+      <Item>Motion along a limit cycle (lambda = 0)</Item>
+      <Item>Chaotic attractor (lambda greater than 0)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Comparison: Local vs. Global Stability Methods</H2>
+
+  <Body>It is crucial to understand when to apply linearization versus Lyapunov function methods. Linearization (eigenvalue analysis) tells us about local stability near a fixed point but says nothing about trajectories starting far away. Lyapunov functions, when found, prove global asymptotic stability for the entire basin of attraction.</Body>
+
+  <MatchPairs id="q-match-methods">
+    <Prompt>Match each stability analysis method with its key characteristic:</Prompt>
+    <Pairs>
+      <Pair><Left>Linearization (Jacobian eigenvalues)</Left><Right>Local stability only, valid near equilibrium</Right></Pair>
+      <Pair><Left>Lyapunov function V(x)</Left><Right>Global stability, energy-based proof</Right></Pair>
+      <Pair><Left>Lyapunov exponents</Left><Right>Characterizes long-term trajectory behavior</Right></Pair>
+      <Pair><Left>Nullcline analysis</Left><Right>Geometric method for 2D systems</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Only applies to linear systems</Distractor>
+      <Distractor>Requires stochastic simulations</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Key Equations Summary</H2>
+
+  <Body>The fundamental equations of Lyapunov stability theory form the backbone of global stability analysis. For Lyapunov functions, we require positive definiteness V(x) greater than 0 and the orbital derivative dV/dt = nabla V dot f(x) less than or equal to 0. For Lyapunov exponents, the formula lambda = lim as t approaches infinity of (1/t) ln(|delta x(t)| / |delta x(0)|) quantifies the exponential rate of trajectory separation.</Body>
+
+  <FillBlanks id="q-fill-lyapunov">
+    <Prompt>Complete the key concepts: A Lyapunov function must be <Blank>positive definite</Blank> and have an orbital derivative that is <Blank>non-positive</Blank>. A positive Lyapunov exponent (lambda greater than 0) indicates <Blank>chaotic</Blank> dynamics with sensitive dependence on <Blank>initial conditions</Blank>.</Prompt>
+    <Distractors>
+      <Distractor>negative definite</Distractor>
+      <Distractor>bounded</Distractor>
+      <Distractor>periodic</Distractor>
+      <Distractor>parameters</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Common Misconceptions</H2>
+
+  <Body>Several misconceptions frequently arise when learning Lyapunov methods. First, students often assume finding a Lyapunov function is straightforward. In reality, there is no general algorithm for constructing Lyapunov functions for nonlinear systems, and their existence may be difficult to establish even when the system is stable.</Body>
+
+  <Body>Second, students sometimes confuse local stability (from linearization) with global stability (from Lyapunov functions). A system can be locally stable but have a limited basin of attraction, meaning trajectories starting far from the equilibrium may not converge.</Body>
+
+  <Body>Third, irregular or complex firing patterns in neurons are sometimes interpreted as chaotic without computing Lyapunov exponents. True chaos requires positive Lyapunov exponents; irregular behavior can also arise from noise or complex but non-chaotic deterministic dynamics.</Body>
+
+  <Body>Finally, numerical computation of Lyapunov exponents requires long integration times for accurate estimates. Finite-time effects can give misleading values, particularly near bifurcation boundaries where dynamics change qualitatively.</Body>
+
+  <SingleSelect id="q-misconception">
+    <Prompt>A neuron exhibits highly irregular firing patterns. Which statement is correct?</Prompt>
+    <Options>
+      <Option>The firing is definitely chaotic because it appears random</Option>
+      <Option correct="true">We cannot conclude chaos without computing Lyapunov exponents; irregularity may have other causes</Option>
+      <Option>Irregular firing always implies positive Lyapunov exponents</Option>
+      <Option>Biological neurons cannot exhibit true mathematical chaos</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Practical Applications in Computational Neuroscience</H2>
+
+  <Body>Lyapunov analysis has important applications in understanding neural coding reliability. If a neuron operates in a chaotic regime, its spike timing becomes unpredictable and unreliable for encoding information. Conversely, stable dynamics ensure reproducible responses to identical stimuli.</Body>
+
+  <Body>Parameter sensitivity analysis using Lyapunov exponents helps identify operating regimes where neuronal dynamics are robust versus sensitive to perturbations. This is relevant for understanding pathological states like epilepsy, where abnormal synchronization may involve transitions through bifurcations into unstable or chaotic regimes.</Body>
+
+  <Code lang="python">
+def analyze_response_reliability(model, x0, stimulus, n_trials=20, noise_level=0.01):
+    """
+    Assess firing reliability by measuring trial-to-trial variability.
+
+    High Lyapunov exponent systems will show large variability even
+    with minimal noise, while stable systems remain reliable.
+    """
+    spike_times_all = []
+
+    for trial in range(n_trials):
+        # Add small noise to initial condition
+        x0_noisy = x0 + noise_level * np.random.randn(len(x0))
+
+        # Simulate and extract spike times
+        # (implementation details depend on model)
+        # spike_times = simulate_and_detect_spikes(model, x0_noisy, stimulus)
+        # spike_times_all.append(spike_times)
+        pass
+
+    # Compute reliability metrics:
+    # - Coefficient of variation of ISIs
+    # - Spike time jitter across trials
+    # - Correlation between trial spike trains
+
+    # High reliability (low jitter) suggests negative Lyapunov exponent
+    # Low reliability (high jitter) suggests positive Lyapunov exponent
+    return None  # Placeholder
+
+# Conceptual demonstration of the connection:
+# Reliable neural coding requires lambda &lt; 0 (stable dynamics)
+# Chaotic neurons (lambda &gt; 0) have unreliable spike timing
+  </Code>
+
+  <FlashCard id="fc-reliability">
+    <Front>Why does a positive Lyapunov exponent imply unreliable neural coding?</Front>
+    <Back>Positive Lyapunov exponents mean exponential sensitivity to initial conditions. Even tiny perturbations (noise, slight differences in initial state) lead to vastly different spike times, making precise temporal coding impossible.</Back>
+  </FlashCard>
+
+  <H2>Summary</H2>
+
+  <Body>This lesson introduced two powerful tools for analyzing neuronal dynamics: Lyapunov functions for proving global stability, and Lyapunov exponents for detecting chaos. Lyapunov functions are positive definite functions that decrease along trajectories, providing rigorous proofs of convergence to equilibria. Lyapunov exponents quantify the exponential rate of trajectory separation, with positive values signaling chaotic dynamics and unpredictable long-term behavior.</Body>
+
+  <Body>For neuronal models, these tools reveal whether firing patterns are reliable and predictable (negative Lyapunov exponents) or chaotic and sensitive to perturbations (positive Lyapunov exponents). This distinction has profound implications for neural coding theory and understanding pathological brain states.</Body>
+
+  <Subjective id="q-subjective-chaos">
+    <Prompt>Explain why the detection of chaos through Lyapunov exponents is important for understanding neural coding. In your answer, discuss what chaos implies for the reliability of spike timing and how this affects the ability of neurons to transmit information through temporal coding schemes.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly explains that positive Lyapunov exponents indicate chaos and sensitive dependence on initial conditions</Requirement>
+        <Indicators>positive, exponent, sensitive, initial conditions, exponential, separation, divergence</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Connects chaos to unreliable spike timing and trial-to-trial variability</Requirement>
+        <Indicators>unreliable, variability, spike timing, jitter, inconsistent, unpredictable firing</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses implications for temporal coding schemes that rely on precise spike timing</Requirement>
+        <Indicators>temporal coding, precise timing, information, encoding, rate vs timing</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides biological context or examples of when chaos matters in neural systems</Requirement>
+        <Indicators>biological, neural coding, brain, pathological, epilepsy, synchronization</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="250" />
+  </Subjective>
+
+</Lesson>
