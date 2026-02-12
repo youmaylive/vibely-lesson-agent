@@ -273,7 +273,7 @@ async def generate_all_lessons(
             if lesson_id in success_set:
                 lesson["mlai_path"] = f"{module_id}/{lesson_id}.mlai"
 
-    output_curriculum = output_dir_path / "curriculum.json"
+    output_curriculum = output_dir_path / "new_curriculum.json"
     with open(output_curriculum, "w", encoding="utf-8") as f:
         json.dump(enriched, f, indent=2, ensure_ascii=False)
     print(f"\n📄 Curriculum written to {output_curriculum}")
