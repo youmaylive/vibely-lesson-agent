@@ -1,0 +1,931 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-06-03</Id>
+    <Title>Fisher Information: Parameter Estimation Bounds</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>fisher-information</Tag>
+      <Tag>parameter-estimation</Tag>
+      <Tag>cramer-rao-bound</Tag>
+      <Tag>statistical-inference</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>optimal-experimental-design</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Fisher Information: Parameter Estimation Bounds</H1>
+
+  <Body>
+    Fisher information represents one of the most elegant bridges between information theory and statistical inference. While Shannon's mutual information (covered in the previous lesson) quantifies how much a neural response tells us about a stimulus, Fisher information answers a fundamentally different question: how precisely can we estimate a parameter from observed data? This distinction is crucial for experimental neuroscience, where we often need to infer biophysical parameters—membrane conductances, synaptic time constants, firing thresholds—from noisy measurements.
+  </Body>
+
+  <Body>
+    In this lesson, we develop Fisher information from first principles, derive the celebrated Cramér-Rao bound that establishes fundamental limits on estimation precision, and explore applications to neuronal modeling and optimal experimental design. By the end, you will understand why Fisher information is indispensable for both theoretical analysis and practical parameter estimation in computational neuroscience.
+  </Body>
+
+  <H2>From Likelihood to Fisher Information</H2>
+
+  <Body>
+    Consider a parametric model p(x; θ) where x represents observed data and θ is an unknown parameter we wish to estimate. The likelihood function L(θ) = p(x; θ) expresses how probable our observations are for different parameter values. Maximum likelihood estimation finds the θ that maximizes L(θ), equivalently maximizing the log-likelihood ℓ(θ) = log p(x; θ).
+  </Body>
+
+  <Body>
+    The score function is defined as the derivative of the log-likelihood with respect to the parameter:
+  </Body>
+
+  <Code lang="python">
+# Score function: derivative of log-likelihood
+# s(θ) = ∂ log p(x; θ) / ∂θ
+
+import numpy as np
+from scipy.misc import derivative
+
+def score_function(x, theta, log_likelihood):
+    """
+    Compute the score function (gradient of log-likelihood).
+
+    Parameters:
+    -----------
+    x : array_like
+        Observed data
+    theta : float
+        Parameter value
+    log_likelihood : callable
+        Function log_likelihood(x, theta) returning log p(x; theta)
+
+    Returns:
+    --------
+    score : float
+        Score function evaluated at theta
+    """
+    return derivative(lambda t: log_likelihood(x, t), theta, dx=1e-6)
+  </Code>
+
+  <Body>
+    A key property of the score function is that its expectation is zero under the true parameter value: E[s(θ)] = 0. This follows from the normalization condition ∫p(x; θ)dx = 1 when we differentiate both sides with respect to θ.
+  </Body>
+
+  <Body>
+    Fisher information is defined as the variance of the score function:
+  </Body>
+
+  <Code lang="python">
+# Fisher Information Definition
+# I(θ) = E[(∂ log p(x; θ) / ∂θ)²] = Var(score)
+
+def fisher_information(theta, score_samples):
+    """
+    Estimate Fisher information from score function samples.
+
+    Since E[score] = 0, we have:
+    I(θ) = E[score²] = Var(score)
+
+    Parameters:
+    -----------
+    theta : float
+        Parameter value
+    score_samples : array_like
+        Samples of the score function at theta
+
+    Returns:
+    --------
+    I : float
+        Fisher information estimate
+    """
+    return np.mean(score_samples**2)
+  </Code>
+
+  <Body>
+    Under regularity conditions (the support of p(x; θ) doesn't depend on θ, and we can exchange differentiation and integration), Fisher information has an equivalent form as the negative expected second derivative of the log-likelihood:
+  </Body>
+
+  <Code lang="python">
+# Equivalent form (under regularity conditions):
+# I(θ) = -E[∂² log p(x; θ) / ∂θ²]
+
+def fisher_information_hessian(theta, data_samples, log_likelihood):
+    """
+    Compute Fisher information via the Hessian (second derivative) form.
+
+    This form is often easier to compute analytically.
+
+    Parameters:
+    -----------
+    theta : float
+        Parameter value
+    data_samples : array_like
+        Samples from p(x; theta)
+    log_likelihood : callable
+        Function log_likelihood(x, theta)
+
+    Returns:
+    --------
+    I : float
+        Fisher information
+    """
+    hessians = []
+    for x in data_samples:
+        h = derivative(lambda t: log_likelihood(x, t), theta, n=2, dx=1e-5)
+        hessians.append(h)
+    return -np.mean(hessians)
+  </Code>
+
+  <FlashCard id="fc1">
+    <Front>What is the score function in statistical inference?</Front>
+    <Back>The score function s(θ) = ∂ log p(x; θ) / ∂θ is the derivative of the log-likelihood with respect to the parameter. It measures how sensitive the log-likelihood is to changes in θ. Its expected value is zero at the true parameter value.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>Define Fisher information and state its two equivalent forms.</Front>
+    <Back>Fisher information I(θ) quantifies how much information data carries about a parameter. Form 1: I(θ) = E[(∂ log p(x; θ) / ∂θ)²] (variance of score). Form 2: I(θ) = -E[∂² log p(x; θ) / ∂θ²] (negative expected Hessian). Both forms are equal under regularity conditions.</Back>
+  </FlashCard>
+
+  <H2>The Cramér-Rao Bound</H2>
+
+  <Body>
+    The Cramér-Rao inequality establishes a fundamental lower bound on the variance of any unbiased estimator. If θ̂ is an unbiased estimator of θ (meaning E[θ̂] = θ), then:
+  </Body>
+
+  <Body>
+    Var(θ̂) ≥ 1 / I(θ)
+  </Body>
+
+  <Body>
+    This remarkable result states that no unbiased estimator can have variance smaller than the inverse of Fisher information. The bound is achieved when the estimator is efficient—the maximum likelihood estimator (MLE) achieves this bound asymptotically as sample size increases.
+  </Body>
+
+  <Code lang="python">
+# Cramér-Rao Bound: Fundamental limit on estimation precision
+# Var(θ̂) ≥ 1 / I(θ)
+
+def cramer_rao_bound(fisher_info):
+    """
+    Compute the Cramér-Rao lower bound on estimator variance.
+
+    Parameters:
+    -----------
+    fisher_info : float
+        Fisher information I(θ)
+
+    Returns:
+    --------
+    bound : float
+        Minimum achievable variance for unbiased estimators
+    """
+    return 1.0 / fisher_info
+
+def efficiency(estimator_variance, fisher_info):
+    """
+    Compute efficiency of an estimator.
+
+    Efficiency = (Cramér-Rao bound) / (actual variance)
+    An efficient estimator has efficiency = 1.
+
+    Parameters:
+    -----------
+    estimator_variance : float
+        Variance of the estimator
+    fisher_info : float
+        Fisher information
+
+    Returns:
+    --------
+    eff : float
+        Efficiency (between 0 and 1)
+    """
+    cr_bound = cramer_rao_bound(fisher_info)
+    return cr_bound / estimator_variance
+  </Code>
+
+  <Body>
+    The proof of the Cramér-Rao bound uses the Cauchy-Schwarz inequality. Consider the covariance between the estimator θ̂ and the score function:
+  </Body>
+
+  <Body>
+    Cov(θ̂, s(θ))² ≤ Var(θ̂) · Var(s(θ)) = Var(θ̂) · I(θ)
+  </Body>
+
+  <Body>
+    For an unbiased estimator, one can show that Cov(θ̂, s(θ)) = 1, which immediately yields the Cramér-Rao bound. The bound is tight (achieved) when θ̂ and s(θ) are linearly related—this characterizes efficient estimators.
+  </Body>
+
+  <FlashCard id="fc3">
+    <Front>State the Cramér-Rao bound and explain its significance.</Front>
+    <Back>The Cramér-Rao bound states Var(θ̂) ≥ 1/I(θ) for any unbiased estimator θ̂. Significance: (1) It provides a fundamental limit on estimation precision that no method can surpass; (2) It allows us to evaluate estimator quality by comparing actual variance to this bound; (3) It shows that higher Fisher information enables more precise estimation.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>A neuroscientist estimates a membrane time constant τ from voltage recordings. If the Fisher information for τ is I(τ) = 100 ms⁻², what is the minimum achievable standard deviation for any unbiased estimator of τ?</Prompt>
+    <Options>
+      <Option correct="true">0.1 ms</Option>
+      <Option>0.01 ms</Option>
+      <Option>10 ms</Option>
+      <Option>100 ms</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Fisher Information for Common Distributions</H2>
+
+  <H3>Gaussian Distribution</H3>
+
+  <Body>
+    For a Gaussian distribution N(μ, σ²), we can derive Fisher information for both parameters. Consider first estimating the mean μ with known variance:
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import stats
+
+def fisher_info_gaussian_mean(sigma_squared, n_samples=1):
+    """
+    Fisher information for Gaussian mean with known variance.
+
+    For X ~ N(μ, σ²):
+    log p(x; μ) = -1/2 log(2πσ²) - (x-μ)²/(2σ²)
+    ∂/∂μ log p = (x-μ)/σ²
+    I(μ) = E[(x-μ)²/σ⁴] = σ²/σ⁴ = 1/σ²
+
+    For n i.i.d. samples: I_n(μ) = n/σ²
+
+    Parameters:
+    -----------
+    sigma_squared : float
+        Known variance σ²
+    n_samples : int
+        Number of independent samples
+
+    Returns:
+    --------
+    I : float
+        Fisher information for μ
+    """
+    return n_samples / sigma_squared
+
+def fisher_info_gaussian_variance(sigma_squared, n_samples=1):
+    """
+    Fisher information for Gaussian variance with known mean.
+
+    For estimating σ²:
+    I(σ²) = 1 / (2σ⁴)
+
+    For n i.i.d. samples: I_n(σ²) = n / (2σ⁴)
+
+    Parameters:
+    -----------
+    sigma_squared : float
+        Variance σ²
+    n_samples : int
+        Number of independent samples
+
+    Returns:
+    --------
+    I : float
+        Fisher information for σ²
+    """
+    return n_samples / (2 * sigma_squared**2)
+
+# Example: Estimating mean from noisy measurements
+sigma = 2.0  # Known standard deviation (mV)
+n = 50       # Number of measurements
+
+I_mu = fisher_info_gaussian_mean(sigma**2, n)
+min_std = np.sqrt(1 / I_mu)
+
+print(f"Fisher information for mean: I(μ) = {I_mu:.2f} mV⁻²")
+print(f"Cramér-Rao bound on std dev: {min_std:.3f} mV")
+# Output: Fisher information for mean: I(μ) = 12.50 mV⁻²
+# Output: Cramér-Rao bound on std dev: 0.283 mV
+  </Code>
+
+  <H3>Poisson Distribution</H3>
+
+  <Body>
+    Poisson firing statistics are fundamental in neural coding. For a Poisson distribution with rate parameter λ:
+  </Body>
+
+  <Code lang="python">
+def fisher_info_poisson(rate, duration=1.0):
+    """
+    Fisher information for Poisson rate parameter.
+
+    For spike count N ~ Poisson(λT) where T is observation duration:
+    p(n; λ) = (λT)^n exp(-λT) / n!
+    log p = n log(λT) - λT - log(n!)
+    ∂/∂λ log p = n/λ - T
+    I(λ) = E[(n/λ - T)²] = Var(n)/λ² = λT/λ² = T/λ
+
+    Interpretation: Higher firing rate → LESS precision per spike
+    (but more spikes, so total information can increase)
+
+    Parameters:
+    -----------
+    rate : float
+        Firing rate λ (spikes/s)
+    duration : float
+        Observation duration T (s)
+
+    Returns:
+    --------
+    I : float
+        Fisher information for λ
+    """
+    return duration / rate
+
+# Example: How precisely can we estimate firing rate?
+rate = 50.0   # spikes/second
+T = 1.0       # 1 second observation
+
+I_lambda = fisher_info_poisson(rate, T)
+min_std_rate = np.sqrt(1 / I_lambda)
+
+print(f"Fisher information: I(λ) = {I_lambda:.4f} s²/spike²")
+print(f"Minimum std dev of rate estimate: {min_std_rate:.2f} spikes/s")
+# The Cramér-Rao bound gives: std(λ̂) ≥ √(λ/T) = √50 ≈ 7.07 spikes/s
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>What is the Fisher information for the mean of a Gaussian distribution N(μ, σ²)?</Front>
+    <Back>For estimating μ with known σ²: I(μ) = 1/σ². This means smaller variance leads to more information about the mean. For n independent samples, the Fisher information is n/σ². The Cramér-Rao bound gives Var(μ̂) ≥ σ²/n, achieved by the sample mean.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q2">
+    <Prompt>Which statements about Fisher information for Poisson spike counts are correct? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Fisher information for the rate parameter λ is I(λ) = T/λ where T is observation duration</Option>
+      <Option correct="true">Longer observation times increase Fisher information linearly</Option>
+      <Option>Higher firing rates always lead to more Fisher information</Option>
+      <Option correct="true">For fixed observation time, higher rates decrease Fisher information per spike</Option>
+      <Option>The Cramér-Rao bound for rate estimation is independent of the true rate</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Multi-Parameter Fisher Information Matrix</H2>
+
+  <Body>
+    When estimating multiple parameters θ = (θ₁, θ₂, ..., θₖ), Fisher information generalizes to a matrix. The Fisher information matrix has elements:
+  </Body>
+
+  <Body>
+    I_ij(θ) = E[∂ log p(x; θ)/∂θ_i · ∂ log p(x; θ)/∂θ_j] = -E[∂² log p(x; θ)/∂θ_i ∂θ_j]
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+
+def fisher_information_matrix(theta, log_likelihood, data_samples, eps=1e-5):
+    """
+    Compute the Fisher information matrix numerically.
+
+    Parameters:
+    -----------
+    theta : array_like
+        Parameter vector (k parameters)
+    log_likelihood : callable
+        Function log_likelihood(x, theta) returning log p(x; theta)
+    data_samples : array_like
+        Samples from the distribution
+    eps : float
+        Finite difference step size
+
+    Returns:
+    --------
+    I : ndarray
+        k x k Fisher information matrix
+    """
+    k = len(theta)
+    n_samples = len(data_samples)
+
+    # Compute score vectors for all samples
+    scores = np.zeros((n_samples, k))
+
+    for i, x in enumerate(data_samples):
+        for j in range(k):
+            theta_plus = theta.copy()
+            theta_minus = theta.copy()
+            theta_plus[j] += eps
+            theta_minus[j] -= eps
+            scores[i, j] = (log_likelihood(x, theta_plus) -
+                           log_likelihood(x, theta_minus)) / (2 * eps)
+
+    # Fisher information matrix = E[score @ score.T]
+    I = np.zeros((k, k))
+    for i in range(n_samples):
+        I += np.outer(scores[i], scores[i])
+    I /= n_samples
+
+    return I
+
+# Example: Fisher information matrix for 2D Gaussian
+def log_likelihood_gaussian_2d(x, theta):
+    """Log-likelihood for N(μ, σ²) with θ = [μ, σ²]."""
+    mu, sigma_sq = theta
+    return -0.5 * np.log(2 * np.pi * sigma_sq) - (x - mu)**2 / (2 * sigma_sq)
+
+# True parameters
+mu_true, sigma_sq_true = 5.0, 4.0
+theta_true = np.array([mu_true, sigma_sq_true])
+
+# Generate samples
+np.random.seed(42)
+data = np.random.normal(mu_true, np.sqrt(sigma_sq_true), 1000)
+
+# Compute Fisher information matrix
+I_matrix = fisher_information_matrix(theta_true, log_likelihood_gaussian_2d, data)
+print("Fisher Information Matrix:")
+print(f"  I(μ,μ) = {I_matrix[0,0]:.4f} (theory: 1/σ² = {1/sigma_sq_true:.4f})")
+print(f"  I(σ²,σ²) = {I_matrix[1,1]:.6f} (theory: 1/(2σ⁴) = {1/(2*sigma_sq_true**2):.6f})")
+print(f"  I(μ,σ²) = {I_matrix[0,1]:.6f} (theory: 0)")
+  </Code>
+
+  <Body>
+    The multi-parameter Cramér-Rao bound states that the covariance matrix of any unbiased estimator satisfies:
+  </Body>
+
+  <Body>
+    Cov(θ̂) ≥ I(θ)⁻¹ (matrix inequality: Cov(θ̂) - I(θ)⁻¹ is positive semidefinite)
+  </Body>
+
+  <Body>
+    Off-diagonal elements of I(θ)⁻¹ reveal correlations between parameter estimates. When parameters are orthogonal (I_ij = 0 for i ≠ j), they can be estimated independently, and the bound reduces to single-parameter bounds.
+  </Body>
+
+  <MatchPairs id="q3">
+    <Prompt>Match each Fisher information concept with its definition or property:</Prompt>
+    <Pairs>
+      <Pair><Left>Score function s(θ)</Left><Right>∂ log p(x; θ) / ∂θ</Right></Pair>
+      <Pair><Left>Fisher information I(θ)</Left><Right>Var(score) = E[s(θ)²]</Right></Pair>
+      <Pair><Left>Cramér-Rao bound</Left><Right>Var(θ̂) ≥ 1/I(θ)</Right></Pair>
+      <Pair><Left>Efficient estimator</Left><Right>Achieves the Cramér-Rao bound</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>E[θ̂] = θ</Distractor>
+      <Distractor>H(X) - H(X|θ)</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Jeffreys Prior: The Non-Informative Prior</H2>
+
+  <Body>
+    Jeffreys prior provides a principled approach to constructing non-informative priors in Bayesian inference. It is defined as:
+  </Body>
+
+  <Body>
+    p(θ) ∝ √I(θ)
+  </Body>
+
+  <Body>
+    The key property of Jeffreys prior is invariance under reparameterization. If we transform θ to φ = g(θ), the Jeffreys prior for φ is exactly what we would obtain by transforming the Jeffreys prior for θ. This ensures that our "non-informative" prior doesn't secretly favor certain parameter values due to our choice of parameterization.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def jeffreys_prior_gaussian_variance(sigma_sq):
+    """
+    Jeffreys prior for Gaussian variance.
+
+    I(σ²) = 1/(2σ⁴)
+    Jeffreys prior: p(σ²) ∝ √I(σ²) = 1/(√2 · σ²) ∝ 1/σ²
+
+    This is an improper prior (doesn't integrate to 1),
+    but leads to proper posteriors with data.
+    """
+    return 1.0 / sigma_sq
+
+def jeffreys_prior_poisson_rate(rate):
+    """
+    Jeffreys prior for Poisson rate parameter.
+
+    I(λ) = T/λ (for observation time T=1)
+    Jeffreys prior: p(λ) ∝ √I(λ) = 1/√λ
+
+    This prior gives more weight to smaller rates,
+    compensating for the fact that high rates are
+    easier to estimate precisely.
+    """
+    return 1.0 / np.sqrt(rate)
+
+# Visualize Jeffreys priors
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+# Gaussian variance
+sigma_sq = np.linspace(0.1, 5, 100)
+axes[0].plot(sigma_sq, jeffreys_prior_gaussian_variance(sigma_sq), 'b-', lw=2)
+axes[0].set_xlabel(r'$\sigma^2$')
+axes[0].set_ylabel(r'$p(\sigma^2) \propto 1/\sigma^2$')
+axes[0].set_title('Jeffreys Prior for Gaussian Variance')
+
+# Poisson rate
+rates = np.linspace(0.1, 10, 100)
+axes[1].plot(rates, jeffreys_prior_poisson_rate(rates), 'r-', lw=2)
+axes[1].set_xlabel(r'$\lambda$')
+axes[1].set_ylabel(r'$p(\lambda) \propto 1/\sqrt{\lambda}$')
+axes[1].set_title('Jeffreys Prior for Poisson Rate')
+
+plt.tight_layout()
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What is Jeffreys prior and why is it used?</Front>
+    <Back>Jeffreys prior is p(θ) ∝ √I(θ), a non-informative prior derived from Fisher information. It is used because: (1) It is invariant under reparameterization—the same prior regardless of how we express the parameter; (2) It represents "maximum ignorance" about θ in a principled way; (3) It often yields good frequentist properties (matching coverage probabilities).</Back>
+  </FlashCard>
+
+  <SingleSelect id="q4">
+    <Prompt>For a Poisson distribution with rate λ, the Fisher information is I(λ) = T/λ. What is the Jeffreys prior for λ?</Prompt>
+    <Options>
+      <Option correct="true">p(λ) ∝ 1/√λ</Option>
+      <Option>p(λ) ∝ λ</Option>
+      <Option>p(λ) ∝ 1/λ</Option>
+      <Option>p(λ) ∝ √λ</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Application: Fisher Information in Neuronal Models</H2>
+
+  <Body>
+    In computational neuroscience, Fisher information helps us understand how precisely we can estimate biophysical parameters from neural recordings. Consider an integrate-and-fire neuron where we want to estimate the firing threshold V_th from observed spike times.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.stats import norm
+
+def lif_spike_probability(dt, V_th, mu, sigma):
+    """
+    Probability of spiking in time interval dt for leaky IF neuron.
+
+    Assumes membrane potential is approximately Gaussian-distributed
+    due to synaptic noise, with mean μ and std σ.
+
+    Parameters:
+    -----------
+    dt : float
+        Time step
+    V_th : float
+        Firing threshold (parameter to estimate)
+    mu : float
+        Mean membrane potential
+    sigma : float
+        Standard deviation of membrane potential
+
+    Returns:
+    --------
+    p_spike : float
+        Probability of spiking in interval dt
+    """
+    # Probability that V exceeds threshold
+    p_above = 1 - norm.cdf(V_th, loc=mu, scale=sigma)
+    # For small dt, approximate spike probability
+    return p_above * dt
+
+def fisher_info_threshold(V_th, mu, sigma, T, dt=0.001):
+    """
+    Fisher information for threshold estimation in IF model.
+
+    We observe spike train and want to estimate V_th.
+    Uses the fact that spike probability depends on V_th.
+
+    Parameters:
+    -----------
+    V_th : float
+        Firing threshold (mV)
+    mu : float
+        Mean membrane potential (mV)
+    sigma : float
+        Membrane potential std (mV)
+    T : float
+        Total observation time (s)
+    dt : float
+        Time resolution (s)
+
+    Returns:
+    --------
+    I : float
+        Fisher information for V_th
+    """
+    n_bins = int(T / dt)
+
+    # Compute spike probability and its derivative w.r.t. V_th
+    z = (V_th - mu) / sigma
+    p = 1 - norm.cdf(z)  # P(V &gt; V_th)
+
+    # dp/dV_th = -φ(z)/σ where φ is standard normal pdf
+    dp_dVth = -norm.pdf(z) / sigma
+
+    # For Bernoulli observation in each bin:
+    # I(V_th) = (dp/dV_th)² / (p(1-p)) per bin
+    # Sum over all bins
+    if p &gt; 0 and p &lt; 1:
+        I_per_bin = dp_dVth**2 / (p * (1 - p))
+        return n_bins * I_per_bin
+    else:
+        return 0.0
+
+# Example: How precisely can we estimate threshold?
+V_th = -50.0    # True threshold (mV)
+mu = -55.0      # Mean membrane potential (mV)
+sigma = 5.0     # Membrane potential std (mV)
+T = 10.0        # 10 seconds of recording
+
+I = fisher_info_threshold(V_th, mu, sigma, T)
+min_std_Vth = np.sqrt(1/I) if I &gt; 0 else np.inf
+
+print(f"Fisher information for V_th: {I:.2f} mV^{{-2}}")
+print(f"Cramér-Rao bound on std dev: {min_std_Vth:.4f} mV")
+  </Code>
+
+  <Body>
+    This analysis reveals that threshold estimation precision depends critically on how close the mean membrane potential is to threshold—when mu is far below V_th, spikes are rare and we learn little about V_th per unit time. Optimal experimental conditions for threshold estimation involve driving the membrane potential close to (but below) threshold.
+  </Body>
+
+  <FillBlanks id="q5">
+    <Prompt>
+      Fisher information I(θ) measures how much data reveals about a <Blank>parameter</Blank>.
+      The Cramér-Rao bound states that no unbiased estimator can have variance less than <Blank>1/I(θ)</Blank>.
+      An estimator that achieves this bound is called <Blank>efficient</Blank>.
+      Jeffreys prior p(θ) ∝ <Blank>√I(θ)</Blank> provides a non-informative prior that is invariant under reparameterization.
+    </Prompt>
+    <Distractors>
+      <Distractor>stimulus</Distractor>
+      <Distractor>I(θ)</Distractor>
+      <Distractor>maximum likelihood</Distractor>
+      <Distractor>I(θ)²</Distractor>
+      <Distractor>unbiased</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Optimal Experimental Design</H2>
+
+  <Body>
+    Fisher information provides a principled foundation for optimal experimental design. The key insight is that experimental conditions (stimuli, recording duration, etc.) affect how much information we gather about parameters. By maximizing Fisher information, we can design experiments that yield the most precise parameter estimates.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize_scalar
+
+def optimal_stimulus_for_threshold(mu_range, sigma, V_th_true, T):
+    """
+    Find optimal mean membrane potential for threshold estimation.
+
+    We want to find μ that maximizes Fisher information about V_th.
+
+    Parameters:
+    -----------
+    mu_range : tuple
+        (mu_min, mu_max) range to search
+    sigma : float
+        Fixed membrane potential std
+    V_th_true : float
+        True threshold (assumed known approximately)
+    T : float
+        Recording duration
+
+    Returns:
+    --------
+    mu_optimal : float
+        Mean membrane potential that maximizes I(V_th)
+    """
+    from scipy.stats import norm
+
+    def neg_fisher_info(mu):
+        z = (V_th_true - mu) / sigma
+        p = 1 - norm.cdf(z)
+        if p &lt;= 0.001 or p &gt;= 0.999:
+            return 1e10  # Avoid extreme probabilities
+        dp_dVth = -norm.pdf(z) / sigma
+        I = (T / 0.001) * dp_dVth**2 / (p * (1 - p))
+        return -I  # Negative for minimization
+
+    result = minimize_scalar(neg_fisher_info, bounds=mu_range, method='bounded')
+    return result.x
+
+# Example: Find optimal stimulus
+sigma = 5.0
+V_th = -50.0
+T = 10.0
+
+mu_opt = optimal_stimulus_for_threshold((-70, -45), sigma, V_th, T)
+print(f"Optimal mean membrane potential: {mu_opt:.2f} mV")
+print(f"Distance below threshold: {V_th - mu_opt:.2f} mV")
+# Optimal is typically ~0.6σ below threshold
+  </Code>
+
+  <Body>
+    For threshold estimation, the optimal stimulus drives the membrane potential to approximately 0.6σ below threshold—a balance between having enough spikes to observe (information) and having spikes be informative about the threshold location.
+  </Body>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these steps for using Fisher information in optimal experimental design (from first to last):</Prompt>
+    <SortedItems>
+      <Item>Define the parameter(s) of interest (e.g., threshold, conductance)</Item>
+      <Item>Derive or compute Fisher information as a function of experimental conditions</Item>
+      <Item>Identify which experimental variables can be controlled (e.g., stimulus amplitude)</Item>
+      <Item>Maximize Fisher information over controllable variables</Item>
+      <Item>Implement the optimal experimental protocol</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Fisher Information vs. Mutual Information</H2>
+
+  <Body>
+    Fisher information and mutual information are related but distinct concepts. Shannon's mutual information I(X;S) measures how much knowing the response X reduces uncertainty about the stimulus S. Fisher information I(θ) measures how precisely we can estimate a continuous parameter θ from observations.
+  </Body>
+
+  <Body>
+    A beautiful connection emerges asymptotically: for large sample sizes and regular models, the two quantities become proportional. Specifically, the mutual information between n observations and parameter θ approaches:
+  </Body>
+
+  <Body>
+    I(X₁,...,Xₙ; θ) ≈ (1/2) log(n · I(θ) / 2πe) as n → ∞
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+
+def mutual_info_parameter_asymptotic(n, fisher_info):
+    """
+    Asymptotic mutual information between n samples and parameter.
+
+    For large n, I(X^n; θ) ≈ 0.5 * log(n * I(θ) / (2πe))
+
+    This shows how Fisher information determines the asymptotic
+    rate of information accumulation about parameters.
+
+    Parameters:
+    -----------
+    n : int
+        Number of observations
+    fisher_info : float
+        Fisher information (single observation)
+
+    Returns:
+    --------
+    I_mutual : float
+        Approximate mutual information (in nats)
+    """
+    return 0.5 * np.log(n * fisher_info / (2 * np.pi * np.e))
+
+# Example: Information accumulation in Gaussian mean estimation
+sigma = 2.0
+fisher_info = 1 / sigma**2  # For Gaussian mean
+
+for n in [10, 100, 1000, 10000]:
+    I_asymp = mutual_info_parameter_asymptotic(n, fisher_info)
+    print(f"n = {n:5d}: I(X^n; μ) ≈ {I_asymp:.3f} nats = {I_asymp/np.log(2):.3f} bits")
+  </Code>
+
+  <FlashCard id="fc6">
+    <Front>How do Fisher information and mutual information differ conceptually?</Front>
+    <Back>Mutual information I(X;S) measures stimulus-response dependence: how much does observing X tell us about which stimulus occurred? Fisher information I(θ) measures parameter estimation precision: how precisely can we estimate θ from data? Mutual information is about discrimination between discrete stimuli; Fisher information is about estimating continuous parameters. They converge asymptotically in appropriate limits.</Back>
+  </FlashCard>
+
+  <H2>Regularity Conditions and Limitations</H2>
+
+  <Body>
+    The Cramér-Rao bound requires several regularity conditions that can fail in practice:
+  </Body>
+
+  <Body>
+    1. The support of p(x; θ) must not depend on θ. Counter-example: Uniform(0, θ) distribution—the MLE achieves variance O(1/n²), beating the naive Cramér-Rao bound.
+  </Body>
+
+  <Body>
+    2. The log-likelihood must be twice differentiable with respect to θ.
+  </Body>
+
+  <Body>
+    3. The order of integration and differentiation must be interchangeable.
+  </Body>
+
+  <Body>
+    4. Fisher information must be finite and positive.
+  </Body>
+
+  <Code lang="python">
+# Counter-example: Uniform(0, θ) distribution
+# The Cramér-Rao bound doesn't apply because the support depends on θ
+
+import numpy as np
+
+def uniform_mle_variance(theta_true, n_samples, n_simulations=10000):
+    """
+    Empirically compute variance of MLE for Uniform(0, θ).
+
+    MLE is θ̂ = max(X₁, ..., Xₙ)
+    True variance is θ² / (n(n+2)), which is O(1/n²), not O(1/n)!
+    This beats what we'd naively expect from Cramér-Rao.
+    """
+    mle_estimates = []
+
+    for _ in range(n_simulations):
+        samples = np.random.uniform(0, theta_true, n_samples)
+        mle = np.max(samples)
+        mle_estimates.append(mle)
+
+    return np.var(mle_estimates)
+
+# Compare empirical variance to theoretical
+theta = 1.0
+for n in [10, 50, 100, 500]:
+    empirical_var = uniform_mle_variance(theta, n)
+    theoretical_var = theta**2 / (n * (n + 2))
+    cr_naive = theta**2 / n  # What Cramér-Rao would give (if it applied)
+
+    print(f"n={n:3d}: Empirical={empirical_var:.6f}, "
+          f"Theory={theoretical_var:.6f}, "
+          f"Naive CR={cr_naive:.6f}")
+# Notice: actual variance is much smaller than naive CR!
+  </Code>
+
+  <MultiSelect id="q7">
+    <Prompt>Which of the following are valid regularity conditions required for the Cramér-Rao bound? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The support of p(x; θ) must not depend on θ</Option>
+      <Option correct="true">Fisher information must be finite and positive</Option>
+      <Option>The estimator must be the maximum likelihood estimator</Option>
+      <Option correct="true">The log-likelihood must be twice differentiable with respect to θ</Option>
+      <Option>The parameter θ must be one-dimensional</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Summary and Key Takeaways</H2>
+
+  <Body>
+    Fisher information provides a fundamental framework for understanding parameter estimation in statistical and neural models:
+  </Body>
+
+  <Body>
+    • Fisher information I(θ) = E[(∂ log p/∂θ)²] = -E[∂² log p/∂θ²] quantifies information about θ in data
+  </Body>
+
+  <Body>
+    • The Cramér-Rao bound Var(θ̂) ≥ 1/I(θ) establishes fundamental limits on estimation precision
+  </Body>
+
+  <Body>
+    • Efficient estimators achieve the Cramér-Rao bound; MLEs are asymptotically efficient
+  </Body>
+
+  <Body>
+    • Jeffreys prior p(θ) ∝ √I(θ) provides a principled non-informative prior
+  </Body>
+
+  <Body>
+    • For multiple parameters, Fisher information generalizes to a matrix with Cov(θ̂) ≥ I(θ)⁻¹
+  </Body>
+
+  <Body>
+    • Optimal experimental design maximizes Fisher information over controllable variables
+  </Body>
+
+  <Body>
+    • Fisher and mutual information are asymptotically related but serve different purposes
+  </Body>
+
+  <Subjective id="q8">
+    <Prompt>A neuroscientist wants to estimate the synaptic time constant τ of a postsynaptic neuron. They can control the stimulation rate (frequency of presynaptic spikes). Explain how Fisher information could guide their experimental design. What considerations should determine their choice of stimulation frequency? Address potential limitations of this approach.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that Fisher information I(τ) should be computed as a function of stimulation frequency, and the optimal frequency maximizes I(τ)</Requirement>
+        <Indicators>Fisher information, maximize, optimal, stimulation frequency, derivative, log-likelihood</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Discusses the trade-off between having enough synaptic events (high frequency) and having events be informative about τ (separation between events)</Requirement>
+        <Indicators>trade-off, balance, enough events, separation, overlap, temporal resolution</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions practical considerations such as synaptic depression, refractory effects, or other nonlinearities at high frequencies</Requirement>
+        <Indicators>synaptic depression, facilitation, refractory, nonlinear, saturation, adaptation</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Addresses limitations such as regularity conditions, model misspecification, or finite-sample effects</Requirement>
+        <Indicators>regularity, assumption, model, misspecification, finite sample, asymptotic, approximation</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="400" />
+  </Subjective>
+
+  <SingleSelect id="q9">
+    <Prompt>For a Gaussian distribution N(μ, σ²) with unknown mean and known variance, the sample mean X̄ achieves the Cramér-Rao bound. What does this tell us about the sample mean as an estimator?</Prompt>
+    <Options>
+      <Option correct="true">It is an efficient estimator—no unbiased estimator can have lower variance</Option>
+      <Option>It is a biased estimator that should be corrected</Option>
+      <Option>It only works for large sample sizes</Option>
+      <Option>It has the minimum possible bias among all estimators</Option>
+    </Options>
+  </SingleSelect>
+
+  <FlashCard id="fc7">
+    <Front>What is an efficient estimator?</Front>
+    <Back>An efficient estimator is an unbiased estimator that achieves the Cramér-Rao bound: Var(θ̂) = 1/I(θ). Not all parameters have efficient estimators for finite samples, but the MLE is asymptotically efficient (achieves the bound as n → ∞). Efficiency indicates optimal use of information in the data.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc8">
+    <Front>How does Fisher information scale with sample size for i.i.d. observations?</Front>
+    <Back>For n independent and identically distributed observations, Fisher information scales linearly: I_n(θ) = n · I₁(θ), where I₁ is the Fisher information from a single observation. This means the Cramér-Rao bound on variance decreases as 1/n, explaining why more data yields more precise estimates.</Back>
+  </FlashCard>
+
+</Lesson>

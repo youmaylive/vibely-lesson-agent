@@ -1,0 +1,872 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-07-02</Id>
+    <Title>Saccadic Eye Movements: Optimal Control Model</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>optimal-control</Tag>
+      <Tag>saccades</Tag>
+      <Tag>motor-control</Tag>
+      <Tag>variance-minimization</Tag>
+      <Tag>signal-dependent-noise</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Saccadic Eye Movements: Optimal Control Model</H1>
+
+  <Body>
+    Saccadic eye movements are among the fastest and most precise movements in the human motor repertoire. These rapid, ballistic-like rotations of the eyes occur when we shift our gaze from one point of visual interest to another. Despite their apparent simplicity, saccades reveal profound principles about how the nervous system solves control problems under uncertainty.
+  </Body>
+
+  <Body>
+    In this lesson, we apply the optimal control framework from Lesson 7.1 to derive a quantitative model of saccadic eye movements. We will discover that the stereotyped velocity profiles observed in saccades—characterized by bell-shaped velocity curves and a characteristic relationship between peak velocity and amplitude (the "main sequence")—emerge naturally from variance minimization in the presence of signal-dependent noise. This demonstrates how the brain implements sophisticated control strategies to achieve precise, rapid movements despite the inherent noisiness of neural processing.
+  </Body>
+
+  <FlashCard id="fc1">
+    <Front>What is a saccadic eye movement?</Front>
+    <Back>A rapid, ballistic-like rotation of the eyes that shifts gaze from one fixation point to another. Saccades are among the fastest movements in the human body, typically lasting 30-100ms depending on amplitude.</Back>
+  </FlashCard>
+
+  <H2>The Saccadic Control System</H2>
+
+  <Body>
+    The oculomotor system that generates saccades can be modeled as a second-order dynamical system. The eye globe, suspended in the orbit by extraocular muscles and connective tissue, behaves approximately as a mass-spring-damper system. However, for saccades, the relevant dynamics are dominated by the neural control signals and the mechanical properties of the eye plant.
+  </Body>
+
+  <H3>State-Space Representation</H3>
+
+  <Body>
+    We represent the saccadic system using two state variables: eye position x₁ and eye velocity x₂. The dynamics follow a second-order linear system driven by a control input u (the neural command signal):
+  </Body>
+
+  <Code lang="python">
+# State variables for saccadic dynamics
+# x1 = eye position (degrees)
+# x2 = eye velocity (degrees/second)
+# u = control input (desired position command)
+
+# Time constants (typical values from experimental data)
+tau1 = 0.224  # seconds (reciprocal of pole at ~4.5 Hz)
+tau2 = 0.013  # seconds (reciprocal of pole at ~77 Hz)
+  </Code>
+
+  <Body>
+    The state equations take the form:
+  </Body>
+
+  <Code lang="python">
+# Saccadic dynamics equations
+# dx1/dt = x2                                    (position derivative is velocity)
+# dx2/dt = -(1/(tau1*tau2))*x1 - (1/tau2)*x2 + (1/(tau1*tau2))*u
+  </Code>
+
+  <Body>
+    In matrix form, this becomes ẋ = Ax + Bu where:
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+
+# System matrices for saccadic dynamics
+tau1, tau2 = 0.224, 0.013
+
+A = np.array([
+    [0, 1],
+    [-1/(tau1*tau2), -1/tau2]
+])
+
+B = np.array([
+    [0],
+    [1/(tau1*tau2)]
+])
+
+print(f"A matrix:\n{A}")
+print(f"B matrix:\n{B}")
+# A matrix:
+# [[   0.       1.    ]
+#  [-343.36  -76.92  ]]
+# B matrix:
+# [[  0.  ]
+#  [343.36]]
+  </Code>
+
+  <FlashCard id="fc2">
+    <Front>What are the two state variables in the saccadic control model?</Front>
+    <Back>x₁ = eye position (in degrees) and x₂ = eye velocity (in degrees/second). The position derivative equals velocity (dx₁/dt = x₂), while velocity is governed by second-order dynamics.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>In the saccadic dynamics equation dx₂/dt = -(1/τ₁τ₂)x₁ - (1/τ₂)x₂ + (1/τ₁τ₂)u, what does the term -(1/τ₂)x₂ represent?</Prompt>
+    <Options>
+      <Option correct="true">Viscous damping proportional to velocity</Option>
+      <Option>Elastic restoring force proportional to position</Option>
+      <Option>Neural control signal input</Option>
+      <Option>Inertial acceleration of the eye globe</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Signal-Dependent Noise in Motor Control</H2>
+
+  <Body>
+    A crucial insight from motor neuroscience is that the noise in motor commands is not constant—it scales with the magnitude of the control signal. This phenomenon, known as signal-dependent noise, has profound implications for optimal control strategies.
+  </Body>
+
+  <Body>
+    When we send a larger control signal (e.g., commanding a faster movement), the variability in that signal also increases. This can be modeled as:
+  </Body>
+
+  <Code lang="python">
+# Signal-dependent noise model
+# u_actual = u_intended + noise
+# where noise ~ N(0, (k * |u_intended|)^2)
+# k is the coefficient of variation (typically 0.05-0.15)
+
+import numpy as np
+
+def noisy_control(u_intended, k=0.1):
+    """
+    Generate control signal with signal-dependent noise.
+
+    Parameters:
+    -----------
+    u_intended : float
+        The intended (mean) control signal
+    k : float
+        Coefficient of variation (noise scales as k * |u|)
+
+    Returns:
+    --------
+    u_actual : float
+        The actual control signal with noise
+    """
+    noise_std = k * np.abs(u_intended)
+    noise = np.random.normal(0, noise_std)
+    return u_intended + noise
+  </Code>
+
+  <Body>
+    The experimental evidence for signal-dependent noise comes from studies showing that movement endpoint variance increases with movement speed and force. This observation is robust across different motor systems, including saccades, reaching movements, and force production tasks.
+  </Body>
+
+  <FlashCard id="fc3">
+    <Front>What is signal-dependent noise in motor control?</Front>
+    <Back>Signal-dependent noise means that the variability (standard deviation) of motor commands scales proportionally with the magnitude of the command signal. Larger control signals have proportionally larger noise, with variance σ² ∝ |u|².</Back>
+  </FlashCard>
+
+  <MultiSelect id="q2">
+    <Prompt>Which of the following are consequences of signal-dependent noise in motor control? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Faster movements tend to be more variable</Option>
+      <Option correct="true">The optimal control strategy is not simply "bang-bang" control</Option>
+      <Option>Movement duration is independent of amplitude</Option>
+      <Option correct="true">There is a trade-off between speed and accuracy</Option>
+      <Option>Noise can be eliminated by averaging multiple commands</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Variance Minimization Problem</H2>
+
+  <Body>
+    Given signal-dependent noise, what control strategy should the brain use? Harris and Wolpert (1998) proposed that the nervous system minimizes the variance of the movement endpoint while achieving the desired target. This leads to a variance minimization optimal control problem.
+  </Body>
+
+  <H3>Problem Formulation</H3>
+
+  <Body>
+    Consider a saccade from initial position x₀ to target position x_target that must be completed by time T. The optimization problem is:
+  </Body>
+
+  <Code lang="python">
+"""
+Variance Minimization Problem for Saccades
+==========================================
+
+Minimize: E[x₁²(T)]  (expected squared position error at movement end)
+
+Subject to:
+- Dynamics: dx/dt = Ax + Bu + noise(u)
+- Initial condition: x(0) = [x₀, 0]ᵀ (starting position, zero velocity)
+- Terminal constraint: E[x(T)] = [x_target, 0]ᵀ (target position, zero velocity)
+
+The key insight is that signal-dependent noise makes the variance of
+the final position depend on the control history u(t).
+
+Variance contribution from control:
+Var[x₁(T)] = ∫₀ᵀ k² u²(t) × (influence of u(t) on x₁(T))² dt
+"""
+  </Code>
+
+  <Body>
+    The solution to this problem reveals that the optimal control signal is not a simple step function (which would minimize time) but rather a smooth, modulated signal that balances speed against the noise penalty.
+  </Body>
+
+  <FillBlanks id="q3">
+    <Prompt>
+      In the variance minimization framework for saccades, the objective is to minimize the expected <Blank>squared error</Blank> of the final eye position. This is necessary because motor commands are corrupted by <Blank>signal-dependent</Blank> noise, where the noise magnitude scales with the <Blank>control signal</Blank> magnitude.
+    </Prompt>
+    <Distractors>
+      <Distractor>absolute error</Distractor>
+      <Distractor>constant</Distractor>
+      <Distractor>movement duration</Distractor>
+      <Distractor>velocity profile</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H3>Optimal Control Solution</H3>
+
+  <Body>
+    For the linear-quadratic-Gaussian (LQG) formulation with signal-dependent noise, the optimal control law takes a state-feedback form u*(x,t) = -K(t)x(t), where the gain matrix K(t) is computed from a modified Riccati equation.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import odeint
+from scipy.linalg import solve_continuous_are
+
+def solve_saccade_optimal_control(x_target, T, tau1=0.224, tau2=0.013, k=0.1, dt=0.001):
+    """
+    Solve the variance-minimization optimal control problem for saccades.
+
+    Parameters:
+    -----------
+    x_target : float
+        Target eye position (degrees)
+    T : float
+        Movement duration (seconds)
+    tau1, tau2 : float
+        Time constants of the oculomotor plant
+    k : float
+        Signal-dependent noise coefficient
+    dt : float
+        Time step for simulation
+
+    Returns:
+    --------
+    t : array
+        Time vector
+    x : array
+        State trajectory [position, velocity]
+    u : array
+        Optimal control signal
+    """
+    # System matrices
+    A = np.array([[0, 1], [-1/(tau1*tau2), -1/tau2]])
+    B = np.array([[0], [1/(tau1*tau2)]])
+
+    # Cost matrices for variance minimization
+    # Q penalizes state deviation, R penalizes control effort (modified by k²)
+    Q = np.zeros((2, 2))  # No running state cost
+    R = np.array([[k**2]])  # Control cost (variance penalty)
+
+    # Terminal cost: position accuracy at time T
+    Qf = np.array([[1, 0], [0, 0]])  # Only penalize final position error
+
+    # Solve Riccati equation (simplified steady-state approximation)
+    # For full time-varying solution, integrate backward from Qf
+    P = solve_continuous_are(A, B, Q, R)
+    K = np.linalg.inv(R) @ B.T @ P
+
+    # Simulate closed-loop dynamics
+    t = np.arange(0, T, dt)
+    n_steps = len(t)
+
+    x = np.zeros((n_steps, 2))
+    u = np.zeros(n_steps)
+
+    # Initial condition: at origin, zero velocity
+    x[0] = [0, 0]
+
+    # Target-relative control: drive (x - x_target) to zero
+    x_target_vec = np.array([x_target, 0])
+
+    for i in range(n_steps - 1):
+        # State error from target
+        x_error = x[i] - x_target_vec
+
+        # Optimal feedback control
+        u[i] = -K @ x_error
+
+        # State derivative
+        dx = A @ x[i].reshape(-1, 1) + B * u[i]
+
+        # Euler integration
+        x[i+1] = x[i] + dx.flatten() * dt
+
+    return t, x, u
+
+# Example: 10-degree saccade
+t, x, u = solve_saccade_optimal_control(x_target=10, T=0.08)
+print(f"Final position: {x[-1, 0]:.2f} degrees")
+print(f"Peak velocity: {np.max(x[:, 1]):.1f} deg/s")
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>What form does the optimal control law take in the variance minimization problem for saccades?</Front>
+    <Back>A linear state-feedback law: u*(x,t) = -K(t)x(t), where K(t) is a time-varying gain matrix computed from a Riccati differential equation. This feedback form automatically adjusts the control based on the current state.</Back>
+  </FlashCard>
+
+  <H2>The Main Sequence</H2>
+
+  <Body>
+    One of the most robust empirical findings in saccade research is the "main sequence"—a characteristic relationship between saccade amplitude and peak velocity. For human saccades, peak velocity increases approximately linearly with amplitude for small saccades but saturates for larger amplitudes.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def generate_main_sequence(amplitudes, tau1=0.224, tau2=0.013, k=0.1):
+    """
+    Generate the main sequence relationship by simulating saccades
+    of different amplitudes.
+
+    Parameters:
+    -----------
+    amplitudes : array
+        Array of saccade amplitudes (degrees)
+
+    Returns:
+    --------
+    peak_velocities : array
+        Peak velocities for each amplitude
+    durations : array
+        Movement durations for each amplitude
+    """
+    peak_velocities = []
+    durations = []
+
+    for amp in amplitudes:
+        # Duration scales approximately as sqrt(amplitude) for optimal control
+        T = 0.02 + 0.02 * np.sqrt(amp)
+
+        t, x, u = solve_saccade_optimal_control(x_target=amp, T=T, tau1=tau1, tau2=tau2, k=k)
+
+        peak_velocities.append(np.max(x[:, 1]))
+
+        # Duration: time to reach 90% of target
+        reach_idx = np.where(x[:, 0] &gt;= 0.9 * amp)[0]
+        if len(reach_idx) &gt; 0:
+            durations.append(t[reach_idx[0]])
+        else:
+            durations.append(T)
+
+    return np.array(peak_velocities), np.array(durations)
+
+# Generate main sequence
+amplitudes = np.linspace(1, 30, 15)
+peak_vel, dur = generate_main_sequence(amplitudes)
+
+# Fit exponential saturation model: V_peak = V_max * (1 - exp(-A/A0))
+# This is the typical empirical form of the main sequence
+  </Code>
+
+  <Body>
+    The main sequence can be approximated by: V_peak = V_max × (1 - exp(-A/A₀)), where V_max ≈ 500-600 deg/s is the asymptotic peak velocity and A₀ ≈ 10-15 degrees is a characteristic amplitude. Remarkably, the variance minimization model naturally produces this saturating relationship without explicitly encoding it.
+  </Body>
+
+  <MatchPairs id="q4">
+    <Prompt>Match each saccade characteristic with its typical value or description:</Prompt>
+    <Pairs>
+      <Pair><Left>Small saccade (5°) peak velocity</Left><Right>~200 deg/s</Right></Pair>
+      <Pair><Left>Large saccade (20°) peak velocity</Left><Right>~500 deg/s</Right></Pair>
+      <Pair><Left>Main sequence saturation amplitude</Left><Right>10-15 degrees</Right></Pair>
+      <Pair><Left>Typical saccade duration</Left><Right>30-100 ms</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>~50 deg/s</Distractor>
+      <Distractor>1-2 seconds</Distractor>
+      <Distractor>~1000 deg/s</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Velocity Profile Analysis</H2>
+
+  <Body>
+    The optimal control solution produces characteristic bell-shaped velocity profiles. The velocity rises smoothly to a peak near the middle of the movement, then decreases symmetrically (for small saccades) or asymmetrically (for larger saccades where the deceleration phase is longer).
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def analyze_velocity_profile(x_target, T):
+    """
+    Analyze the velocity profile of an optimal saccade.
+    """
+    t, x, u = solve_saccade_optimal_control(x_target=x_target, T=T)
+
+    position = x[:, 0]
+    velocity = x[:, 1]
+
+    # Find key characteristics
+    peak_vel = np.max(velocity)
+    peak_time_idx = np.argmax(velocity)
+    peak_time = t[peak_time_idx]
+
+    # Acceleration phase duration
+    accel_duration = peak_time
+
+    # Deceleration phase duration
+    decel_duration = T - peak_time
+
+    # Skewness: ratio of decel to accel duration
+    skewness = decel_duration / accel_duration if accel_duration &gt; 0 else np.inf
+
+    print(f"Saccade amplitude: {x_target} degrees")
+    print(f"Peak velocity: {peak_vel:.1f} deg/s")
+    print(f"Time to peak: {peak_time*1000:.1f} ms")
+    print(f"Acceleration duration: {accel_duration*1000:.1f} ms")
+    print(f"Deceleration duration: {decel_duration*1000:.1f} ms")
+    print(f"Profile skewness: {skewness:.2f}")
+
+    return t, position, velocity
+
+# Analyze different amplitude saccades
+print("=== Small Saccade (5°) ===")
+t1, pos1, vel1 = analyze_velocity_profile(5, 0.05)
+
+print("\n=== Medium Saccade (15°) ===")
+t2, pos2, vel2 = analyze_velocity_profile(15, 0.07)
+
+print("\n=== Large Saccade (25°) ===")
+t3, pos3, vel3 = analyze_velocity_profile(25, 0.09)
+  </Code>
+
+  <SingleSelect id="q5">
+    <Prompt>Why does the variance minimization model produce asymmetric velocity profiles for large saccades?</Prompt>
+    <Options>
+      <Option>The oculomotor plant has nonlinear dynamics</Option>
+      <Option correct="true">Larger control signals during acceleration incur more noise, so deceleration is prolonged to allow correction</Option>
+      <Option>The visual system cannot process fast motion during acceleration</Option>
+      <Option>Muscle fatigue causes slower deceleration</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Comparing Deterministic and Stochastic Trajectories</H2>
+
+  <Body>
+    To understand the effect of signal-dependent noise, we can compare the deterministic optimal trajectory with stochastic realizations. The variance across trials reveals how noise accumulates during the movement.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+
+def simulate_stochastic_saccade(x_target, T, k=0.1, n_trials=100, dt=0.001):
+    """
+    Simulate multiple stochastic saccade trials with signal-dependent noise.
+
+    Returns ensemble of trajectories for variance analysis.
+    """
+    tau1, tau2 = 0.224, 0.013
+    A = np.array([[0, 1], [-1/(tau1*tau2), -1/tau2]])
+    B = np.array([[0], [1/(tau1*tau2)]])
+
+    # Get optimal gain from deterministic solution
+    # (simplified: using fixed gain)
+    K = np.array([[10.0, 0.5]])  # Approximate optimal gain
+
+    t = np.arange(0, T, dt)
+    n_steps = len(t)
+
+    # Store all trials
+    all_positions = np.zeros((n_trials, n_steps))
+    all_velocities = np.zeros((n_trials, n_steps))
+
+    x_target_vec = np.array([x_target, 0])
+
+    for trial in range(n_trials):
+        x = np.array([0.0, 0.0])  # Initial state
+
+        for i in range(n_steps):
+            all_positions[trial, i] = x[0]
+            all_velocities[trial, i] = x[1]
+
+            if i &lt; n_steps - 1:
+                # Compute intended control
+                x_error = x - x_target_vec
+                u_intended = -K @ x_error
+
+                # Add signal-dependent noise
+                noise_std = k * np.abs(u_intended)
+                u_actual = u_intended + np.random.normal(0, noise_std)
+
+                # State update
+                dx = A @ x.reshape(-1, 1) + B * u_actual
+                x = x + dx.flatten() * dt
+
+    # Compute statistics
+    mean_position = np.mean(all_positions, axis=0)
+    std_position = np.std(all_positions, axis=0)
+
+    mean_velocity = np.mean(all_velocities, axis=0)
+    std_velocity = np.std(all_velocities, axis=0)
+
+    return t, mean_position, std_position, mean_velocity, std_velocity, all_positions
+
+# Simulate stochastic saccades
+t, mean_pos, std_pos, mean_vel, std_vel, all_pos = simulate_stochastic_saccade(
+    x_target=10, T=0.08, k=0.1, n_trials=100
+)
+
+print(f"Final position mean: {mean_pos[-1]:.2f} degrees")
+print(f"Final position std: {std_pos[-1]:.3f} degrees")
+print(f"Coefficient of variation: {std_pos[-1]/10*100:.2f}%")
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>How does endpoint variance grow during a saccade with signal-dependent noise?</Front>
+    <Back>Endpoint variance accumulates throughout the movement as each noisy control signal contributes to position uncertainty. The variance grows most rapidly during periods of high control magnitude (acceleration phase) and continues to accumulate until the movement ends.</Back>
+  </FlashCard>
+
+  <H2>Experimental Validation</H2>
+
+  <Body>
+    The variance minimization model makes several testable predictions that can be compared with experimental saccade data from humans and primates:
+  </Body>
+
+  <Code lang="python">
+"""
+Key Predictions of the Variance Minimization Model
+===================================================
+
+1. Main Sequence: Peak velocity saturates with amplitude
+   - Model: V_peak ∝ A for small A, saturates for large A
+   - Data: Confirmed in humans and monkeys
+
+2. Velocity Profile Shape: Bell-shaped, asymmetric for large saccades
+   - Model: Longer deceleration phase for large saccades
+   - Data: Confirmed across species
+
+3. Endpoint Variability: Increases with saccade amplitude
+   - Model: Var[endpoint] ∝ amplitude (approximately)
+   - Data: Confirmed in precision studies
+
+4. Speed-Accuracy Tradeoff: Faster movements are less accurate
+   - Model: Higher peak velocity → more accumulated noise
+   - Data: Confirmed in both speed and accuracy instructions
+
+5. Duration Scaling: Duration increases sub-linearly with amplitude
+   - Model: T ∝ √A (approximately)
+   - Data: Confirmed empirically
+"""
+
+def validate_model_predictions(experimental_data=None):
+    """
+    Compare model predictions with experimental data.
+
+    If no data provided, uses typical human saccade values.
+    """
+    # Typical experimental values (human data)
+    exp_amplitudes = np.array([5, 10, 15, 20, 25, 30])
+    exp_peak_vel = np.array([200, 350, 450, 500, 530, 550])  # deg/s
+    exp_duration = np.array([30, 45, 55, 65, 75, 85])  # ms
+    exp_endpoint_std = np.array([0.3, 0.5, 0.7, 0.9, 1.1, 1.3])  # degrees
+
+    # Generate model predictions
+    model_peak_vel, model_duration = generate_main_sequence(exp_amplitudes)
+
+    # Compare
+    vel_correlation = np.corrcoef(exp_peak_vel, model_peak_vel)[0, 1]
+    dur_correlation = np.corrcoef(exp_duration, model_duration * 1000)[0, 1]
+
+    print(f"Peak velocity correlation: r = {vel_correlation:.3f}")
+    print(f"Duration correlation: r = {dur_correlation:.3f}")
+
+    return vel_correlation, dur_correlation
+  </Code>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these events in the neural pathway for saccade generation, from visual input to eye movement:</Prompt>
+    <SortedItems>
+      <Item>Visual cortex processes target location</Item>
+      <Item>Frontal eye field selects saccade target</Item>
+      <Item>Superior colliculus computes motor command</Item>
+      <Item>Brainstem burst generator produces pulse signal</Item>
+      <Item>Extraocular muscles contract to rotate eye</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Parameter Fitting from Data</H2>
+
+  <Body>
+    To apply the model to real data, we need to estimate the system parameters (τ₁, τ₂, k) from experimental measurements. This can be done using maximum likelihood estimation or least-squares fitting.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+
+def fit_saccade_model(exp_amplitudes, exp_peak_velocities, exp_durations):
+    """
+    Fit the saccadic model parameters to experimental data.
+
+    Parameters:
+    -----------
+    exp_amplitudes : array
+        Experimental saccade amplitudes
+    exp_peak_velocities : array
+        Measured peak velocities
+    exp_durations : array
+        Measured saccade durations
+
+    Returns:
+    --------
+    params : dict
+        Fitted parameters (tau1, tau2, k)
+    """
+
+    def objective(params):
+        tau1, tau2, k = params
+
+        # Ensure parameters are positive
+        if tau1 &lt;= 0 or tau2 &lt;= 0 or k &lt;= 0:
+            return np.inf
+
+        total_error = 0
+
+        for amp, exp_vel, exp_dur in zip(exp_amplitudes, exp_peak_velocities, exp_durations):
+            try:
+                # Simulate saccade with current parameters
+                T = exp_dur / 1000  # Convert ms to seconds
+                t, x, u = solve_saccade_optimal_control(
+                    x_target=amp, T=T, tau1=tau1, tau2=tau2, k=k
+                )
+
+                model_vel = np.max(x[:, 1])
+
+                # Squared error in velocity prediction
+                total_error += (model_vel - exp_vel)**2
+
+            except Exception:
+                total_error += 1e6
+
+        return total_error
+
+    # Initial guess
+    x0 = [0.224, 0.013, 0.1]
+
+    # Bounds for parameters
+    bounds = [(0.05, 0.5), (0.005, 0.05), (0.01, 0.3)]
+
+    # Optimize
+    result = minimize(objective, x0, bounds=bounds, method='L-BFGS-B')
+
+    fitted_params = {
+        'tau1': result.x[0],
+        'tau2': result.x[1],
+        'k': result.x[2]
+    }
+
+    print(f"Fitted parameters:")
+    print(f"  tau1 = {fitted_params['tau1']:.4f} s")
+    print(f"  tau2 = {fitted_params['tau2']:.4f} s")
+    print(f"  k = {fitted_params['k']:.4f}")
+
+    return fitted_params
+
+# Example fitting with synthetic data
+exp_amp = np.array([5, 10, 15, 20])
+exp_vel = np.array([210, 360, 460, 510])
+exp_dur = np.array([32, 48, 60, 72])
+
+# fitted = fit_saccade_model(exp_amp, exp_vel, exp_dur)
+  </Code>
+
+  <FlashCard id="fc6">
+    <Front>What are the typical values of the oculomotor plant time constants in the saccadic model?</Front>
+    <Back>τ₁ ≈ 0.224 seconds (corresponding to a pole at ~4.5 Hz) and τ₂ ≈ 0.013 seconds (corresponding to a pole at ~77 Hz). These values capture the mechanical dynamics of the eye plant.</Back>
+  </FlashCard>
+
+  <H2>Feedback vs. Feedforward Control</H2>
+
+  <Body>
+    An important question in saccade research is whether these movements are purely ballistic (feedforward) or incorporate online feedback corrections. The variance minimization framework naturally includes feedback through the state-dependent control law u*(x,t) = -K(t)x(t).
+  </Body>
+
+  <Code lang="python">
+"""
+Evidence for Feedback in Saccades
+=================================
+
+Classical view: Saccades are purely ballistic
+- Programmed before movement onset
+- No online correction possible (too fast)
+- Open-loop execution
+
+Modern view: Saccades incorporate feedback
+- Visual feedback is too slow (~100ms delay)
+- BUT proprioceptive and efference copy signals provide fast feedback
+- Evidence:
+  1. Saccade trajectories adapt to perturbations
+  2. Corrective saccades occur rapidly after errors
+  3. Model-predicted feedback improves endpoint accuracy
+
+The optimal control model reconciles both views:
+- The feedback gain K(t) is pre-computed (programmed)
+- But the actual control signal adjusts based on current state
+- This is "feedback control with feedforward gains"
+"""
+
+def compare_feedforward_feedback(x_target, T, perturbation_time=0.03):
+    """
+    Compare pure feedforward vs. feedback control under perturbation.
+    """
+    tau1, tau2 = 0.224, 0.013
+    A = np.array([[0, 1], [-1/(tau1*tau2), -1/tau2]])
+    B = np.array([[0], [1/(tau1*tau2)]])
+
+    dt = 0.001
+    t = np.arange(0, T, dt)
+    n_steps = len(t)
+
+    # Pre-compute nominal trajectory (feedforward)
+    t_nom, x_nom, u_nom = solve_saccade_optimal_control(x_target=x_target, T=T)
+
+    # Feedback gain
+    K = np.array([[10.0, 0.5]])
+    x_target_vec = np.array([x_target, 0])
+
+    # Simulate with perturbation at perturbation_time
+    x_ff = np.zeros((n_steps, 2))  # Feedforward
+    x_fb = np.zeros((n_steps, 2))  # Feedback
+
+    perturbation = np.array([2.0, 0])  # Position perturbation
+
+    for i in range(n_steps - 1):
+        # Apply perturbation
+        if np.abs(t[i] - perturbation_time) &lt; dt:
+            x_ff[i] += perturbation
+            x_fb[i] += perturbation
+
+        # Feedforward: use pre-planned control
+        u_ff = u_nom[min(i, len(u_nom)-1)]
+        dx_ff = A @ x_ff[i].reshape(-1, 1) + B * u_ff
+        x_ff[i+1] = x_ff[i] + dx_ff.flatten() * dt
+
+        # Feedback: adjust control based on current state
+        u_fb = -K @ (x_fb[i] - x_target_vec)
+        dx_fb = A @ x_fb[i].reshape(-1, 1) + B * u_fb
+        x_fb[i+1] = x_fb[i] + dx_fb.flatten() * dt
+
+    ff_error = np.abs(x_ff[-1, 0] - x_target)
+    fb_error = np.abs(x_fb[-1, 0] - x_target)
+
+    print(f"Feedforward final error: {ff_error:.2f} degrees")
+    print(f"Feedback final error: {fb_error:.2f} degrees")
+    print(f"Error reduction with feedback: {(1 - fb_error/ff_error)*100:.1f}%")
+
+    return t, x_ff, x_fb
+
+# Compare control strategies
+t, x_ff, x_fb = compare_feedforward_feedback(x_target=10, T=0.08)
+  </Code>
+
+  <SingleSelect id="q7">
+    <Prompt>What is the primary evidence that saccades incorporate some form of feedback control rather than being purely ballistic?</Prompt>
+    <Options>
+      <Option>Saccades can be voluntarily stopped mid-flight</Option>
+      <Option correct="true">Saccade trajectories show adaptive compensation for perturbations and prediction errors</Option>
+      <Option>Eye position sensors provide real-time visual feedback</Option>
+      <Option>Saccade velocities vary randomly from trial to trial</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Computational Principles</H2>
+
+  <Body>
+    The saccadic optimal control model illustrates several fundamental computational principles that appear throughout motor neuroscience:
+  </Body>
+
+  <FlashCard id="fc7">
+    <Front>What is the "minimum variance" principle in motor control?</Front>
+    <Back>The principle that the nervous system plans movements to minimize the variance of task-relevant variables (like endpoint position) rather than minimizing energy, time, or jerk. This accounts for signal-dependent noise and explains many features of human movement.</Back>
+  </FlashCard>
+
+  <Code lang="python">
+"""
+Computational Principles from Saccade Optimal Control
+=====================================================
+
+1. VARIANCE MINIMIZATION
+   - The brain optimizes for precision, not speed or energy
+   - Signal-dependent noise creates fundamental accuracy limits
+   - Explains speed-accuracy tradeoffs
+
+2. INTERNAL MODELS
+   - Forward model: predicts sensory consequences of motor commands
+   - Inverse model: computes commands needed for desired movement
+   - Both are used in optimal control
+
+3. SEPARATION PRINCIPLE
+   - Optimal estimation (Kalman filter) can be separated from
+     optimal control (LQR) in linear-Gaussian systems
+   - Brain may implement these as distinct computations
+
+4. FEEDBACK WITH FEEDFORWARD GAINS
+   - Pre-computed control policy (gains) provides feedforward
+   - State-dependent application provides feedback
+   - Combines benefits of both approaches
+
+5. COST FUNCTION ENCODES TASK GOALS
+   - Different tasks → different cost functions
+   - Saccades: minimize endpoint variance
+   - Reaching: minimize effort + endpoint variance + time
+   - Walking: minimize metabolic cost
+"""
+  </Code>
+
+  <Subjective id="q8">
+    <Prompt>Explain why signal-dependent noise is a critical component of the saccadic optimal control model. What would the model predict differently if motor noise were constant (independent of signal magnitude)?</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains signal-dependent noise concept: noise variance scales with control signal magnitude</Requirement>
+        <Indicators>proportional, scales with, magnitude, larger signals, more noise, variance increases</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies that constant noise would lead to bang-bang or time-optimal control rather than smooth trajectories</Requirement>
+        <Indicators>bang-bang, step, maximum, time-optimal, not smooth, different profile</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Explains that signal-dependent noise creates a speed-accuracy tradeoff that shapes the velocity profile</Requirement>
+        <Indicators>speed-accuracy, tradeoff, bell-shaped, smooth, modulated, penalty</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions that the main sequence relationship emerges from signal-dependent noise</Requirement>
+        <Indicators>main sequence, saturation, peak velocity, amplitude relationship</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Notes experimental evidence supporting signal-dependent noise in biological motor systems</Requirement>
+        <Indicators>experimental, data, observed, measured, biological, evidence</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>
+    In this lesson, we developed a complete optimal control model for saccadic eye movements. Starting from the second-order dynamics of the oculomotor plant, we formulated a variance minimization problem that accounts for signal-dependent noise in motor commands. The solution yields smooth, bell-shaped velocity profiles and naturally reproduces the main sequence relationship between saccade amplitude and peak velocity.
+  </Body>
+
+  <Body>
+    Key insights from this model include: (1) the brain may optimize for precision rather than speed or energy; (2) signal-dependent noise fundamentally shapes optimal movement strategies; (3) feedback control with pre-computed gains reconciles the apparent ballistic nature of saccades with adaptive correction capabilities; and (4) mathematical frameworks from control theory provide quantitative predictions that can be tested against experimental data.
+  </Body>
+
+  <Body>
+    This model serves as a template for understanding optimal control in other motor systems, including reaching movements, locomotion, and speech production. The principles of variance minimization and signal-dependent noise appear to be universal features of biological motor control.
+  </Body>
+
+  <MultiSelect id="q9">
+    <Prompt>Which of the following are correctly matched model predictions with their experimental confirmations? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Bell-shaped velocity profiles — observed in human and primate saccades</Option>
+      <Option correct="true">Main sequence saturation — peak velocity plateaus for large amplitude saccades</Option>
+      <Option>Constant movement duration — all saccades take the same time regardless of amplitude</Option>
+      <Option correct="true">Endpoint variance increases with amplitude — larger saccades have more variable endpoints</Option>
+      <Option>Zero-noise optimal control — biological systems achieve noise-free motor commands</Option>
+    </Options>
+  </MultiSelect>
+
+</Lesson>

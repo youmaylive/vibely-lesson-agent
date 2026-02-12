@@ -1,0 +1,1190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-07-03</Id>
+    <Title>Frequency Control in Neuronal Models</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>optimal-control</Tag>
+      <Tag>frequency-control</Tag>
+      <Tag>neuronal-models</Tag>
+      <Tag>deep-brain-stimulation</Tag>
+      <Tag>adjoint-method</Tag>
+      <Tag>robustness</Tag>
+      <Tag>neurological-disorders</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Frequency Control in Neuronal Models</H1>
+
+  <Body>
+    Neurons communicate through sequences of action potentials, and the firing rate—the frequency of these spikes—encodes crucial information about stimuli, motor commands, and internal states. In many neurological disorders, pathological firing patterns emerge: excessive synchronization in epilepsy, irregular oscillations in Parkinson's disease, or aberrant frequencies in chronic pain. Optimal control theory provides a principled framework for designing interventions that restore healthy firing patterns by computing synaptic inputs or electrical stimulation waveforms that drive neurons toward target frequencies.
+  </Body>
+
+  <Body>
+    This lesson develops the mathematical framework for frequency control, building on the neuronal models from Module 1 and the optimal control foundations from earlier in this module. We will formulate frequency regulation as an optimization problem, derive gradient-based algorithms using adjoint methods, analyze robustness to noise and parameter uncertainty, and explore applications to deep brain stimulation for treating Parkinson's disease and suppressing epileptic seizures.
+  </Body>
+
+  <H2>The Frequency Control Problem</H2>
+
+  <Body>
+    Consider a neuron model with membrane potential V(t) governed by dynamics that depend on an external control input u(t), representing synaptic current, optogenetic stimulation, or electrode injection:
+  </Body>
+
+  <Code lang="python">
+# General neuronal dynamics with control input
+# C dV/dt = f(V, w) + u(t)
+# dw/dt = g(V, w)
+# where w represents gating variables or adaptation
+
+import numpy as np
+
+def neuron_with_control(t, state, params, u_func):
+    """
+    Generic neuron model with external control input.
+
+    Parameters:
+    - state: [V, w1, w2, ...] membrane potential and auxiliary variables
+    - params: model parameters (conductances, time constants, etc.)
+    - u_func: control input as function of time
+    """
+    V = state[0]
+    w = state[1:]
+
+    # Intrinsic dynamics (model-specific)
+    f_V = intrinsic_current(V, w, params)
+    g_w = gating_dynamics(V, w, params)
+
+    # Add control input
+    dVdt = (f_V + u_func(t)) / params['C']
+    dwdt = g_w
+
+    return np.concatenate([[dVdt], dwdt])
+  </Code>
+
+  <Body>
+    The firing rate f(u) depends on the control input u through a complex, generally nonlinear relationship. For a given input waveform u(t), we can measure the steady-state firing frequency by counting spikes over a long time window. The frequency control objective seeks an input that achieves a target firing rate f_target while minimizing control effort:
+  </Body>
+
+  <Code lang="python">
+# Frequency control cost functional
+# J[u] = |f(u) - f_target|² + α ∫₀ᵀ u(t)² dt
+#
+# where:
+# - f(u) is the firing rate achieved with control u
+# - f_target is the desired firing frequency
+# - α is the regularization weight (control effort penalty)
+# - T is the control horizon
+
+def frequency_control_cost(u_params, neuron_model, f_target, alpha, T):
+    """
+    Evaluate the frequency control cost functional.
+
+    Parameters:
+    - u_params: parameterization of control input
+    - neuron_model: callable that simulates neuron and returns spike times
+    - f_target: target firing rate (Hz)
+    - alpha: control effort regularization weight
+    - T: simulation duration (s)
+    """
+    # Reconstruct control signal from parameters
+    u_func = reconstruct_control(u_params)
+
+    # Simulate neuron and count spikes
+    spike_times = neuron_model(u_func, T)
+    f_achieved = len(spike_times) / T  # firing rate in Hz
+
+    # Frequency error term
+    freq_error = (f_achieved - f_target)**2
+
+    # Control effort term (L2 norm)
+    t_grid = np.linspace(0, T, 1000)
+    u_values = u_func(t_grid)
+    control_effort = alpha * np.trapezoid(u_values**2, t_grid)
+
+    return freq_error + control_effort
+  </Code>
+
+  <FlashCard id="fc-frequency-control">
+    <Front>What is the frequency control problem in neuronal systems?</Front>
+    <Back>Finding an external input u(t) that drives a neuron to fire at a specified target frequency f_target while minimizing control effort, formulated as minimizing J[u] = |f(u) - f_target|² + α∫u²dt.</Back>
+  </FlashCard>
+
+  <H2>The f-I Curve and Its Inversion</H2>
+
+  <Body>
+    For many neuron models, the relationship between constant input current I and steady-state firing rate f is captured by the f-I curve (also called the frequency-current or gain function). This curve encapsulates the neuron's input-output characteristics and provides insight into control design.
+  </Body>
+
+  <Code lang="python">
+def compute_fI_curve(neuron_model, I_range, T_sim=2.0, T_transient=0.5):
+    """
+    Compute the f-I curve for a neuron model.
+
+    Parameters:
+    - neuron_model: function(I) -> spike_times for constant input I
+    - I_range: array of input current values to test
+    - T_sim: total simulation time
+    - T_transient: initial transient to discard
+    """
+    firing_rates = []
+
+    for I in I_range:
+        spike_times = neuron_model(I, T_sim)
+        # Count spikes after transient
+        valid_spikes = spike_times[spike_times > T_transient]
+        rate = len(valid_spikes) / (T_sim - T_transient)
+        firing_rates.append(rate)
+
+    return np.array(firing_rates)
+
+# For integrate-and-fire model with threshold θ and reset V_r:
+# f(I) = 1 / τ_m * ln(I / (I - θ + V_r))  for I > I_threshold
+# f(I) = 0 for I ≤ I_threshold
+
+def IF_fI_analytical(I, tau_m, theta, V_r, V_rest=0):
+    """
+    Analytical f-I curve for leaky integrate-and-fire neuron.
+
+    f = 1 / (τ_m * ln((I - V_rest) / (I - θ)))
+    """
+    I_rheobase = theta  # minimum current to fire (with V_rest=0)
+
+    if I &lt;= I_rheobase:
+        return 0.0
+
+    return 1.0 / (tau_m * np.log((I - V_rest) / (I - theta)))
+  </Code>
+
+  <Body>
+    For simple models like the leaky integrate-and-fire (LIF) neuron, the f-I curve can be inverted analytically to find the input required for a target frequency:
+  </Body>
+
+  <Code lang="python">
+def IF_fI_inverse(f_target, tau_m, theta, V_r, V_rest=0):
+    """
+    Invert the LIF f-I curve to find input for target frequency.
+
+    Given f = 1 / (τ_m * ln((I - V_rest) / (I - θ)))
+    Solve for I:
+
+    τ_m * f = 1 / ln((I - V_rest) / (I - θ))
+    ln((I - V_rest) / (I - θ)) = 1 / (τ_m * f)
+    (I - V_rest) / (I - θ) = exp(1 / (τ_m * f))
+
+    Let k = exp(1 / (τ_m * f))
+    I - V_rest = k * (I - θ)
+    I - V_rest = k*I - k*θ
+    I(1 - k) = V_rest - k*θ
+    I = (V_rest - k*θ) / (1 - k)
+      = (k*θ - V_rest) / (k - 1)
+    """
+    if f_target &lt;= 0:
+        raise ValueError("Target frequency must be positive")
+
+    k = np.exp(1.0 / (tau_m * f_target))
+    I_required = (k * theta - V_rest) / (k - 1)
+
+    return I_required
+
+# Example: Find input for 50 Hz firing
+tau_m = 0.010  # 10 ms membrane time constant
+theta = 1.0    # threshold (normalized)
+V_r = 0.0      # reset potential
+f_target = 50  # Hz
+
+I_optimal = IF_fI_inverse(f_target, tau_m, theta, V_r)
+print(f"Input for {f_target} Hz: I = {I_optimal:.3f}")
+  </Code>
+
+  <FlashCard id="fc-fI-curve">
+    <Front>What is the f-I curve (frequency-current relationship)?</Front>
+    <Back>The f-I curve describes the steady-state firing rate as a function of constant input current. It characterizes neuronal gain and excitability. For the LIF model: f(I) = 1/(τ_m · ln((I-V_rest)/(I-θ))) when I exceeds rheobase.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q-fI-inversion">
+    <Prompt>For a leaky integrate-and-fire neuron with membrane time constant τ_m = 20 ms and threshold θ = 15 mV (reset at 0 mV), what happens to the required input current I as the target firing rate f_target increases?</Prompt>
+    <Options>
+      <Option correct="true">I increases nonlinearly, approaching infinity as f approaches 1/τ_m</Option>
+      <Option>I increases linearly with f_target</Option>
+      <Option>I decreases as f_target increases</Option>
+      <Option>I remains constant regardless of f_target</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Gradient-Based Optimization via Adjoint Methods</H2>
+
+  <Body>
+    For complex neuron models like Hodgkin-Huxley, the f-I relationship cannot be inverted analytically. Instead, we use gradient-based optimization to minimize the cost functional J[u]. The key challenge is computing ∂J/∂u efficiently, which requires sensitivity analysis through the adjoint method.
+  </Body>
+
+  <Body>
+    The adjoint method avoids computing the full Jacobian of the state trajectory with respect to control parameters. Instead, it solves a backward-in-time "adjoint" equation that propagates sensitivity information from the cost functional back through the dynamics.
+  </Body>
+
+  <Code lang="python">
+"""
+Adjoint Method for Frequency Control
+
+Forward problem:
+    dx/dt = F(x, u, t),  x(0) = x₀
+
+Cost functional:
+    J = Φ(x(T)) + ∫₀ᵀ L(x, u, t) dt
+
+Adjoint equation (backward in time):
+    -dλ/dt = (∂F/∂x)ᵀ λ + ∂L/∂x
+    λ(T) = ∂Φ/∂x(T)
+
+Gradient:
+    ∂J/∂u = ∫₀ᵀ [(∂F/∂u)ᵀ λ + ∂L/∂u] dt
+"""
+
+def adjoint_gradient(x_trajectory, u_trajectory, t_grid, params,
+                     dF_dx, dF_du, dL_dx, dL_du, dPhi_dx):
+    """
+    Compute gradient of cost functional using adjoint method.
+
+    Parameters:
+    - x_trajectory: state trajectory from forward simulation [T x n_states]
+    - u_trajectory: control trajectory [T x n_controls]
+    - t_grid: time points
+    - params: model parameters
+    - dF_dx, dF_du: Jacobians of dynamics
+    - dL_dx, dL_du: gradients of running cost
+    - dPhi_dx: gradient of terminal cost
+
+    Returns:
+    - gradient: ∂J/∂u at each time point
+    """
+    n_times = len(t_grid)
+    n_states = x_trajectory.shape[1]
+    n_controls = u_trajectory.shape[1]
+
+    # Initialize adjoint variable at terminal time
+    lambda_adj = np.zeros((n_times, n_states))
+    lambda_adj[-1] = dPhi_dx(x_trajectory[-1])
+
+    # Backward integration of adjoint equation
+    dt = t_grid[1] - t_grid[0]
+    for i in range(n_times - 2, -1, -1):
+        x_i = x_trajectory[i]
+        u_i = u_trajectory[i]
+
+        # Adjoint dynamics: -dλ/dt = (∂F/∂x)ᵀ λ + ∂L/∂x
+        jac_F = dF_dx(x_i, u_i, t_grid[i], params)
+        grad_L = dL_dx(x_i, u_i, t_grid[i])
+
+        # Backward Euler step
+        lambda_adj[i] = lambda_adj[i+1] + dt * (jac_F.T @ lambda_adj[i+1] + grad_L)
+
+    # Compute gradient ∂J/∂u
+    gradient = np.zeros((n_times, n_controls))
+    for i in range(n_times):
+        x_i = x_trajectory[i]
+        u_i = u_trajectory[i]
+
+        grad_F_u = dF_du(x_i, u_i, t_grid[i], params)
+        grad_L_u = dL_du(x_i, u_i, t_grid[i])
+
+        gradient[i] = grad_F_u.T @ lambda_adj[i] + grad_L_u
+
+    return gradient
+  </Code>
+
+  <FlashCard id="fc-adjoint-method">
+    <Front>What is the adjoint method in optimal control?</Front>
+    <Back>A technique for efficiently computing gradients of cost functionals. Instead of forward sensitivity equations (expensive for many parameters), it solves a single backward-in-time adjoint equation: -dλ/dt = (∂F/∂x)ᵀλ + ∂L/∂x, then computes ∂J/∂u = ∫[(∂F/∂u)ᵀλ + ∂L/∂u]dt.</Back>
+  </FlashCard>
+
+  <Body>
+    For the Hodgkin-Huxley model, we must compute Jacobians with respect to the four state variables (V, m, h, n) and the control input. The adjoint equations become a system of four coupled ODEs integrated backward from the terminal time.
+  </Body>
+
+  <Code lang="python">
+"""
+Adjoint method for Hodgkin-Huxley frequency control
+"""
+
+def HH_jacobians(V, m, h, n, u, params):
+    """
+    Compute Jacobians for HH model at a given state.
+
+    HH dynamics:
+    C dV/dt = -g_Na*m³h(V-E_Na) - g_K*n⁴(V-E_K) - g_L(V-E_L) + u
+    dm/dt = α_m(V)(1-m) - β_m(V)m
+    dh/dt = α_h(V)(1-h) - β_h(V)h
+    dn/dt = α_n(V)(1-n) - β_n(V)n
+    """
+    g_Na, g_K, g_L = params['g_Na'], params['g_K'], params['g_L']
+    E_Na, E_K, E_L = params['E_Na'], params['E_K'], params['E_L']
+    C = params['C']
+
+    # Rate function derivatives (simplified notation)
+    dalpha_m_dV = alpha_m_deriv(V)
+    dbeta_m_dV = beta_m_deriv(V)
+    # ... similar for h, n
+
+    # Jacobian ∂F/∂x (4x4 matrix)
+    dF_dx = np.zeros((4, 4))
+
+    # ∂(dV/dt)/∂V
+    dF_dx[0, 0] = (-g_Na * m**3 * h - g_K * n**4 - g_L) / C
+    # ∂(dV/dt)/∂m
+    dF_dx[0, 1] = -g_Na * 3 * m**2 * h * (V - E_Na) / C
+    # ∂(dV/dt)/∂h
+    dF_dx[0, 2] = -g_Na * m**3 * (V - E_Na) / C
+    # ∂(dV/dt)/∂n
+    dF_dx[0, 3] = -g_K * 4 * n**3 * (V - E_K) / C
+
+    # Gating variable Jacobians (off-diagonal through V-dependence)
+    dF_dx[1, 0] = dalpha_m_dV * (1 - m) - dbeta_m_dV * m
+    dF_dx[1, 1] = -alpha_m(V) - beta_m(V)
+    # ... similar for h, n rows
+
+    # Jacobian ∂F/∂u (4x1 vector)
+    dF_du = np.array([1.0/C, 0, 0, 0])
+
+    return dF_dx, dF_du
+  </Code>
+
+  <MatchPairs id="q-adjoint-components">
+    <Prompt>Match each component of the adjoint method with its mathematical role:</Prompt>
+    <Pairs>
+      <Pair><Left>λ(t) (adjoint variable)</Left><Right>Propagates cost sensitivity backward through dynamics</Right></Pair>
+      <Pair><Left>(∂F/∂x)ᵀ</Left><Right>Transpose Jacobian coupling adjoint dynamics to state</Right></Pair>
+      <Pair><Left>λ(T) = ∂Φ/∂x(T)</Left><Right>Terminal condition from final cost gradient</Right></Pair>
+      <Pair><Left>∫(∂F/∂u)ᵀλ dt</Left><Right>Contribution to control gradient from dynamics</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Forward sensitivity matrix for parameter estimation</Distractor>
+      <Distractor>Hessian for second-order optimization</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Handling Spike Events in Gradient Computation</H2>
+
+  <Body>
+    A critical challenge in frequency control is that firing rate is a discontinuous function of input—small changes in u can cause spikes to appear or disappear. This non-smoothness makes naive gradient computation problematic. Several approaches address this:
+  </Body>
+
+  <Body>
+    1. **Spike time sensitivity**: Compute how spike times shift with control changes using implicit differentiation at threshold crossings.
+    2. **Smooth surrogates**: Replace spike counting with smooth approximations (e.g., sigmoid-based soft thresholds).
+    3. **Population averaging**: Work with expected firing rates over ensembles, which are smoother than individual realizations.
+  </Body>
+
+  <Code lang="python">
+def spike_time_sensitivity(x_trajectory, t_grid, u_trajectory, params,
+                           spike_times, threshold):
+    """
+    Compute ∂t_spike/∂u using implicit differentiation.
+
+    At spike time t_s: V(t_s) = threshold
+    Differentiating: (dV/dt)|_{t_s} * ∂t_s/∂u + ∂V/∂u|_{t_s} = 0
+
+    Therefore: ∂t_s/∂u = -∂V/∂u|_{t_s} / (dV/dt)|_{t_s}
+    """
+    sensitivities = []
+
+    for t_s in spike_times:
+        # Find index closest to spike time
+        idx = np.argmin(np.abs(t_grid - t_s))
+
+        # Voltage derivative at spike (from dynamics)
+        dVdt_at_spike = compute_dVdt(x_trajectory[idx], u_trajectory[idx], params)
+
+        # Voltage sensitivity to control (from forward sensitivity equation)
+        dV_du_at_spike = forward_sensitivity(x_trajectory[:idx+1],
+                                              u_trajectory[:idx+1],
+                                              t_grid[:idx+1], params)
+
+        # Spike time sensitivity
+        dt_s_du = -dV_du_at_spike / dVdt_at_spike
+        sensitivities.append(dt_s_du)
+
+    return sensitivities
+
+def smooth_firing_rate(V_trajectory, t_grid, threshold, steepness=10.0):
+    """
+    Smooth surrogate for firing rate using sigmoid approximation.
+
+    Instead of hard threshold crossing, use soft "spike probability":
+    p_spike(V) = σ((V - threshold) * steepness)
+
+    This allows gradient flow through the rate computation.
+    """
+    def sigmoid(x):
+        return 1.0 / (1.0 + np.exp(-x))
+
+    # Soft spike indicator at each time point
+    spike_prob = sigmoid(steepness * (V_trajectory - threshold))
+
+    # Approximate firing rate (smoothed)
+    dt = t_grid[1] - t_grid[0]
+    smooth_rate = np.sum(spike_prob) * dt / (t_grid[-1] - t_grid[0])
+
+    return smooth_rate
+  </Code>
+
+  <SingleSelect id="q-spike-sensitivity">
+    <Prompt>Why is the standard adjoint method insufficient for computing exact gradients of firing rate with respect to control input?</Prompt>
+    <Options>
+      <Option correct="true">Firing rate is a discontinuous function of input due to discrete spike events</Option>
+      <Option>The adjoint equation cannot be integrated backward in time</Option>
+      <Option>The Hodgkin-Huxley model has too many state variables</Option>
+      <Option>Control inputs must be constant, not time-varying</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Physiological Constraints and Bounded Control</H2>
+
+  <Body>
+    Realistic control inputs must satisfy physiological constraints. Synaptic currents have bounded magnitudes, deep brain stimulation electrodes have charge injection limits, and optogenetic activation requires non-negative light intensities. These constraints transform the unconstrained optimization into a constrained problem.
+  </Body>
+
+  <Code lang="python">
+"""
+Constrained frequency control:
+    minimize  J[u] = |f(u) - f_target|² + α∫u²dt
+    subject to  u_min ≤ u(t) ≤ u_max  (box constraints)
+                ∫|u|dt ≤ Q_max        (total charge constraint)
+                u(t) ≥ 0              (optogenetic: non-negative)
+"""
+
+def projected_gradient_descent(u_init, gradient_func, constraints,
+                                learning_rate=0.01, max_iter=1000, tol=1e-6):
+    """
+    Gradient descent with projection onto constraint set.
+
+    Parameters:
+    - u_init: initial control trajectory
+    - gradient_func: function returning ∂J/∂u
+    - constraints: dict with 'u_min', 'u_max', 'Q_max'
+    - learning_rate: step size
+    - max_iter: maximum iterations
+    - tol: convergence tolerance
+    """
+    u = u_init.copy()
+
+    for iteration in range(max_iter):
+        # Compute gradient
+        grad = gradient_func(u)
+
+        # Gradient step
+        u_new = u - learning_rate * grad
+
+        # Project onto box constraints
+        u_new = np.clip(u_new, constraints['u_min'], constraints['u_max'])
+
+        # Project onto total charge constraint if violated
+        if 'Q_max' in constraints:
+            total_charge = np.trapezoid(np.abs(u_new), dx=dt)
+            if total_charge > constraints['Q_max']:
+                # Scale down to satisfy constraint
+                u_new *= constraints['Q_max'] / total_charge
+
+        # Check convergence
+        if np.linalg.norm(u_new - u) < tol:
+            print(f"Converged after {iteration} iterations")
+            break
+
+        u = u_new
+
+    return u
+
+# Charge-balanced stimulation (important for DBS safety)
+def enforce_charge_balance(u_trajectory, t_grid):
+    """
+    Modify control to ensure zero net charge injection.
+
+    For DBS electrodes, charge imbalance causes tissue damage.
+    Constraint: ∫u(t)dt = 0
+    """
+    total_charge = np.trapezoid(u_trajectory, t_grid)
+    duration = t_grid[-1] - t_grid[0]
+
+    # Subtract mean to achieve balance
+    u_balanced = u_trajectory - total_charge / duration
+
+    return u_balanced
+  </Code>
+
+  <FillBlanks id="q-constraints">
+    <Prompt>
+      In constrained optimal control, <Blank>box constraints</Blank> limit the control magnitude at each time point (u_min ≤ u ≤ u_max), while <Blank>charge balance</Blank> constraints ensure ∫u(t)dt = 0 to prevent tissue damage in deep brain stimulation. The optimization uses <Blank>projected gradient descent</Blank> to enforce these constraints during iterative updates.
+    </Prompt>
+    <Distractors>
+      <Distractor>equality constraints</Distractor>
+      <Distractor>steepest descent</Distractor>
+      <Distractor>momentum conservation</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Robustness Analysis</H2>
+
+  <Body>
+    A control law optimized for a nominal model may fail when applied to real neurons with parameter variability or under noisy conditions. Robustness analysis quantifies sensitivity to uncertainties and guides robust control design.
+  </Body>
+
+  <Code lang="python">
+"""
+Robustness analysis for frequency control
+"""
+
+def monte_carlo_robustness(optimal_control, nominal_params, param_stds,
+                           noise_std, n_samples=1000, f_target=50.0):
+    """
+    Assess robustness via Monte Carlo simulation.
+
+    Parameters:
+    - optimal_control: control trajectory designed for nominal model
+    - nominal_params: dict of nominal parameter values
+    - param_stds: dict of parameter standard deviations
+    - noise_std: standard deviation of additive noise
+    - n_samples: number of Monte Carlo samples
+    - f_target: target firing rate
+
+    Returns:
+    - frequency_errors: array of |f_achieved - f_target| for each sample
+    - statistics: mean, std, failure rate
+    """
+    frequency_errors = []
+
+    for _ in range(n_samples):
+        # Sample perturbed parameters
+        perturbed_params = {}
+        for key, nom_val in nominal_params.items():
+            if key in param_stds:
+                perturbed_params[key] = nom_val + np.random.normal(0, param_stds[key])
+            else:
+                perturbed_params[key] = nom_val
+
+        # Simulate with noise
+        spike_times = simulate_with_noise(optimal_control, perturbed_params, noise_std)
+        f_achieved = compute_firing_rate(spike_times)
+
+        frequency_errors.append(np.abs(f_achieved - f_target))
+
+    frequency_errors = np.array(frequency_errors)
+
+    # Compute statistics
+    stats = {
+        'mean_error': np.mean(frequency_errors),
+        'std_error': np.std(frequency_errors),
+        'max_error': np.max(frequency_errors),
+        'failure_rate': np.mean(frequency_errors > 0.1 * f_target)  # >10% error
+    }
+
+    return frequency_errors, stats
+
+def sensitivity_analysis(optimal_control, nominal_params, f_target):
+    """
+    Local sensitivity analysis: ∂f/∂θ for each parameter θ.
+
+    Identifies which parameters most affect achieved frequency.
+    """
+    sensitivities = {}
+    epsilon = 1e-4
+
+    f_nominal = evaluate_frequency(optimal_control, nominal_params)
+
+    for param_name, param_value in nominal_params.items():
+        # Perturb parameter
+        params_plus = nominal_params.copy()
+        params_plus[param_name] = param_value * (1 + epsilon)
+
+        params_minus = nominal_params.copy()
+        params_minus[param_name] = param_value * (1 - epsilon)
+
+        # Evaluate frequencies
+        f_plus = evaluate_frequency(optimal_control, params_plus)
+        f_minus = evaluate_frequency(optimal_control, params_minus)
+
+        # Central difference
+        sensitivity = (f_plus - f_minus) / (2 * epsilon * param_value)
+        sensitivities[param_name] = sensitivity
+
+    return sensitivities
+  </Code>
+
+  <FlashCard id="fc-robustness">
+    <Front>What is robustness in the context of neuronal frequency control?</Front>
+    <Back>The ability of a control law to achieve near-target firing rates despite parameter uncertainty (biological variability) and noise (stochastic ion channels, synaptic noise). Assessed via Monte Carlo simulation or sensitivity analysis.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q-robustness-factors">
+    <Prompt>Which factors can cause an optimally-designed frequency control law to fail when applied to a real neuron? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Ion channel conductance variability between neurons</Option>
+      <Option correct="true">Stochastic channel gating (ion channel noise)</Option>
+      <Option correct="true">Unmodeled synaptic inputs from the network</Option>
+      <Option>Using gradient descent instead of Newton's method</Option>
+      <Option correct="true">Temperature-dependent changes in kinetics</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Application: Epilepsy and Seizure Suppression</H2>
+
+  <Body>
+    Epileptic seizures involve pathological hypersynchronization of neuronal populations. Optimal control can design stimulation patterns that desynchronize activity and suppress seizures. The control objective shifts from single-neuron frequency to population-level synchronization measures.
+  </Body>
+
+  <Code lang="python">
+"""
+Epilepsy model: Coupled neurons with pathological synchronization
+"""
+
+def kuramoto_order_parameter(phases):
+    """
+    Compute synchronization level using Kuramoto order parameter.
+
+    r = |1/N * Σ exp(i*θ_j)|
+
+    r = 1: perfect synchronization (seizure)
+    r ≈ 0: desynchronized (healthy)
+    """
+    N = len(phases)
+    complex_order = np.mean(np.exp(1j * phases))
+    return np.abs(complex_order)
+
+def seizure_suppression_cost(u, coupled_neurons, target_order=0.2, alpha=0.01):
+    """
+    Cost functional for seizure suppression.
+
+    J[u] = ∫(r(t) - r_target)² dt + α∫u²dt
+
+    where r(t) is the instantaneous synchronization level.
+    Goal: reduce synchronization from ~1 (seizure) to ~0.2 (healthy).
+    """
+    # Simulate coupled neuron network with control
+    phases_trajectory = coupled_neurons.simulate(u)
+
+    # Compute order parameter over time
+    r_trajectory = [kuramoto_order_parameter(phi) for phi in phases_trajectory]
+
+    # Synchronization error
+    sync_error = np.mean((np.array(r_trajectory) - target_order)**2)
+
+    # Control effort
+    control_cost = alpha * np.mean(u**2)
+
+    return sync_error + control_cost
+
+class CoupledNeuronNetwork:
+    """
+    Network of coupled neurons for epilepsy modeling.
+
+    Each neuron: dθ_i/dt = ω_i + (K/N)Σsin(θ_j - θ_i) + u_i
+
+    High coupling K leads to synchronization (seizure-like).
+    Control u_i can disrupt phase relationships.
+    """
+
+    def __init__(self, N, omega_mean, omega_std, K):
+        self.N = N
+        self.omega = np.random.normal(omega_mean, omega_std, N)  # natural frequencies
+        self.K = K  # coupling strength
+
+    def dynamics(self, t, theta, u_func):
+        u = u_func(t)
+
+        # Coupling term
+        phase_diffs = theta[:, None] - theta[None, :]  # θ_i - θ_j
+        coupling = (self.K / self.N) * np.sum(np.sin(-phase_diffs), axis=1)
+
+        return self.omega + coupling + u
+
+    def simulate(self, u_trajectory, T, dt=0.001):
+        """Simulate network dynamics."""
+        t_grid = np.arange(0, T, dt)
+        u_func = lambda t: u_trajectory[int(t/dt) % len(u_trajectory)]
+
+        theta = np.random.uniform(0, 2*np.pi, self.N)  # initial phases
+        trajectory = [theta.copy()]
+
+        for t in t_grid[1:]:
+            dtheta = self.dynamics(t, theta, u_func)
+            theta = theta + dt * dtheta
+            trajectory.append(theta.copy())
+
+        return np.array(trajectory)
+  </Code>
+
+  <FlashCard id="fc-kuramoto">
+    <Front>What is the Kuramoto order parameter and why is it relevant to epilepsy?</Front>
+    <Back>r = |1/N · Σexp(iθ_j)| measures population synchronization. r≈1 indicates hypersynchronization (seizure-like), r≈0 indicates healthy desynchronized activity. Control aims to reduce r from pathological to healthy levels.</Back>
+  </FlashCard>
+
+  <H2>Application: Parkinson's Disease and Deep Brain Stimulation</H2>
+
+  <Body>
+    Parkinson's disease involves loss of dopaminergic neurons in the substantia nigra, leading to pathological oscillations (especially beta-band, 13-30 Hz) in the basal ganglia-thalamo-cortical circuit. Deep brain stimulation (DBS) delivers electrical pulses to the subthalamic nucleus (STN) or globus pallidus (GPi), suppressing symptoms. Optimal control can improve DBS by designing waveforms that achieve therapeutic effects with less energy.
+  </Body>
+
+  <Code lang="python">
+"""
+Deep Brain Stimulation optimization for Parkinson's disease
+"""
+
+def standard_dbs_waveform(T, frequency=130, pulse_width=0.06e-3, amplitude=3.0):
+    """
+    Standard clinical DBS: high-frequency (130 Hz) regular pulses.
+
+    Parameters:
+    - T: duration (s)
+    - frequency: stimulation frequency (Hz)
+    - pulse_width: pulse duration (s)
+    - amplitude: pulse amplitude (mA)
+    """
+    dt = 1e-5  # 10 μs resolution
+    t = np.arange(0, T, dt)
+
+    waveform = np.zeros_like(t)
+    period = 1.0 / frequency
+
+    for pulse_start in np.arange(0, T, period):
+        pulse_end = pulse_start + pulse_width
+        mask = (t >= pulse_start) & (t < pulse_end)
+        waveform[mask] = amplitude
+
+    return t, waveform
+
+def optimize_dbs_waveform(basal_ganglia_model, target_beta_power,
+                          energy_weight=0.1, max_amplitude=5.0):
+    """
+    Optimize DBS waveform to minimize beta oscillations with minimal energy.
+
+    Cost: J[u] = β_power(u) + α * energy(u)
+
+    where β_power is the power spectral density in 13-30 Hz band.
+    """
+    from scipy.optimize import minimize
+    from scipy.signal import welch
+
+    def cost_function(waveform_params):
+        # Reconstruct waveform from parameters
+        waveform = parameterized_waveform(waveform_params)
+
+        # Simulate basal ganglia with this stimulation
+        lfp_signal = basal_ganglia_model.simulate(waveform)
+
+        # Compute beta power (13-30 Hz)
+        freqs, psd = welch(lfp_signal, fs=1000)
+        beta_mask = (freqs >= 13) & (freqs <= 30)
+        beta_power = np.trapezoid(psd[beta_mask], freqs[beta_mask])
+
+        # Energy cost
+        energy = np.mean(waveform**2)
+
+        return beta_power + energy_weight * energy
+
+    # Initialize with standard DBS parameters
+    init_params = standard_dbs_params()
+
+    # Optimize with constraints
+    bounds = get_waveform_bounds(max_amplitude)
+    result = minimize(cost_function, init_params, bounds=bounds, method='L-BFGS-B')
+
+    return result.x
+
+def adaptive_dbs_controller(lfp_signal, target_beta, Kp=0.5, Ki=0.1):
+    """
+    Closed-loop adaptive DBS using PI control on beta power.
+
+    Adjusts stimulation amplitude based on real-time beta power.
+    More efficient than open-loop: only stimulates when needed.
+    """
+    # Estimate current beta power
+    beta_power = estimate_beta_power(lfp_signal)
+
+    # Error signal
+    error = beta_power - target_beta
+
+    # PI control law
+    amplitude = Kp * error + Ki * integrated_error
+
+    # Saturate to safe limits
+    amplitude = np.clip(amplitude, 0, max_safe_amplitude)
+
+    return amplitude
+  </Code>
+
+  <SortQuiz id="q-dbs-development">
+    <Prompt>Arrange the developments in deep brain stimulation from earliest to most recent/advanced:</Prompt>
+    <SortedItems>
+      <Item>Lesioning surgery (destroying brain tissue)</Item>
+      <Item>Open-loop constant high-frequency stimulation</Item>
+      <Item>Amplitude-modulated stimulation based on symptoms</Item>
+      <Item>Closed-loop adaptive DBS based on neural biomarkers</Item>
+      <Item>Optimized waveform design using control theory</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Comparing Control Strategies</H2>
+
+  <Body>
+    Different control architectures offer trade-offs between performance, robustness, and implementation complexity:
+  </Body>
+
+  <Code lang="python">
+"""
+Comparison of control strategies for frequency regulation
+"""
+
+# 1. Open-loop optimal control
+def open_loop_control(model, f_target, T):
+    """
+    Pre-computed optimal waveform applied without feedback.
+
+    Pros: Simple implementation, no sensors needed
+    Cons: Sensitive to model mismatch, no disturbance rejection
+    """
+    u_optimal = compute_optimal_waveform(model, f_target, T)
+    return lambda t: u_optimal[int(t / dt)]
+
+# 2. Feedback control with rate estimation
+def feedback_control(f_target, Kp=0.1):
+    """
+    Proportional feedback based on estimated firing rate.
+
+    u(t) = Kp * (f_target - f_estimated(t))
+
+    Pros: Robust to parameter uncertainty, rejects disturbances
+    Cons: Requires rate estimation, may have delays
+    """
+    def controller(f_estimated):
+        error = f_target - f_estimated
+        return Kp * error
+    return controller
+
+# 3. Model predictive control (MPC)
+def mpc_controller(model, f_target, horizon=0.1):
+    """
+    Receding horizon optimal control.
+
+    At each step:
+    1. Measure current state
+    2. Solve optimal control for horizon [t, t+H]
+    3. Apply first control action
+    4. Repeat
+
+    Pros: Handles constraints, uses model for prediction
+    Cons: Computationally intensive, requires accurate model
+    """
+    def controller(current_state, t):
+        # Solve finite-horizon optimal control from current state
+        u_trajectory = solve_finite_horizon_ocp(
+            model, current_state, f_target, horizon
+        )
+        return u_trajectory[0]  # Apply first action
+    return controller
+
+# 4. Robust control (H∞ or minimax)
+def robust_controller(nominal_model, uncertainty_set, f_target):
+    """
+    Design control that works for all models in uncertainty set.
+
+    min max J[u, θ]
+     u   θ∈Θ
+
+    Pros: Guaranteed performance despite uncertainty
+    Cons: Conservative, may sacrifice nominal performance
+    """
+    pass  # Typically requires specialized robust control toolboxes
+  </Code>
+
+  <MatchPairs id="q-control-tradeoffs">
+    <Prompt>Match each control strategy with its primary advantage:</Prompt>
+    <Pairs>
+      <Pair><Left>Open-loop optimal control</Left><Right>No sensors required, simple implementation</Right></Pair>
+      <Pair><Left>Proportional feedback control</Left><Right>Robust to model mismatch and disturbances</Right></Pair>
+      <Pair><Left>Model predictive control (MPC)</Left><Right>Handles constraints explicitly in optimization</Right></Pair>
+      <Pair><Left>Robust (H∞) control</Left><Right>Guaranteed worst-case performance bounds</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Minimizes computational requirements</Distractor>
+      <Distractor>Eliminates all steady-state error</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Implementation: Complete Frequency Control Pipeline</H2>
+
+  <Body>
+    We now present a complete implementation combining the concepts developed in this lesson: formulating the optimization problem, computing gradients via the adjoint method, optimizing with constraints, and analyzing robustness.
+  </Body>
+
+  <Code lang="python">
+"""
+Complete frequency control pipeline for Hodgkin-Huxley neuron
+"""
+
+import numpy as np
+from scipy.integrate import solve_ivp
+from scipy.optimize import minimize
+
+class HodgkinHuxleyFrequencyControl:
+    """
+    Optimal frequency control for the Hodgkin-Huxley neuron model.
+    """
+
+    # Standard HH parameters
+    DEFAULT_PARAMS = {
+        'C': 1.0,      # μF/cm²
+        'g_Na': 120.0, # mS/cm²
+        'g_K': 36.0,
+        'g_L': 0.3,
+        'E_Na': 50.0,  # mV
+        'E_K': -77.0,
+        'E_L': -54.4
+    }
+
+    def __init__(self, params=None, dt=0.01, threshold=0.0):
+        self.params = params or self.DEFAULT_PARAMS.copy()
+        self.dt = dt
+        self.threshold = threshold
+
+    def alpha_m(self, V):
+        return 0.1 * (V + 40) / (1 - np.exp(-(V + 40) / 10))
+
+    def beta_m(self, V):
+        return 4.0 * np.exp(-(V + 65) / 18)
+
+    def alpha_h(self, V):
+        return 0.07 * np.exp(-(V + 65) / 20)
+
+    def beta_h(self, V):
+        return 1.0 / (1 + np.exp(-(V + 35) / 10))
+
+    def alpha_n(self, V):
+        return 0.01 * (V + 55) / (1 - np.exp(-(V + 55) / 10))
+
+    def beta_n(self, V):
+        return 0.125 * np.exp(-(V + 65) / 80)
+
+    def dynamics(self, t, state, u_func):
+        """HH dynamics with control input."""
+        V, m, h, n = state
+        p = self.params
+
+        u = u_func(t)
+
+        # Currents
+        I_Na = p['g_Na'] * m**3 * h * (V - p['E_Na'])
+        I_K = p['g_K'] * n**4 * (V - p['E_K'])
+        I_L = p['g_L'] * (V - p['E_L'])
+
+        # Derivatives
+        dV = (-I_Na - I_K - I_L + u) / p['C']
+        dm = self.alpha_m(V) * (1 - m) - self.beta_m(V) * m
+        dh = self.alpha_h(V) * (1 - h) - self.beta_h(V) * h
+        dn = self.alpha_n(V) * (1 - n) - self.beta_n(V) * n
+
+        return [dV, dm, dh, dn]
+
+    def simulate(self, u_func, T, x0=None):
+        """
+        Simulate HH model with given control input.
+
+        Returns: t_grid, state_trajectory, spike_times
+        """
+        if x0 is None:
+            x0 = [-65.0, 0.05, 0.6, 0.32]  # Rest state
+
+        t_span = (0, T)
+        t_eval = np.arange(0, T, self.dt)
+
+        sol = solve_ivp(
+            lambda t, x: self.dynamics(t, x, u_func),
+            t_span, x0, t_eval=t_eval, method='RK45'
+        )
+
+        # Detect spikes
+        V = sol.y[0]
+        spike_times = self._detect_spikes(sol.t, V)
+
+        return sol.t, sol.y.T, spike_times
+
+    def _detect_spikes(self, t, V):
+        """Detect spike times via threshold crossing."""
+        above = V > self.threshold
+        crossings = np.where(np.diff(above.astype(int)) == 1)[0]
+        return t[crossings]
+
+    def compute_firing_rate(self, spike_times, T, transient=0.1):
+        """Compute firing rate excluding initial transient."""
+        valid_spikes = spike_times[spike_times > transient]
+        return len(valid_spikes) / (T - transient)
+
+    def frequency_control_cost(self, u_params, f_target, T, alpha=0.01):
+        """
+        Cost functional: |f(u) - f_target|² + α∫u²dt
+        """
+        # Reconstruct control
+        u_func = lambda t: np.interp(t, np.linspace(0, T, len(u_params)), u_params)
+
+        # Simulate
+        t_grid, _, spike_times = self.simulate(u_func, T)
+        f_achieved = self.compute_firing_rate(spike_times, T)
+
+        # Cost components
+        freq_error = (f_achieved - f_target)**2
+        control_effort = alpha * np.trapezoid(u_params**2, np.linspace(0, T, len(u_params)))
+
+        return freq_error + control_effort
+
+    def optimize(self, f_target, T, n_control_points=50, alpha=0.01,
+                 u_min=-10, u_max=50, method='L-BFGS-B'):
+        """
+        Find optimal control for target frequency.
+        """
+        # Initial guess: constant input
+        u_init = np.ones(n_control_points) * 10.0
+
+        # Bounds
+        bounds = [(u_min, u_max)] * n_control_points
+
+        # Optimize
+        result = minimize(
+            lambda u: self.frequency_control_cost(u, f_target, T, alpha),
+            u_init,
+            method=method,
+            bounds=bounds,
+            options={'maxiter': 100, 'disp': True}
+        )
+
+        return result.x, result.fun
+
+    def robustness_test(self, u_optimal, f_target, T, n_samples=100,
+                        param_cv=0.1, noise_std=1.0):
+        """
+        Monte Carlo robustness analysis.
+
+        Parameters:
+        - param_cv: coefficient of variation for parameter uncertainty
+        - noise_std: additive noise standard deviation
+        """
+        errors = []
+
+        for _ in range(n_samples):
+            # Perturb parameters
+            perturbed_params = {}
+            for key, val in self.params.items():
+                perturbed_params[key] = val * (1 + np.random.normal(0, param_cv))
+
+            # Create perturbed model
+            perturbed_model = HodgkinHuxleyFrequencyControl(perturbed_params, self.dt)
+
+            # Add noise to control
+            u_noisy = u_optimal + np.random.normal(0, noise_std, len(u_optimal))
+            u_func = lambda t, u=u_noisy: np.interp(
+                t, np.linspace(0, T, len(u)), u
+            )
+
+            # Simulate and compute error
+            _, _, spike_times = perturbed_model.simulate(u_func, T)
+            f_achieved = perturbed_model.compute_firing_rate(spike_times, T)
+            errors.append(np.abs(f_achieved - f_target))
+
+        return {
+            'mean_error': np.mean(errors),
+            'std_error': np.std(errors),
+            'max_error': np.max(errors),
+            'success_rate': np.mean(np.array(errors) < 0.1 * f_target)
+        }
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create controller
+    hh_control = HodgkinHuxleyFrequencyControl()
+
+    # Target: 50 Hz firing
+    f_target = 50.0  # Hz
+    T = 0.5  # 500 ms simulation
+
+    print(f"Optimizing for {f_target} Hz target frequency...")
+    u_optimal, cost = hh_control.optimize(f_target, T, alpha=0.001)
+
+    # Verify
+    u_func = lambda t: np.interp(t, np.linspace(0, T, len(u_optimal)), u_optimal)
+    _, _, spikes = hh_control.simulate(u_func, T)
+    f_achieved = hh_control.compute_firing_rate(spikes, T)
+    print(f"Achieved frequency: {f_achieved:.1f} Hz")
+
+    # Robustness test
+    print("\nRobustness analysis...")
+    robustness = hh_control.robustness_test(u_optimal, f_target, T)
+    print(f"Mean error: {robustness['mean_error']:.2f} Hz")
+    print(f"Success rate: {robustness['success_rate']*100:.1f}%")
+  </Code>
+
+  <SingleSelect id="q-implementation">
+    <Prompt>In the complete implementation above, why is the control input parameterized with discrete control points and interpolation rather than optimizing the continuous function directly?</Prompt>
+    <Options>
+      <Option correct="true">To reduce the optimization to a finite-dimensional problem solvable by standard numerical methods</Option>
+      <Option>Because neurons only respond to discrete stimulation pulses</Option>
+      <Option>To ensure the control is always positive</Option>
+      <Option>To avoid computing the adjoint equations</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Summary and Key Takeaways</H2>
+
+  <Body>
+    Frequency control in neuronal models exemplifies how optimal control theory addresses clinically relevant problems in computational neuroscience. The key insights from this lesson are:
+  </Body>
+
+  <Body>
+    1. **Problem Formulation**: Frequency control minimizes J[u] = |f(u) - f_target|² + α∫u²dt, balancing target achievement against control effort.
+  </Body>
+
+  <Body>
+    2. **Gradient Computation**: The adjoint method efficiently computes ∂J/∂u by solving a backward ODE, avoiding expensive forward sensitivity computations.
+  </Body>
+
+  <Body>
+    3. **Handling Discontinuities**: Spike events create non-smooth dependencies requiring special treatment (spike time sensitivity, smooth surrogates).
+  </Body>
+
+  <Body>
+    4. **Physiological Constraints**: Real applications require bounded controls, charge balance, and other safety constraints handled via projected gradient methods.
+  </Body>
+
+  <Body>
+    5. **Robustness**: Monte Carlo analysis and sensitivity studies ensure controls work despite biological variability and noise.
+  </Body>
+
+  <Body>
+    6. **Clinical Applications**: Deep brain stimulation for Parkinson's and seizure suppression for epilepsy demonstrate the therapeutic potential of optimal neuronal control.
+  </Body>
+
+  <FlashCard id="fc-summary">
+    <Front>What are the three main components of a frequency control cost functional?</Front>
+    <Back>1) Frequency error term: |f(u) - f_target|² measuring deviation from target rate. 2) Control effort term: α∫u²dt penalizing energy expenditure. 3) Constraints: physiological bounds, charge balance, non-negativity (handled separately in optimization).</Back>
+  </FlashCard>
+
+  <Subjective id="q-subjective-dbs">
+    <Prompt>Explain why closed-loop adaptive deep brain stimulation is considered superior to traditional open-loop constant-frequency stimulation for treating Parkinson's disease. Discuss at least two specific advantages and the technical challenges involved in implementing closed-loop control.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains energy efficiency advantage: closed-loop only stimulates when biomarkers indicate need</Requirement>
+        <Indicators>energy, efficient, battery, only when needed, adaptive, on-demand, reduces stimulation</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Explains reduced side effects due to avoiding unnecessary stimulation</Requirement>
+        <Indicators>side effects, speech, motor, overstimulation, unnecessary, targeting, precise</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses technical challenge of reliable biomarker extraction (e.g., beta power from LFP)</Requirement>
+        <Indicators>biomarker, beta power, LFP, local field potential, sensing, detection, real-time</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses challenge of latency/delay in the control loop</Requirement>
+        <Indicators>latency, delay, real-time, processing, response time, feedback loop</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+</Lesson>

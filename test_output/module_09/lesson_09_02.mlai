@@ -1,0 +1,1185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-09-02</Id>
+    <Title>Reservoir Computing and Liquid State Machines</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>reservoir-computing</Tag>
+      <Tag>liquid-state-machines</Tag>
+      <Tag>echo-state-networks</Tag>
+      <Tag>spiking-neural-networks</Tag>
+      <Tag>temporal-computing</Tag>
+      <Tag>recurrent-networks</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Reservoir Computing and Liquid State Machines</H1>
+
+  <Body>
+    In this lesson, we explore a powerful paradigm that bridges neuroscience and machine learning: reservoir computing. Unlike traditional recurrent neural networks where all weights are trained through backpropagation, reservoir computing exploits the rich dynamics of fixed random connectivity. This approach dramatically simplifies training while providing remarkable computational capabilities for temporal pattern processing.
+  </Body>
+
+  <Body>
+    Recall from our study of synchronization in Module 5 that recurrent networks exhibit complex emergent dynamics. Reservoir computing leverages these dynamics as a computational resource, requiring only the training of a simple readout layer. This paradigm has profound implications for both understanding biological neural computation and designing efficient neuromorphic systems.
+  </Body>
+
+  <H2>The Reservoir Computing Paradigm</H2>
+
+  <Body>
+    Reservoir computing emerged from two independent discoveries: Echo State Networks (ESNs) by Herbert Jaeger and Liquid State Machines (LSMs) by Wolfgang Maass, both around 2001-2002. The key insight is to separate the recurrent neural network into two components: a fixed reservoir that transforms inputs into high-dimensional representations, and a trained readout that extracts desired outputs from these representations.
+  </Body>
+
+  <Body>
+    The reservoir is a recurrent neural network with randomly initialized and fixed connection weights. When driven by an input signal, the reservoir produces complex, high-dimensional dynamics. These dynamics serve as a nonlinear expansion of the input, projecting it into a space where linear separation becomes possible for many tasks. The readout layer then performs a simple linear (or sometimes nonlinear) transformation to produce the final output.
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import linalg
+
+class EchoStateNetwork:
+    """
+    Basic Echo State Network implementation.
+
+    The reservoir transforms inputs into high-dimensional state space.
+    Only readout weights are trained.
+    """
+
+    def __init__(self, n_inputs, n_reservoir, n_outputs,
+                 spectral_radius=0.9, sparsity=0.1, noise=0.001):
+        """
+        Initialize ESN with random reservoir.
+
+        Parameters:
+        -----------
+        n_inputs : int
+            Number of input dimensions
+        n_reservoir : int
+            Number of reservoir neurons
+        n_outputs : int
+            Number of output dimensions
+        spectral_radius : float
+            Spectral radius of reservoir weight matrix (controls echo state property)
+        sparsity : float
+            Fraction of non-zero connections in reservoir
+        noise : float
+            Noise level added to reservoir states
+        """
+        self.n_inputs = n_inputs
+        self.n_reservoir = n_reservoir
+        self.n_outputs = n_outputs
+        self.noise = noise
+
+        # Initialize input weights (random, fixed)
+        self.W_in = np.random.randn(n_reservoir, n_inputs) * 0.1
+
+        # Initialize reservoir weights (sparse, random, scaled by spectral radius)
+        W = np.random.randn(n_reservoir, n_reservoir)
+        # Apply sparsity mask
+        mask = np.random.rand(n_reservoir, n_reservoir) &lt; sparsity
+        W *= mask
+        # Scale to desired spectral radius
+        rho = np.max(np.abs(linalg.eigvals(W)))
+        self.W_res = W * (spectral_radius / rho) if rho &gt; 0 else W
+
+        # Readout weights (to be trained)
+        self.W_out = None
+
+    def _update_state(self, state, input_vec):
+        """Update reservoir state given current state and input."""
+        pre_activation = np.dot(self.W_in, input_vec) + np.dot(self.W_res, state)
+        new_state = np.tanh(pre_activation)
+        new_state += self.noise * np.random.randn(self.n_reservoir)
+        return new_state
+
+    def _collect_states(self, inputs, initial_state=None):
+        """
+        Run input through reservoir and collect all states.
+
+        Parameters:
+        -----------
+        inputs : array of shape (T, n_inputs)
+            Input time series
+        initial_state : array of shape (n_reservoir,) or None
+            Initial reservoir state (zeros if None)
+
+        Returns:
+        --------
+        states : array of shape (T, n_reservoir)
+            Reservoir states for each time step
+        """
+        T = inputs.shape[0]
+        states = np.zeros((T, self.n_reservoir))
+        state = initial_state if initial_state is not None else np.zeros(self.n_reservoir)
+
+        for t in range(T):
+            state = self._update_state(state, inputs[t])
+            states[t] = state
+
+        return states
+
+    def fit(self, inputs, targets, washout=100, ridge_alpha=1e-6):
+        """
+        Train readout weights using ridge regression.
+
+        Parameters:
+        -----------
+        inputs : array of shape (T, n_inputs)
+            Training input sequence
+        targets : array of shape (T, n_outputs)
+            Target output sequence
+        washout : int
+            Number of initial time steps to discard (for state initialization)
+        ridge_alpha : float
+            Ridge regression regularization parameter
+        """
+        # Collect reservoir states
+        states = self._collect_states(inputs)
+
+        # Remove washout period
+        states = states[washout:]
+        targets = targets[washout:]
+
+        # Train readout with ridge regression: W_out = targets^T @ states @ (states^T @ states + alpha*I)^-1
+        R = np.dot(states.T, states) + ridge_alpha * np.eye(self.n_reservoir)
+        self.W_out = np.dot(np.dot(targets.T, states), linalg.inv(R))
+
+    def predict(self, inputs, initial_state=None):
+        """Generate predictions for input sequence."""
+        states = self._collect_states(inputs, initial_state)
+        return np.dot(states, self.W_out.T)
+  </Code>
+
+  <FlashCard id="fc1">
+    <Front>What is the key architectural principle of reservoir computing?</Front>
+    <Back>Reservoir computing separates a recurrent neural network into a fixed random reservoir (which transforms inputs into high-dimensional dynamics) and a trained readout layer (which extracts desired outputs). Only the readout weights are learned, while reservoir weights remain fixed after random initialization.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What is the spectral radius of a reservoir, and why is it important?</Front>
+    <Back>The spectral radius is the maximum absolute eigenvalue of the reservoir weight matrix. It must be less than 1 (typically 0.9-0.99) to ensure the echo state property, where the reservoir's dynamics depend on recent inputs rather than initial conditions. A spectral radius ≥ 1 can cause unstable or chaotic dynamics that lose input information.</Back>
+  </FlashCard>
+
+  <H2>The Echo State Property</H2>
+
+  <Body>
+    The echo state property (ESP) is the fundamental requirement for a reservoir to function correctly. A reservoir possesses the ESP if its current state depends primarily on the recent input history rather than on its initial conditions. Mathematically, for any two initial states, the reservoir states should converge when driven by the same input sequence.
+  </Body>
+
+  <Body>
+    For a discrete-time reservoir with dynamics x(t+1) = f(W_res · x(t) + W_in · u(t)), the echo state property is guaranteed when the spectral radius ρ(W_res) &lt; 1. This ensures that the effect of past states decays exponentially over time, creating a "fading memory" of inputs. The decay rate determines the effective memory horizon of the reservoir.
+  </Body>
+
+  <Code lang="python">
+def analyze_echo_state_property(W_res, W_in, n_steps=1000, n_trials=10):
+    """
+    Analyze whether a reservoir satisfies the echo state property.
+
+    Tests convergence of reservoir states from different initial conditions
+    when driven by the same input sequence.
+
+    Parameters:
+    -----------
+    W_res : array of shape (N, N)
+        Reservoir weight matrix
+    W_in : array of shape (N, n_inputs)
+        Input weight matrix
+    n_steps : int
+        Number of time steps to simulate
+    n_trials : int
+        Number of different initial conditions to test
+
+    Returns:
+    --------
+    has_esp : bool
+        Whether the reservoir likely has the echo state property
+    convergence_rate : float
+        Estimated rate of convergence (0 if not convergent)
+    """
+    N = W_res.shape[0]
+    n_inputs = W_in.shape[1]
+
+    # Check spectral radius (necessary condition)
+    spectral_radius = np.max(np.abs(linalg.eigvals(W_res)))
+    print(f"Spectral radius: {spectral_radius:.4f}")
+
+    # Generate common input sequence
+    inputs = np.random.randn(n_steps, n_inputs)
+
+    # Simulate from different initial conditions
+    trajectories = np.zeros((n_trials, n_steps, N))
+
+    for trial in range(n_trials):
+        # Random initial state
+        state = np.random.randn(N)
+
+        for t in range(n_steps):
+            state = np.tanh(np.dot(W_res, state) + np.dot(W_in, inputs[t]))
+            trajectories[trial, t] = state
+
+    # Compute pairwise distances over time
+    distances = np.zeros(n_steps)
+    for t in range(n_steps):
+        states_at_t = trajectories[:, t, :]
+        # Average pairwise distance
+        for i in range(n_trials):
+            for j in range(i+1, n_trials):
+                distances[t] += np.linalg.norm(states_at_t[i] - states_at_t[j])
+        distances[t] /= (n_trials * (n_trials - 1) / 2)
+
+    # Check for convergence
+    final_distance = np.mean(distances[-100:])
+    initial_distance = np.mean(distances[:100])
+
+    has_esp = final_distance &lt; 0.01 * initial_distance
+
+    # Estimate convergence rate (exponential fit)
+    if has_esp and initial_distance &gt; 0:
+        # d(t) ≈ d_0 * exp(-λt) → log(d(t)/d_0) ≈ -λt
+        valid_idx = distances &gt; 1e-10
+        if np.sum(valid_idx) &gt; 10:
+            log_distances = np.log(distances[valid_idx] / initial_distance)
+            times = np.arange(n_steps)[valid_idx]
+            convergence_rate = -np.polyfit(times, log_distances, 1)[0]
+        else:
+            convergence_rate = np.inf
+    else:
+        convergence_rate = 0.0
+
+    return has_esp, convergence_rate
+
+
+def compute_memory_capacity(esn, max_delay=100):
+    """
+    Compute the memory capacity of an echo state network.
+
+    Memory capacity measures how well the reservoir can reconstruct
+    past inputs from current states. Total MC is bounded by reservoir size.
+
+    MC_k = corr(y_k, u_{t-k})^2 where y_k is trained to predict u_{t-k}
+
+    Parameters:
+    -----------
+    esn : EchoStateNetwork
+        Trained or untrained ESN (will train for each delay)
+    max_delay : int
+        Maximum delay to test
+
+    Returns:
+    --------
+    mc_values : array of shape (max_delay,)
+        Memory capacity for each delay
+    total_mc : float
+        Total memory capacity (sum of mc_values)
+    """
+    # Generate random input sequence
+    T = 5000
+    inputs = np.random.randn(T, esn.n_inputs)
+
+    # Collect reservoir states
+    states = esn._collect_states(inputs)
+
+    mc_values = np.zeros(max_delay)
+
+    for k in range(1, max_delay + 1):
+        # Target is input delayed by k steps
+        targets = inputs[:-k] if k &lt; T else np.zeros((T, esn.n_inputs))
+        states_k = states[k:]
+
+        # Train linear readout with ridge regression
+        ridge_alpha = 1e-6
+        R = np.dot(states_k.T, states_k) + ridge_alpha * np.eye(esn.n_reservoir)
+        W = np.dot(np.dot(targets.T, states_k), linalg.inv(R))
+
+        # Compute prediction and correlation
+        predictions = np.dot(states_k, W.T)
+
+        # Memory capacity is squared correlation
+        for i in range(esn.n_inputs):
+            corr = np.corrcoef(predictions[:, i], targets[:, i])[0, 1]
+            mc_values[k-1] += corr**2 / esn.n_inputs
+
+    total_mc = np.sum(mc_values)
+
+    return mc_values, total_mc
+  </Code>
+
+  <FlashCard id="fc3">
+    <Front>What is the echo state property (ESP)?</Front>
+    <Back>The echo state property states that a reservoir's current state should depend primarily on the recent history of inputs, not on initial conditions. For any two different initial states, the reservoir trajectories should converge when driven by the same input sequence. This creates a well-defined input-to-state mapping and ensures the network has "fading memory."</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>For a reservoir to guarantee the echo state property, what condition must the spectral radius ρ(W_res) satisfy?</Prompt>
+    <Options>
+      <Option correct="true">ρ(W_res) &lt; 1</Option>
+      <Option>ρ(W_res) = 1</Option>
+      <Option>ρ(W_res) &gt; 1</Option>
+      <Option>ρ(W_res) can be any positive value</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>What is the theoretical upper bound on the memory capacity of a reservoir with N neurons?</Prompt>
+    <Options>
+      <Option correct="true">N (the number of reservoir neurons)</Option>
+      <Option>N² (the number of potential connections)</Option>
+      <Option>log(N) (logarithmic in reservoir size)</Option>
+      <Option>There is no theoretical upper bound</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Liquid State Machines</H2>
+
+  <Body>
+    While Echo State Networks use rate-based (continuous activation) neurons, Liquid State Machines (LSMs) employ spiking neurons, making them more biologically realistic. The term "liquid" refers to the transient dynamics of the reservoir—like ripples on a pond after dropping a stone, the network's response to an input creates complex spatiotemporal patterns that gradually fade.
+  </Body>
+
+  <Body>
+    In an LSM, integrate-and-fire neurons receive input through synaptic connections and generate spikes when their membrane potential exceeds a threshold. The collection of spike times across the reservoir constitutes the "liquid state," which is then read out by a trained classifier or regressor.
+  </Body>
+
+  <Code lang="python">
+class LiquidStateMachine:
+    """
+    Liquid State Machine with Leaky Integrate-and-Fire neurons.
+
+    The reservoir uses spiking neurons, providing more biological realism
+    and temporal precision than rate-based reservoirs.
+    """
+
+    def __init__(self, n_inputs, n_reservoir, n_outputs,
+                 tau_m=20.0, v_thresh=-50.0, v_reset=-65.0, v_rest=-65.0,
+                 dt=1.0, connectivity=0.1, exc_frac=0.8):
+        """
+        Initialize LSM with LIF neuron reservoir.
+
+        Parameters:
+        -----------
+        n_inputs : int
+            Number of input channels
+        n_reservoir : int
+            Number of reservoir neurons
+        n_outputs : int
+            Number of output classes/dimensions
+        tau_m : float
+            Membrane time constant (ms)
+        v_thresh : float
+            Spike threshold (mV)
+        v_reset : float
+            Reset potential after spike (mV)
+        v_rest : float
+            Resting potential (mV)
+        dt : float
+            Simulation time step (ms)
+        connectivity : float
+            Connection probability in reservoir
+        exc_frac : float
+            Fraction of excitatory neurons
+        """
+        self.n_inputs = n_inputs
+        self.n_reservoir = n_reservoir
+        self.n_outputs = n_outputs
+        self.tau_m = tau_m
+        self.v_thresh = v_thresh
+        self.v_reset = v_reset
+        self.v_rest = v_rest
+        self.dt = dt
+
+        # Assign excitatory/inhibitory identity
+        n_exc = int(n_reservoir * exc_frac)
+        self.neuron_sign = np.ones(n_reservoir)
+        self.neuron_sign[n_exc:] = -1  # Inhibitory neurons have negative sign
+
+        # Initialize weights with Dale's law
+        self.W_in = np.random.randn(n_reservoir, n_inputs) * 5.0
+
+        # Reservoir weights (sparse, with Dale's law)
+        W = np.random.exponential(1.0, (n_reservoir, n_reservoir))
+        mask = np.random.rand(n_reservoir, n_reservoir) &lt; connectivity
+        W *= mask
+        W *= self.neuron_sign[np.newaxis, :]  # Apply neuron signs (Dale's law)
+        # Remove self-connections
+        np.fill_diagonal(W, 0)
+        # Scale weights
+        self.W_res = W * 0.5
+
+        # Readout weights (to be trained)
+        self.W_out = None
+
+    def _simulate_reservoir(self, input_spikes, duration):
+        """
+        Simulate reservoir dynamics for given input.
+
+        Parameters:
+        -----------
+        input_spikes : array of shape (T, n_inputs)
+            Input spike trains (1 = spike, 0 = no spike)
+        duration : int
+            Number of time steps
+
+        Returns:
+        --------
+        membrane_potentials : array of shape (T, n_reservoir)
+            Membrane potentials over time
+        spike_trains : array of shape (T, n_reservoir)
+            Output spike trains
+        """
+        T = duration
+        v = np.ones(self.n_reservoir) * self.v_rest
+
+        membrane_potentials = np.zeros((T, self.n_reservoir))
+        spike_trains = np.zeros((T, self.n_reservoir))
+
+        for t in range(T):
+            # Input current from external input
+            if t &lt; input_spikes.shape[0]:
+                I_in = np.dot(self.W_in, input_spikes[t])
+            else:
+                I_in = 0
+
+            # Recurrent current from previous time step spikes
+            if t &gt; 0:
+                I_rec = np.dot(self.W_res, spike_trains[t-1])
+            else:
+                I_rec = 0
+
+            # LIF dynamics: tau_m * dv/dt = -(v - v_rest) + I
+            dv = (-(v - self.v_rest) + I_in + I_rec) * (self.dt / self.tau_m)
+            v += dv
+
+            # Spike detection
+            spiked = v &gt;= self.v_thresh
+            spike_trains[t, spiked] = 1
+            v[spiked] = self.v_reset
+
+            membrane_potentials[t] = v
+
+        return membrane_potentials, spike_trains
+
+    def _extract_features(self, spike_trains, window_size=50):
+        """
+        Extract features from spike trains for readout.
+
+        Uses spike counts in sliding windows as features.
+
+        Parameters:
+        -----------
+        spike_trains : array of shape (T, n_reservoir)
+            Reservoir spike trains
+        window_size : int
+            Size of counting window (ms)
+
+        Returns:
+        --------
+        features : array of shape (n_windows, n_reservoir)
+            Spike count features
+        """
+        T = spike_trains.shape[0]
+        n_windows = T // window_size
+
+        features = np.zeros((n_windows, self.n_reservoir))
+        for w in range(n_windows):
+            start = w * window_size
+            end = start + window_size
+            features[w] = np.sum(spike_trains[start:end], axis=0)
+
+        return features
+
+    def fit(self, input_sequences, labels, duration_per_sample=500):
+        """
+        Train readout on labeled input sequences.
+
+        Parameters:
+        -----------
+        input_sequences : list of arrays
+            List of input spike trains
+        labels : array of shape (n_samples,)
+            Class labels for each sequence
+        duration_per_sample : int
+            Duration to simulate each sample (ms)
+        """
+        all_features = []
+        all_labels = []
+
+        for i, (inp, label) in enumerate(zip(input_sequences, labels)):
+            _, spikes = self._simulate_reservoir(inp, duration_per_sample)
+            features = self._extract_features(spikes)
+            # Use last window's features
+            all_features.append(features[-1])
+            all_labels.append(label)
+
+        X = np.array(all_features)
+        y = np.array(all_labels)
+
+        # One-hot encode labels
+        n_classes = len(np.unique(y))
+        Y = np.zeros((len(y), n_classes))
+        for i, label in enumerate(y):
+            Y[i, int(label)] = 1
+
+        # Ridge regression for readout
+        ridge_alpha = 1e-4
+        R = np.dot(X.T, X) + ridge_alpha * np.eye(self.n_reservoir)
+        self.W_out = np.dot(np.dot(Y.T, X), linalg.inv(R))
+
+    def predict(self, input_spikes, duration=500):
+        """Predict class for input spike train."""
+        _, spikes = self._simulate_reservoir(input_spikes, duration)
+        features = self._extract_features(spikes)
+        output = np.dot(features[-1], self.W_out.T)
+        return np.argmax(output)
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>What is the key difference between Echo State Networks and Liquid State Machines?</Front>
+    <Back>Echo State Networks (ESNs) use rate-based neurons with continuous activation functions (typically tanh), while Liquid State Machines (LSMs) use spiking neurons (like integrate-and-fire models). LSMs are more biologically realistic and can exploit precise spike timing, but are more computationally expensive to simulate.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q3">
+    <Prompt>Which of the following are advantages of the reservoir computing paradigm over fully-trained recurrent neural networks? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Training is computationally efficient (only readout weights are learned)</Option>
+      <Option correct="true">Avoids vanishing/exploding gradient problems during training</Option>
+      <Option correct="true">Can be implemented with biologically plausible learning rules</Option>
+      <Option>Always achieves higher accuracy than trained RNNs</Option>
+      <Option correct="true">Enables hardware implementation with random, fixed connectivity</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Computational Capacity and Memory</H2>
+
+  <Body>
+    The computational power of a reservoir arises from two sources: its memory capacity and its ability to perform nonlinear transformations. Memory capacity quantifies how well the reservoir can recall past inputs, while the nonlinear transformation capacity captures its ability to compute complex functions of the input history.
+  </Body>
+
+  <Body>
+    The total memory capacity MC of a reservoir is bounded by the number of neurons N. For a reservoir with orthogonal dynamics, the memory capacity exactly equals N, distributed across different time delays. The memory capacity at delay k is defined as the squared correlation between the optimal linear readout and the delayed input: MC_k = corr²(ŷ_k, u_{t-k}).
+  </Body>
+
+  <Code lang="python">
+def analyze_reservoir_capacity(n_reservoir=100, spectral_radius=0.9,
+                                sparsity=0.1, n_trials=10):
+    """
+    Comprehensive analysis of reservoir computational capacity.
+
+    Analyzes both linear memory capacity and nonlinear transformation capacity.
+
+    Parameters:
+    -----------
+    n_reservoir : int
+        Number of reservoir neurons
+    spectral_radius : float
+        Spectral radius of reservoir
+    sparsity : float
+        Connection sparsity
+    n_trials : int
+        Number of random reservoirs to average over
+
+    Returns:
+    --------
+    results : dict
+        Dictionary containing capacity measures
+    """
+    results = {
+        'memory_capacity': [],
+        'nonlinear_capacity': [],
+        'effective_dimension': []
+    }
+
+    for trial in range(n_trials):
+        # Create reservoir
+        esn = EchoStateNetwork(
+            n_inputs=1,
+            n_reservoir=n_reservoir,
+            n_outputs=1,
+            spectral_radius=spectral_radius,
+            sparsity=sparsity
+        )
+
+        # Measure memory capacity
+        mc_values, total_mc = compute_memory_capacity(esn, max_delay=n_reservoir)
+        results['memory_capacity'].append(total_mc)
+
+        # Measure nonlinear capacity (e.g., ability to compute x^2, x^3)
+        T = 5000
+        inputs = np.random.randn(T, 1)
+        states = esn._collect_states(inputs)
+
+        nonlinear_cap = 0
+        for degree in [2, 3]:
+            targets = inputs[100:] ** degree
+            states_sub = states[100:]
+
+            # Train readout
+            ridge_alpha = 1e-6
+            R = np.dot(states_sub.T, states_sub) + ridge_alpha * np.eye(n_reservoir)
+            W = np.dot(np.dot(targets.T, states_sub), linalg.inv(R))
+
+            predictions = np.dot(states_sub, W.T)
+            corr = np.corrcoef(predictions.flatten(), targets.flatten())[0, 1]
+            nonlinear_cap += corr**2
+
+        results['nonlinear_capacity'].append(nonlinear_cap)
+
+        # Compute effective dimension (rank of state covariance)
+        cov = np.cov(states.T)
+        eigenvalues = np.linalg.eigvalsh(cov)
+        eigenvalues = eigenvalues[eigenvalues &gt; 1e-10]
+        # Participation ratio as effective dimension
+        eff_dim = np.sum(eigenvalues)**2 / np.sum(eigenvalues**2)
+        results['effective_dimension'].append(eff_dim)
+
+    # Average results
+    for key in results:
+        results[key] = np.mean(results[key])
+
+    print(f"Memory Capacity: {results['memory_capacity']:.2f} / {n_reservoir}")
+    print(f"Nonlinear Capacity (deg 2+3): {results['nonlinear_capacity']:.3f}")
+    print(f"Effective Dimension: {results['effective_dimension']:.2f}")
+
+    return results
+
+
+def study_topology_effects():
+    """
+    Compare reservoir performance across different network topologies.
+
+    Examines how network structure (random, small-world, scale-free)
+    affects computational capacity.
+    """
+    n_reservoir = 100
+    n_inputs = 1
+
+    topologies = {}
+
+    # Erdos-Renyi random graph
+    p = 0.1
+    W_random = np.random.randn(n_reservoir, n_reservoir)
+    W_random *= (np.random.rand(n_reservoir, n_reservoir) &lt; p)
+    np.fill_diagonal(W_random, 0)
+    # Scale spectral radius
+    rho = np.max(np.abs(linalg.eigvals(W_random)))
+    if rho &gt; 0:
+        W_random *= 0.9 / rho
+    topologies['random'] = W_random
+
+    # Small-world (Watts-Strogatz): start with ring, rewire with probability beta
+    beta = 0.1
+    k = 10  # Each node connected to k nearest neighbors
+    W_smallworld = np.zeros((n_reservoir, n_reservoir))
+    for i in range(n_reservoir):
+        for j in range(1, k//2 + 1):
+            # Connect to neighbors
+            right = (i + j) % n_reservoir
+            left = (i - j) % n_reservoir
+            W_smallworld[i, right] = np.random.randn()
+            W_smallworld[i, left] = np.random.randn()
+    # Rewiring
+    for i in range(n_reservoir):
+        for j in range(n_reservoir):
+            if W_smallworld[i, j] != 0 and np.random.rand() &lt; beta:
+                # Rewire to random target
+                new_target = np.random.randint(n_reservoir)
+                if new_target != i:
+                    W_smallworld[i, j] = 0
+                    W_smallworld[i, new_target] = np.random.randn()
+    rho = np.max(np.abs(linalg.eigvals(W_smallworld)))
+    if rho &gt; 0:
+        W_smallworld *= 0.9 / rho
+    topologies['small_world'] = W_smallworld
+
+    # Scale-free (Barabasi-Albert): preferential attachment
+    W_scalefree = np.zeros((n_reservoir, n_reservoir))
+    m = 5  # Edges per new node
+    degrees = np.ones(n_reservoir)  # Initialize with 1 to avoid division by zero
+    for i in range(m, n_reservoir):
+        # Preferential attachment: connect to existing nodes with prob ~ degree
+        probs = degrees[:i] / np.sum(degrees[:i])
+        targets = np.random.choice(i, size=min(m, i), replace=False, p=probs)
+        for t in targets:
+            W_scalefree[i, t] = np.random.randn()
+            W_scalefree[t, i] = np.random.randn()
+            degrees[i] += 1
+            degrees[t] += 1
+    rho = np.max(np.abs(linalg.eigvals(W_scalefree)))
+    if rho &gt; 0:
+        W_scalefree *= 0.9 / rho
+    topologies['scale_free'] = W_scalefree
+
+    # Evaluate each topology
+    results = {}
+    for name, W in topologies.items():
+        esn = EchoStateNetwork(n_inputs, n_reservoir, 1, spectral_radius=0.9)
+        esn.W_res = W  # Replace with custom topology
+
+        mc_values, total_mc = compute_memory_capacity(esn, max_delay=50)
+        results[name] = {
+            'memory_capacity': total_mc,
+            'mc_profile': mc_values
+        }
+        print(f"{name}: MC = {total_mc:.2f}")
+
+    return results
+  </Code>
+
+  <MatchPairs id="q4">
+    <Prompt>Match each reservoir property with its definition or characteristic:</Prompt>
+    <Pairs>
+      <Pair><Left>Spectral radius</Left><Right>Maximum absolute eigenvalue of weight matrix</Right></Pair>
+      <Pair><Left>Memory capacity</Left><Right>Ability to recall past inputs from current state</Right></Pair>
+      <Pair><Left>Echo state property</Left><Right>State depends on input history, not initial conditions</Right></Pair>
+      <Pair><Left>Fading memory</Left><Right>Influence of past inputs decays exponentially</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Number of trainable parameters</Distractor>
+      <Distractor>Maximum firing rate of neurons</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <SortQuiz id="q5">
+    <Prompt>Order the following steps in the reservoir computing training pipeline from first to last:</Prompt>
+    <SortedItems>
+      <Item>Initialize reservoir with random fixed weights</Item>
+      <Item>Scale spectral radius to ensure echo state property</Item>
+      <Item>Drive reservoir with input and collect states</Item>
+      <Item>Discard initial transient (washout period)</Item>
+      <Item>Train readout weights using linear regression</Item>
+      <Item>Evaluate on test data using trained readout</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Readout Training Methods</H2>
+
+  <Body>
+    The readout layer maps reservoir states to desired outputs. Since only this layer is trained, the optimization is convex for linear readouts, avoiding the difficulties of gradient-based training for recurrent networks. Ridge regression (Tikhonov regularization) is the most common approach, balancing fit quality against overfitting.
+  </Body>
+
+  <Body>
+    For a training set with reservoir states X ∈ ℝ^(T×N) and targets Y ∈ ℝ^(T×M), the ridge regression solution is:
+    W_out = Y^T X (X^T X + αI)^(-1)
+    where α is the regularization parameter. This has a closed-form solution, making training extremely fast compared to iterative gradient descent methods.
+  </Body>
+
+  <Code lang="python">
+def train_readout_methods(states, targets, method='ridge', **kwargs):
+    """
+    Train readout weights using various methods.
+
+    Parameters:
+    -----------
+    states : array of shape (T, N)
+        Reservoir states (design matrix)
+    targets : array of shape (T, M)
+        Target outputs
+    method : str
+        Training method: 'ridge', 'pseudoinverse', 'force'
+    **kwargs : dict
+        Method-specific parameters
+
+    Returns:
+    --------
+    W_out : array of shape (M, N)
+        Trained readout weights
+    """
+    T, N = states.shape
+
+    if method == 'ridge':
+        # Ridge regression (most common)
+        alpha = kwargs.get('alpha', 1e-6)
+        R = np.dot(states.T, states) + alpha * np.eye(N)
+        W_out = np.dot(np.dot(targets.T, states), linalg.inv(R))
+
+    elif method == 'pseudoinverse':
+        # Moore-Penrose pseudoinverse (no regularization)
+        W_out = np.dot(targets.T, linalg.pinv(states.T))
+
+    elif method == 'force':
+        # FORCE learning (online, recursive least squares)
+        # Sussillo &amp; Abbott, 2009
+        alpha = kwargs.get('alpha', 1.0)
+
+        # Initialize
+        W_out = np.random.randn(targets.shape[1], N) * 0.001
+        P = np.eye(N) / alpha  # Inverse correlation matrix estimate
+
+        for t in range(T):
+            x = states[t]
+            y_target = targets[t]
+
+            # Prediction
+            y_pred = np.dot(W_out, x)
+
+            # Error
+            error = y_pred - y_target
+
+            # RLS update
+            Px = np.dot(P, x)
+            k = Px / (1 + np.dot(x, Px))  # Kalman gain
+
+            # Update weights
+            W_out -= np.outer(error, k)
+
+            # Update inverse correlation matrix
+            P -= np.outer(k, Px)
+
+    elif method == 'recursive_ridge':
+        # Recursive ridge regression (online version of ridge)
+        alpha = kwargs.get('alpha', 1e-6)
+        forget = kwargs.get('forget', 0.999)  # Forgetting factor
+
+        W_out = np.zeros((targets.shape[1], N))
+        R = alpha * np.eye(N)
+        P = np.zeros((targets.shape[1], N))
+
+        for t in range(T):
+            x = states[t]
+            y = targets[t]
+
+            # Update correlation matrix with forgetting
+            R = forget * R + np.outer(x, x)
+            P = forget * P + np.outer(y, x)
+
+            # Solve for weights periodically
+            if (t + 1) % 100 == 0 or t == T - 1:
+                W_out = np.dot(P, linalg.inv(R))
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
+    return W_out
+
+
+def compare_regularization_effects(esn, inputs, targets, alphas=None):
+    """
+    Analyze effect of regularization strength on readout performance.
+
+    Parameters:
+    -----------
+    esn : EchoStateNetwork
+        ESN instance
+    inputs : array
+        Input sequence
+    targets : array
+        Target sequence
+    alphas : array
+        Regularization values to test
+
+    Returns:
+    --------
+    results : dict
+        Training and test errors for each alpha
+    """
+    if alphas is None:
+        alphas = np.logspace(-10, 2, 20)
+
+    # Split data
+    T = len(inputs)
+    train_end = int(0.7 * T)
+
+    states = esn._collect_states(inputs)
+
+    # Washout
+    washout = 100
+    states = states[washout:]
+    targets_clean = targets[washout:]
+
+    train_states = states[:train_end-washout]
+    train_targets = targets_clean[:train_end-washout]
+    test_states = states[train_end-washout:]
+    test_targets = targets_clean[train_end-washout:]
+
+    train_errors = []
+    test_errors = []
+
+    for alpha in alphas:
+        # Train
+        R = np.dot(train_states.T, train_states) + alpha * np.eye(esn.n_reservoir)
+        W = np.dot(np.dot(train_targets.T, train_states), linalg.inv(R))
+
+        # Evaluate
+        train_pred = np.dot(train_states, W.T)
+        test_pred = np.dot(test_states, W.T)
+
+        train_mse = np.mean((train_pred - train_targets)**2)
+        test_mse = np.mean((test_pred - test_targets)**2)
+
+        train_errors.append(train_mse)
+        test_errors.append(test_mse)
+
+    results = {
+        'alphas': alphas,
+        'train_errors': np.array(train_errors),
+        'test_errors': np.array(test_errors),
+        'best_alpha': alphas[np.argmin(test_errors)]
+    }
+
+    print(f"Best regularization alpha: {results['best_alpha']:.2e}")
+    print(f"Best test MSE: {np.min(test_errors):.6f}")
+
+    return results
+  </Code>
+
+  <FillBlanks id="q6">
+    <Prompt>
+      In ridge regression for readout training, the regularization parameter α controls the trade-off between <Blank>fitting</Blank> the training data and preventing <Blank>overfitting</Blank>. The closed-form solution is W_out = Y^T X (X^T X + <Blank>αI</Blank>)^(-1), where I is the <Blank>identity</Blank> matrix.
+    </Prompt>
+    <Distractors>
+      <Distractor>memorizing</Distractor>
+      <Distractor>underfitting</Distractor>
+      <Distractor>αX</Distractor>
+      <Distractor>covariance</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Applications and Examples</H2>
+
+  <Body>
+    Reservoir computing has been successfully applied to numerous tasks requiring temporal processing: speech recognition, time series prediction, motor pattern generation, and chaotic system modeling. The paradigm is particularly well-suited for tasks where the input has rich temporal structure and the relationship between input history and output is complex but smooth.
+  </Body>
+
+  <Code lang="python">
+def example_mackey_glass_prediction():
+    """
+    Example: Predicting the Mackey-Glass chaotic time series.
+
+    The Mackey-Glass system is a benchmark for time series prediction,
+    exhibiting chaotic dynamics that require both memory and nonlinearity.
+    """
+    # Generate Mackey-Glass time series
+    def mackey_glass(length, tau=17, delta_t=0.1, n=10, beta=0.2, gamma=0.1):
+        """Generate Mackey-Glass time series."""
+        history_len = int(tau / delta_t)
+        x = np.zeros(length + history_len)
+        x[:history_len] = 1.2  # Initial condition
+
+        for t in range(history_len, length + history_len):
+            x_tau = x[t - history_len]
+            dx = beta * x_tau / (1 + x_tau**n) - gamma * x[t-1]
+            x[t] = x[t-1] + delta_t * dx
+
+        return x[history_len:]
+
+    # Generate data
+    T = 10000
+    data = mackey_glass(T)
+
+    # Normalize
+    data = (data - np.mean(data)) / np.std(data)
+
+    # Create input-output pairs (predict k steps ahead)
+    k = 84  # Prediction horizon (common benchmark value)
+    inputs = data[:-k].reshape(-1, 1)
+    targets = data[k:].reshape(-1, 1)
+
+    # Create and train ESN
+    esn = EchoStateNetwork(
+        n_inputs=1,
+        n_reservoir=500,
+        n_outputs=1,
+        spectral_radius=0.95,
+        sparsity=0.1
+    )
+
+    # Split train/test
+    train_len = 5000
+    esn.fit(inputs[:train_len], targets[:train_len], washout=200)
+
+    # Predict
+    predictions = esn.predict(inputs)
+
+    # Evaluate on test set
+    test_pred = predictions[train_len:]
+    test_target = targets[train_len:]
+
+    # Normalized Root Mean Square Error
+    nrmse = np.sqrt(np.mean((test_pred - test_target)**2)) / np.std(test_target)
+    print(f"Test NRMSE: {nrmse:.4f}")
+
+    return esn, predictions, targets, nrmse
+
+
+def example_spoken_digit_recognition():
+    """
+    Example: Spoken digit recognition using LSM.
+
+    Demonstrates classification of temporal patterns using a
+    liquid state machine with spiking neurons.
+    """
+    # Simulate spoken digit data as spike patterns
+    # (In practice, this would come from cochlear model or MEL features)
+
+    n_digits = 10
+    n_samples_per_digit = 20
+    n_channels = 20  # Input channels (e.g., frequency bands)
+    duration = 300  # ms
+
+    def generate_digit_pattern(digit, duration, n_channels):
+        """Generate synthetic spike pattern for a digit."""
+        np.random.seed(digit * 100)  # Consistent pattern per digit
+
+        # Each digit has a characteristic temporal pattern
+        pattern = np.zeros((duration, n_channels))
+
+        # Base rate modulated by digit-specific function
+        for ch in range(n_channels):
+            # Different temporal profiles for different digits/channels
+            phase = 2 * np.pi * digit / n_digits
+            freq = 0.02 + 0.01 * (ch / n_channels)
+
+            for t in range(duration):
+                rate = 0.1 * (1 + np.sin(freq * t + phase + ch * 0.5))
+                rate *= np.exp(-((ch - digit) ** 2) / 20)  # Digit-specific channel emphasis
+                pattern[t, ch] = 1 if np.random.rand() &lt; rate else 0
+
+        return pattern
+
+    # Generate dataset
+    inputs = []
+    labels = []
+
+    for digit in range(n_digits):
+        for sample in range(n_samples_per_digit):
+            # Add noise/variability
+            pattern = generate_digit_pattern(digit, duration, n_channels)
+            # Add temporal jitter
+            jitter = np.random.randint(-5, 6)
+            pattern = np.roll(pattern, jitter, axis=0)
+
+            inputs.append(pattern)
+            labels.append(digit)
+
+    inputs = np.array(inputs)
+    labels = np.array(labels)
+
+    # Shuffle
+    perm = np.random.permutation(len(labels))
+    inputs = inputs[perm]
+    labels = labels[perm]
+
+    # Split train/test
+    n_train = int(0.8 * len(labels))
+    train_inputs = list(inputs[:n_train])
+    train_labels = labels[:n_train]
+    test_inputs = list(inputs[n_train:])
+    test_labels = labels[n_train:]
+
+    # Create and train LSM
+    lsm = LiquidStateMachine(
+        n_inputs=n_channels,
+        n_reservoir=200,
+        n_outputs=n_digits,
+        tau_m=20.0,
+        connectivity=0.15
+    )
+
+    lsm.fit(train_inputs, train_labels, duration_per_sample=duration)
+
+    # Evaluate
+    correct = 0
+    for inp, true_label in zip(test_inputs, test_labels):
+        pred = lsm.predict(inp, duration=duration)
+        if pred == true_label:
+            correct += 1
+
+    accuracy = correct / len(test_labels)
+    print(f"Test accuracy: {accuracy:.2%}")
+
+    return lsm, accuracy
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What is FORCE learning in the context of reservoir computing?</Front>
+    <Back>FORCE (First-Order Reduced and Controlled Error) learning is an online training method for reservoir readouts using recursive least squares. Unlike batch ridge regression, FORCE updates readout weights after each time step, allowing real-time adaptation. It was introduced by Sussillo and Abbott (2009) and enables training of feedback loops where reservoir output is fed back as input.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc6">
+    <Front>What is the Mackey-Glass system, and why is it used as a benchmark?</Front>
+    <Back>The Mackey-Glass system is a delay differential equation that exhibits chaotic dynamics. It's defined as dx/dt = βx(t-τ)/(1+x(t-τ)^n) - γx(t). It serves as a standard benchmark for time series prediction because: (1) it's deterministic but chaotic, (2) it has tunable complexity via the delay τ, and (3) predicting its future values requires both memory of past states and nonlinear computation.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q7">
+    <Prompt>In a Liquid State Machine for speech recognition, what is typically used as the readout feature from the spiking reservoir?</Prompt>
+    <Options>
+      <Option correct="true">Spike counts in temporal windows</Option>
+      <Option>Individual spike times</Option>
+      <Option>Peak membrane potential values</Option>
+      <Option>Synaptic weight magnitudes</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Network Topology Effects</H2>
+
+  <Body>
+    The structure of connections within a reservoir significantly affects its computational properties. While random (Erdős-Rényi) connectivity is the default, other topologies such as small-world and scale-free networks can offer different trade-offs between memory capacity, nonlinear transformation ability, and computational efficiency.
+  </Body>
+
+  <Body>
+    Small-world networks, characterized by high clustering and short path lengths, can enhance both local processing (through clusters) and global integration (through long-range shortcuts). Scale-free networks, with their hub neurons having many connections, can create hierarchical temporal processing scales. Research suggests that biological neural networks may exploit such non-random structures for efficient computation.
+  </Body>
+
+  <MultiSelect id="q8">
+    <Prompt>Which of the following statements about reservoir topology are correct? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Small-world topology combines high clustering with short path lengths</Option>
+      <Option correct="true">Scale-free networks have hub neurons with many more connections than average</Option>
+      <Option>Random connectivity always produces optimal memory capacity</Option>
+      <Option correct="true">Network topology can affect the trade-off between memory and nonlinearity</Option>
+      <Option>Biological neural networks always have purely random connectivity</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Advantages and Limitations</H2>
+
+  <Body>
+    Reservoir computing offers several key advantages: (1) extremely fast training since only the readout is optimized, (2) avoidance of vanishing/exploding gradients that plague backpropagation through time, (3) compatibility with biologically plausible learning rules, and (4) potential for efficient hardware implementation with fixed random circuits.
+  </Body>
+
+  <Body>
+    However, the paradigm also has limitations. The fixed reservoir means the representation is not optimized for the specific task, potentially requiring larger reservoirs than necessary. Performance is sensitive to hyperparameters (spectral radius, sparsity, input scaling) that must be tuned. For some tasks, fully-trained recurrent networks like LSTMs may achieve better performance when sufficient training data and computation are available.
+  </Body>
+
+  <Subjective id="q9">
+    <Prompt>Explain why the echo state property is crucial for reservoir computing to work. In your answer, describe what would happen if a reservoir did not satisfy this property, and discuss the role of the spectral radius in ensuring it.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that ESP ensures the reservoir state depends on input history rather than initial conditions</Requirement>
+        <Indicators>input history, initial conditions, state depends, fading memory, well-defined mapping</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes consequences of violating ESP: chaotic dynamics, loss of input information, or dependency on arbitrary initial states</Requirement>
+        <Indicators>chaos, chaotic, unstable, lose information, initial state dependency, unpredictable, diverge</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Correctly explains that spectral radius &lt; 1 ensures contractive dynamics and state convergence</Requirement>
+        <Indicators>spectral radius, less than 1, contractive, convergence, eigenvalue, exponential decay</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions the trade-off: spectral radius too small loses memory, too close to 1 risks instability</Requirement>
+        <Indicators>trade-off, balance, too small, short memory, edge of chaos, critical</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>
+    Reservoir computing represents a powerful paradigm for temporal computation that bridges neuroscience and machine learning. By fixing the recurrent connections and training only the readout, we gain computational efficiency while exploiting the rich dynamics of high-dimensional nonlinear systems. The echo state property ensures that reservoirs maintain a fading memory of inputs, enabling reliable temporal processing.
+  </Body>
+
+  <Body>
+    Echo State Networks (rate-based) and Liquid State Machines (spiking) represent two major implementations of this paradigm. Both rely on the same principles: random but carefully constructed reservoirs that project inputs into high-dimensional spaces where linear separation is possible. The computational capacity of a reservoir—its ability to remember past inputs and perform nonlinear transformations—depends on its size, spectral radius, and topology.
+  </Body>
+
+  <Body>
+    Applications range from time series prediction to speech recognition, with reservoir computing particularly suited for tasks requiring integration of temporal information over multiple timescales. While not always achieving state-of-the-art performance compared to fully-trained deep networks, reservoir computing offers unique advantages in training efficiency, biological plausibility, and potential for neuromorphic hardware implementation.
+  </Body>
+
+  <FlashCard id="fc7">
+    <Front>What is the "separation property" in reservoir computing theory?</Front>
+    <Back>The separation property states that a reservoir should map different input sequences to different internal states. Combined with the approximation property (ability to approximate any function of reservoir state), this ensures the reservoir computing system can theoretically approximate any time-invariant filter with fading memory to arbitrary precision.</Back>
+  </FlashCard>
+
+</Lesson>

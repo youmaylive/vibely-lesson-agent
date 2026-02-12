@@ -1,0 +1,1095 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-09-04</Id>
+    <Title>Bridging to Deep Learning: Biological Plausibility</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>biological-plausibility</Tag>
+      <Tag>deep-learning</Tag>
+      <Tag>backpropagation</Tag>
+      <Tag>feedback-alignment</Tag>
+      <Tag>predictive-coding</Tag>
+      <Tag>spiking-neural-networks</Tag>
+      <Tag>neuromorphic-computing</Tag>
+      <Tag>energy-efficiency</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Bridging to Deep Learning: Biological Plausibility</H1>
+
+  <Body>While artificial neural networks (ANNs) have achieved remarkable performance across computer vision, natural language processing, and countless other domains, understanding their relationship to biological neurons remains a profound scientific frontier. This lesson examines the biological plausibility of modern deep learning algorithms—analyzing where they align with and diverge from what we know about neural computation in the brain—and explores alternative learning algorithms inspired by neuroscience.</Body>
+
+  <Body>The central question motivating this lesson is: How do brains learn? Backpropagation, the workhorse of deep learning, enables efficient credit assignment across many layers, but faces fundamental challenges when considered as a model of biological learning. We will explore these challenges and examine biologically plausible alternatives including feedback alignment, predictive coding, and spiking neural networks.</Body>
+
+  <H2>Artificial Neurons vs. Biological Neurons</H2>
+
+  <Body>To understand biological plausibility, we must first appreciate the fundamental differences between artificial and biological neural computation. Artificial neurons are mathematical abstractions that capture some—but far from all—properties of their biological counterparts.</Body>
+
+  <H3>The Artificial Neuron Model</H3>
+
+  <Body>The standard artificial neuron computes a weighted sum of inputs followed by a nonlinear activation function:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def artificial_neuron(x, w, b, activation='relu'):
+    """
+    Standard artificial neuron computation.
+
+    Parameters:
+    -----------
+    x : array, input vector (n_features,)
+    w : array, weight vector (n_features,)
+    b : float, bias term
+    activation : str, activation function type
+
+    Returns:
+    --------
+    float : neuron output
+    """
+    # Weighted sum (linear combination)
+    z = np.dot(w, x) + b
+
+    # Activation function
+    if activation == 'relu':
+        return max(0, z)
+    elif activation == 'sigmoid':
+        return 1 / (1 + np.exp(-z))
+    elif activation == 'tanh':
+        return np.tanh(z)
+    else:
+        return z  # Linear
+</Code>
+
+  <Body>This formulation makes several simplifying assumptions: (1) inputs and outputs are continuous values representing firing rates, (2) computation is instantaneous with no temporal dynamics, (3) the activation function is differentiable everywhere, and (4) all information is encoded in scalar values rather than spike timing.</Body>
+
+  <H3>Biological Neuron Properties</H3>
+
+  <Body>Biological neurons exhibit far richer dynamics that artificial neurons abstract away:</Body>
+
+  <Body>**Temporal dynamics**: Real neurons integrate inputs over time through membrane capacitance, exhibit refractory periods after firing, and can show adaptation, bursting, and other complex behaviors we studied in earlier modules. The Hodgkin-Huxley model captures some of this richness, but even it abstracts away dendritic computation, active conductances in dendrites, and neuromodulation.</Body>
+
+  <Body>**Spike-based communication**: Biological neurons communicate via discrete action potentials, not continuous firing rates. While rate coding approximations can be useful, temporal coding—where precise spike timing carries information—is increasingly recognized as important, particularly for rapid visual processing and auditory localization.</Body>
+
+  <Body>**Dendritic computation**: The neuron's dendritic tree performs sophisticated nonlinear computations before signals reach the soma. Active dendritic conductances, local dendritic spikes, and compartmentalized plasticity mean that a single biological neuron may have computational power comparable to a multi-layer artificial network.</Body>
+
+  <Code lang="python">
+import numpy as np
+
+class BiologicallyInspiredNeuron:
+    """
+    A more biologically realistic neuron model
+    incorporating temporal dynamics and adaptation.
+    """
+    def __init__(self, tau_m=20.0, tau_adapt=100.0,
+                 v_rest=-70.0, v_thresh=-55.0, v_reset=-75.0):
+        self.tau_m = tau_m        # Membrane time constant (ms)
+        self.tau_adapt = tau_adapt # Adaptation time constant
+        self.v_rest = v_rest      # Resting potential (mV)
+        self.v_thresh = v_thresh  # Spike threshold
+        self.v_reset = v_reset    # Reset potential
+
+        # State variables
+        self.v = v_rest           # Membrane potential
+        self.w_adapt = 0.0        # Adaptation current
+        self.spike_times = []
+
+    def update(self, I_syn, dt=0.1):
+        """
+        Update neuron state for one timestep.
+
+        Parameters:
+        -----------
+        I_syn : float, synaptic input current
+        dt : float, timestep (ms)
+
+        Returns:
+        --------
+        bool : whether neuron spiked
+        """
+        # Leaky integration with adaptation
+        dv = (-(self.v - self.v_rest) + I_syn - self.w_adapt) / self.tau_m
+        self.v += dv * dt
+
+        # Adaptation dynamics
+        dw = -self.w_adapt / self.tau_adapt
+        self.w_adapt += dw * dt
+
+        # Check for spike
+        if self.v &gt;= self.v_thresh:
+            self.v = self.v_reset
+            self.w_adapt += 5.0  # Spike-triggered adaptation
+            return True
+        return False
+</Code>
+
+  <FlashCard id="fc1">
+    <Front>What is the key difference between how artificial and biological neurons encode information?</Front>
+    <Back>Artificial neurons typically encode information as continuous scalar values (interpreted as firing rates), while biological neurons communicate via discrete action potentials (spikes), where both rate and precise timing can carry information.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What is dendritic computation and why does it matter for biological plausibility?</Front>
+    <Back>Dendritic computation refers to the nonlinear information processing that occurs in a neuron's dendritic tree before signals reach the soma. Active dendritic conductances enable local computations, meaning a single biological neuron may have computational power comparable to a multi-layer artificial neural network.</Back>
+  </FlashCard>
+
+  <H2>Backpropagation and the Weight Transport Problem</H2>
+
+  <Body>Backpropagation (backprop) is the algorithm that enabled deep learning's success. It efficiently computes gradients for all weights in a network by propagating error signals backward from the output layer. However, when examined as a candidate mechanism for biological learning, backprop faces several fundamental challenges.</Body>
+
+  <H3>The Backpropagation Algorithm</H3>
+
+  <Body>Consider a feedforward network with L layers. For layer ℓ, let W^(ℓ) denote the weight matrix, and let a^(ℓ) = f(z^(ℓ)) = f(W^(ℓ)a^(ℓ-1)) denote the activations after applying nonlinearity f. Given loss function L, backpropagation computes gradients through recursive application of the chain rule:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def backpropagation(network, x, y_true, loss_fn='mse'):
+    """
+    Standard backpropagation through a feedforward network.
+
+    Parameters:
+    -----------
+    network : list of dicts, each containing 'W', 'b', 'activation'
+    x : array, input
+    y_true : array, target output
+    loss_fn : str, loss function type
+
+    Returns:
+    --------
+    gradients : list of dicts with 'dW' and 'db' for each layer
+    """
+    # Forward pass - store activations for backward pass
+    activations = [x]
+    pre_activations = []
+
+    a = x
+    for layer in network:
+        z = np.dot(layer['W'], a) + layer['b']
+        pre_activations.append(z)
+        a = apply_activation(z, layer['activation'])
+        activations.append(a)
+
+    # Compute output error (delta for last layer)
+    y_pred = activations[-1]
+    if loss_fn == 'mse':
+        # dL/da for MSE loss
+        delta = (y_pred - y_true) * activation_derivative(
+            pre_activations[-1], network[-1]['activation']
+        )
+
+    # Backward pass
+    gradients = []
+    for l in range(len(network) - 1, -1, -1):
+        # Gradient for weights: delta @ a^{l-1}.T
+        dW = np.outer(delta, activations[l])
+        db = delta.copy()
+        gradients.insert(0, {'dW': dW, 'db': db})
+
+        # Propagate delta to previous layer (if not input)
+        if l &gt; 0:
+            # KEY: Uses TRANSPOSE of forward weights W^T
+            delta = np.dot(network[l]['W'].T, delta) * \
+                    activation_derivative(pre_activations[l-1],
+                                         network[l-1]['activation'])
+
+    return gradients
+
+def apply_activation(z, activation):
+    if activation == 'relu':
+        return np.maximum(0, z)
+    elif activation == 'sigmoid':
+        return 1 / (1 + np.exp(-z))
+    elif activation == 'tanh':
+        return np.tanh(z)
+    return z
+
+def activation_derivative(z, activation):
+    if activation == 'relu':
+        return (z &gt; 0).astype(float)
+    elif activation == 'sigmoid':
+        s = 1 / (1 + np.exp(-z))
+        return s * (1 - s)
+    elif activation == 'tanh':
+        return 1 - np.tanh(z)**2
+    return np.ones_like(z)
+</Code>
+
+  <H3>Biological Implausibility of Backpropagation</H3>
+
+  <Body>While remarkably effective for training deep networks, backpropagation faces several challenges as a model of biological learning:</Body>
+
+  <Body>**The Weight Transport Problem**: During the backward pass, backpropagation uses the transpose of the forward weight matrix W^T to propagate error signals. This requires that feedback pathways have access to the exact same synaptic weights as feedforward pathways—a symmetric weight constraint that seems implausible biologically. How would feedback synapses "know" the exact strength of feedforward synapses in a different circuit?</Body>
+
+  <Body>**Separate Forward and Backward Phases**: Backpropagation requires distinct forward (inference) and backward (learning) phases with different computations. Biological circuits must operate continuously in real-time, raising questions about how such phase separation could be implemented.</Body>
+
+  <Body>**Non-local Error Signals**: The algorithm requires error signals from the output layer to reach deep layers. While there are feedback connections in cortex, whether they carry the precise derivative-weighted error signals needed for backprop is unclear.</Body>
+
+  <Body>**Derivative of Activation Function**: Backprop requires computing f'(z), the derivative of the activation function at each neuron's pre-activation value. It's unclear how biological neurons could access this information for learning.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is the weight transport problem in backpropagation?</Front>
+    <Back>The weight transport problem refers to the fact that backpropagation requires feedback pathways to use the transpose of the forward weight matrices (W^T) to propagate error signals. This implies that feedback synapses must have access to the exact values of feedforward synaptic weights—a symmetric constraint that is biologically implausible since separate synapses would need to maintain identical strengths.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>Which of the following is NOT a commonly cited biological implausibility of the standard backpropagation algorithm?</Prompt>
+    <Options>
+      <Option>Feedback pathways must use the transpose of feedforward weights</Option>
+      <Option>Requires separate forward and backward computation phases</Option>
+      <Option correct="true">Uses only local information available at each synapse</Option>
+      <Option>Error signals must propagate from output to all hidden layers</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Feedback Alignment: A Biologically Plausible Alternative</H2>
+
+  <Body>Feedback alignment (FA), introduced by Lillicrap et al. (2016), addresses the weight transport problem by using fixed random feedback weights instead of the transpose of forward weights. Remarkably, networks can still learn effectively despite this apparent "mismatch" between forward and backward pathways.</Body>
+
+  <H3>The Feedback Alignment Algorithm</H3>
+
+  <Body>In feedback alignment, we replace W^T in the backward pass with a fixed random matrix B that does not change during training:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+class FeedbackAlignmentNetwork:
+    """
+    Neural network trained with feedback alignment
+    instead of backpropagation.
+    """
+    def __init__(self, layer_sizes, activation='relu'):
+        self.n_layers = len(layer_sizes) - 1
+        self.layers = []
+
+        for i in range(self.n_layers):
+            layer = {
+                # Forward weights (learned)
+                'W': np.random.randn(layer_sizes[i+1], layer_sizes[i]) * 0.1,
+                'b': np.zeros(layer_sizes[i+1]),
+                # Fixed random feedback weights (NOT W.T!)
+                'B': np.random.randn(layer_sizes[i], layer_sizes[i+1]) * 0.1,
+                'activation': activation
+            }
+            self.layers.append(layer)
+
+    def forward(self, x):
+        """Forward pass - identical to standard network."""
+        self.activations = [x]
+        self.pre_activations = []
+
+        a = x
+        for layer in self.layers:
+            z = np.dot(layer['W'], a) + layer['b']
+            self.pre_activations.append(z)
+            a = apply_activation(z, layer['activation'])
+            self.activations.append(a)
+        return a
+
+    def backward_fa(self, y_true, learning_rate=0.01):
+        """
+        Backward pass using feedback alignment.
+        Uses fixed random B instead of W.T
+        """
+        y_pred = self.activations[-1]
+
+        # Output layer error
+        delta = (y_pred - y_true) * activation_derivative(
+            self.pre_activations[-1], self.layers[-1]['activation']
+        )
+
+        for l in range(self.n_layers - 1, -1, -1):
+            # Update weights (same as backprop)
+            dW = np.outer(delta, self.activations[l])
+            self.layers[l]['W'] -= learning_rate * dW
+            self.layers[l]['b'] -= learning_rate * delta
+
+            # Propagate error using RANDOM feedback weights B
+            if l &gt; 0:
+                # KEY DIFFERENCE: Use B instead of W.T
+                delta = np.dot(self.layers[l]['B'], delta) * \
+                        activation_derivative(self.pre_activations[l-1],
+                                            self.layers[l-1]['activation'])
+
+    def train_step(self, x, y_true, learning_rate=0.01):
+        """Single training step with feedback alignment."""
+        self.forward(x)
+        self.backward_fa(y_true, learning_rate)
+        return np.mean((self.activations[-1] - y_true)**2)
+
+
+# Demonstration: FA can learn despite random feedback
+def demonstrate_feedback_alignment():
+    """Compare backprop and feedback alignment on simple task."""
+    np.random.seed(42)
+
+    # Create XOR-like dataset
+    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]]).T
+    Y = np.array([[0], [1], [1], [0]]).T
+
+    # Train with feedback alignment
+    fa_net = FeedbackAlignmentNetwork([2, 10, 10, 1], activation='relu')
+
+    losses = []
+    for epoch in range(1000):
+        epoch_loss = 0
+        for i in range(X.shape[1]):
+            loss = fa_net.train_step(X[:, i], Y[:, i], learning_rate=0.1)
+            epoch_loss += loss
+        losses.append(epoch_loss / X.shape[1])
+
+    print(f"Final loss: {losses[-1]:.4f}")
+    return losses
+</Code>
+
+  <Body>The key insight is that while the random feedback matrix B initially points in a different direction than W^T, the forward weights W learn to align with B over training. This "learning to align" phenomenon means that even with biologically plausible asymmetric connections, the network can learn effectively.</Body>
+
+  <H3>Why Does Feedback Alignment Work?</H3>
+
+  <Body>Feedback alignment works because the error signal δ projected through random weights B still provides useful learning information, even if it's not the exact gradient. Two key observations explain this:</Body>
+
+  <Body>1. **Approximate gradient direction**: The angle between the FA update direction and the true gradient direction tends to be less than 90°, meaning FA updates generally decrease the loss (though not as efficiently as backprop).</Body>
+
+  <Body>2. **Weight alignment**: During training, the forward weights W evolve such that W^T B becomes closer to identity. The network "learns to be taught" by the random feedback.</Body>
+
+  <Code lang="python">
+def analyze_weight_alignment(fa_network, n_epochs=500):
+    """
+    Track alignment between W.T @ B and identity matrix
+    during training.
+    """
+    alignments = []
+
+    for epoch in range(n_epochs):
+        # Train for one epoch
+        # ... (training code)
+
+        # Measure alignment for each layer
+        layer_alignments = []
+        for layer in fa_network.layers[:-1]:  # Exclude output layer
+            W, B = layer['W'], layer['B']
+            # Compute W.T @ B (should approach identity-like)
+            product = np.dot(W.T, B)
+            # Measure alignment via normalized trace
+            alignment = np.trace(product) / (np.linalg.norm(W) * np.linalg.norm(B))
+            layer_alignments.append(alignment)
+
+        alignments.append(layer_alignments)
+
+    return alignments
+</Code>
+
+  <FlashCard id="fc4">
+    <Front>How does feedback alignment solve the weight transport problem?</Front>
+    <Back>Feedback alignment replaces the transpose of forward weights (W^T) in the backward pass with fixed random matrices (B) that do not change during training. Learning still works because: (1) the random feedback provides approximate gradient information, and (2) the forward weights W learn to "align" with the feedback weights B, effectively adapting to be taught by the random feedback pathway.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q2">
+    <Prompt>Which of the following statements about feedback alignment are TRUE? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">It uses fixed random matrices for backward error propagation</Option>
+      <Option>It achieves identical performance to backpropagation on all tasks</Option>
+      <Option correct="true">Forward weights learn to align with the random feedback weights</Option>
+      <Option correct="true">It addresses the weight transport problem in backpropagation</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Predictive Coding: Hierarchical Prediction and Error Correction</H2>
+
+  <Body>Predictive coding is a theoretical framework proposing that the brain continuously generates predictions about sensory inputs and updates internal models based on prediction errors. Unlike backpropagation's separation of forward inference and backward learning, predictive coding networks perform both simultaneously through local computations.</Body>
+
+  <H3>The Predictive Coding Framework</H3>
+
+  <Body>In predictive coding, each level of a hierarchical network maintains two types of units: **representation units** that encode the current estimate of the hidden state, and **error units** that compute the difference between predictions and actual inputs (or inputs from lower levels). Learning occurs by minimizing prediction errors at all levels simultaneously.</Body>
+
+  <Code lang="python">
+import numpy as np
+
+class PredictiveCodingNetwork:
+    """
+    Predictive coding network with hierarchical error minimization.
+
+    Key differences from backprop:
+    1. No separate forward/backward phases
+    2. Local learning rules based on prediction errors
+    3. Inference through iterative settling
+    """
+    def __init__(self, layer_sizes, dt=0.1, n_iterations=50):
+        self.n_layers = len(layer_sizes)
+        self.dt = dt
+        self.n_iterations = n_iterations
+
+        # Initialize weights (generative model: top-down predictions)
+        self.weights = []
+        for i in range(self.n_layers - 1):
+            W = np.random.randn(layer_sizes[i], layer_sizes[i+1]) * 0.1
+            self.weights.append(W)
+
+        # Precision (inverse variance) for each layer
+        self.precisions = [1.0] * (self.n_layers - 1)
+
+    def infer(self, x_input, x_top=None):
+        """
+        Run inference to find representations that minimize
+        prediction error at all levels.
+
+        Parameters:
+        -----------
+        x_input : array, bottom-level sensory input
+        x_top : array, optional top-level prior
+
+        Returns:
+        --------
+        representations : list of arrays for each level
+        errors : list of prediction errors
+        """
+        # Initialize representations
+        representations = [x_input.copy()]
+        for i in range(1, self.n_layers):
+            representations.append(np.zeros(self.weights[i-1].shape[1]))
+
+        if x_top is not None:
+            representations[-1] = x_top.copy()
+
+        # Iterative inference (settling dynamics)
+        for _ in range(self.n_iterations):
+            errors = []
+
+            # Compute prediction errors at each level
+            for l in range(self.n_layers - 1):
+                # Prediction from level above
+                prediction = np.dot(self.weights[l], representations[l+1])
+                # Prediction error
+                error = representations[l] - prediction
+                errors.append(error)
+
+            # Update representations to minimize errors
+            for l in range(1, self.n_layers - 1):
+                # Bottom-up error signal
+                bottom_up = self.precisions[l-1] * np.dot(
+                    self.weights[l-1].T, errors[l-1]
+                )
+                # Top-down error signal
+                top_down = -self.precisions[l] * errors[l]
+
+                # Update representation
+                representations[l] += self.dt * (bottom_up + top_down)
+                representations[l] = np.maximum(0, representations[l])  # ReLU
+
+        return representations, errors
+
+    def learn(self, errors, representations, learning_rate=0.01):
+        """
+        Update weights based on prediction errors.
+        Uses local Hebbian-like learning rule.
+        """
+        for l in range(len(self.weights)):
+            # Weight update: error @ representation.T
+            # This is LOCAL - only uses information at this level
+            dW = np.outer(errors[l], representations[l+1])
+            self.weights[l] += learning_rate * dW
+
+    def train_step(self, x_input, learning_rate=0.01):
+        """Single training step."""
+        # Inference phase
+        representations, errors = self.infer(x_input)
+
+        # Learning phase
+        self.learn(errors, representations, learning_rate)
+
+        # Return total prediction error (free energy proxy)
+        total_error = sum(np.sum(e**2) for e in errors)
+        return total_error
+</Code>
+
+  <Body>A remarkable theoretical result shows that predictive coding networks can approximate backpropagation under certain conditions. When the network reaches equilibrium (prediction errors are minimized), the weight updates in predictive coding correspond to the gradients computed by backpropagation. This provides a potential bridge between the computational efficiency of backprop and biological plausibility.</Body>
+
+  <H3>Free Energy and the Bayesian Brain</H3>
+
+  <Body>Predictive coding can be viewed through the lens of variational Bayesian inference, where the network minimizes variational free energy—an upper bound on surprise (negative log probability of observations). This connects to Friston's Free Energy Principle, which proposes that biological systems maintain themselves by minimizing free energy through perception (updating beliefs) and action (changing the environment).</Body>
+
+  <Code lang="python">
+def compute_variational_free_energy(x_obs, predictions, precisions):
+    """
+    Compute variational free energy for predictive coding.
+
+    F = sum_l [ precision_l * ||x_l - pred_l||^2 + log(precision_l) ]
+
+    This is what the brain supposedly minimizes through:
+    1. Perception: updating internal representations
+    2. Action: changing sensory input
+    """
+    free_energy = 0.0
+
+    for l in range(len(predictions)):
+        # Prediction error term (accuracy)
+        error = x_obs[l] - predictions[l]
+        free_energy += precisions[l] * np.sum(error**2)
+
+        # Complexity term (related to precision)
+        free_energy -= np.log(precisions[l]) * len(predictions[l])
+
+    return 0.5 * free_energy
+</Code>
+
+  <FlashCard id="fc5">
+    <Front>What are the two types of units in a predictive coding network and what do they compute?</Front>
+    <Back>Predictive coding networks have (1) representation units that encode the current estimate of hidden states at each hierarchical level, and (2) error units that compute the difference between top-down predictions and bottom-up inputs. Learning occurs by minimizing prediction errors at all levels simultaneously through local computations.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc6">
+    <Front>What is the relationship between predictive coding and backpropagation?</Front>
+    <Back>Under certain conditions, predictive coding networks can approximate backpropagation. When the network reaches equilibrium (prediction errors minimized through iterative inference), the weight updates correspond to the gradients computed by backpropagation. This provides a potential biologically plausible implementation of gradient-based learning using only local computations.</Back>
+  </FlashCard>
+
+  <MatchPairs id="q3">
+    <Prompt>Match each learning algorithm characteristic with the correct algorithm:</Prompt>
+    <Pairs>
+      <Pair><Left>Uses transpose of forward weights for error propagation</Left><Right>Backpropagation</Right></Pair>
+      <Pair><Left>Uses fixed random matrices for error propagation</Left><Right>Feedback Alignment</Right></Pair>
+      <Pair><Left>Minimizes hierarchical prediction errors</Left><Right>Predictive Coding</Right></Pair>
+      <Pair><Left>Forward weights align with feedback during training</Left><Right>Feedback Alignment</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Hebbian Learning</Distractor>
+      <Distractor>STDP</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Spiking Neural Networks for Deep Learning</H2>
+
+  <Body>Spiking neural networks (SNNs) represent the third generation of neural networks, communicating through discrete spikes rather than continuous activations. SNNs are inherently more biologically realistic and potentially more energy-efficient, but training them for deep learning tasks has proven challenging.</Body>
+
+  <H3>ANN to SNN Conversion</H3>
+
+  <Body>One approach to obtaining deep SNNs is to first train a standard ANN using backpropagation, then convert it to a spiking network. The key insight is that ReLU activations in ANNs can be approximated by spike rates in integrate-and-fire neurons:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+class IntegrateAndFireNeuron:
+    """Leaky integrate-and-fire neuron for SNN."""
+
+    def __init__(self, tau_m=20.0, v_thresh=1.0, v_reset=0.0, v_rest=0.0):
+        self.tau_m = tau_m
+        self.v_thresh = v_thresh
+        self.v_reset = v_reset
+        self.v_rest = v_rest
+        self.v = v_rest
+
+    def update(self, I_in, dt=1.0):
+        """Update membrane potential, return spike (bool)."""
+        dv = (-(self.v - self.v_rest) + I_in) / self.tau_m
+        self.v += dv * dt
+
+        if self.v &gt;= self.v_thresh:
+            self.v = self.v_reset
+            return True
+        return False
+
+
+def convert_ann_to_snn(ann_weights, ann_biases, T_sim=100, dt=1.0):
+    """
+    Convert trained ANN to SNN via rate coding.
+
+    Parameters:
+    -----------
+    ann_weights : list of weight matrices
+    ann_biases : list of bias vectors
+    T_sim : int, simulation time for rate estimation
+    dt : float, timestep
+
+    Returns:
+    --------
+    snn : dict containing SNN parameters
+    """
+    # Normalize weights for SNN dynamics
+    # Key: match expected firing rates to ReLU activations
+
+    # Find maximum activation in ANN to set threshold scaling
+    max_weight_norm = max(np.max(np.abs(W)) for W in ann_weights)
+
+    snn = {
+        'weights': [W / max_weight_norm for W in ann_weights],
+        'biases': [b / max_weight_norm for b in ann_biases],
+        'v_thresh': 1.0 / max_weight_norm,
+        'tau_m': 20.0,
+        'T_sim': T_sim,
+        'dt': dt
+    }
+
+    return snn
+
+
+class SpikingNetwork:
+    """
+    Multi-layer spiking neural network.
+    """
+    def __init__(self, weights, biases, v_thresh=1.0, tau_m=20.0):
+        self.n_layers = len(weights)
+        self.layers = []
+
+        for W, b in zip(weights, biases):
+            n_neurons = W.shape[0]
+            neurons = [IntegrateAndFireNeuron(tau_m=tau_m, v_thresh=v_thresh)
+                      for _ in range(n_neurons)]
+            self.layers.append({
+                'W': W,
+                'b': b,
+                'neurons': neurons
+            })
+
+    def forward(self, input_spikes, T_sim=100, dt=1.0):
+        """
+        Forward pass through SNN.
+
+        Parameters:
+        -----------
+        input_spikes : array (n_inputs, T_sim), input spike trains
+        T_sim : int, simulation time
+        dt : float, timestep
+
+        Returns:
+        --------
+        output_rates : array, output firing rates
+        """
+        current_spikes = input_spikes
+
+        for layer in self.layers:
+            n_neurons = len(layer['neurons'])
+            output_spikes = np.zeros((n_neurons, T_sim))
+
+            for t in range(T_sim):
+                # Compute synaptic input from previous layer spikes
+                I_syn = np.dot(layer['W'], current_spikes[:, t]) + layer['b']
+
+                # Update each neuron
+                for i, neuron in enumerate(layer['neurons']):
+                    if neuron.update(I_syn[i], dt):
+                        output_spikes[i, t] = 1
+
+            current_spikes = output_spikes
+
+            # Reset neurons for next input
+            for neuron in layer['neurons']:
+                neuron.v = neuron.v_rest
+
+        # Return firing rates (spike count / time)
+        output_rates = np.sum(current_spikes, axis=1) / (T_sim * dt) * 1000
+        return output_rates
+</Code>
+
+  <H3>Surrogate Gradient Training</H3>
+
+  <Body>Direct training of SNNs is challenging because spikes are non-differentiable events. Surrogate gradient methods address this by replacing the true (discontinuous) derivative of the spike function with a smooth surrogate during backpropagation:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def spike_function(v, v_thresh):
+    """Hard threshold spike function."""
+    return (v &gt;= v_thresh).astype(float)
+
+def surrogate_gradient(v, v_thresh, beta=5.0):
+    """
+    Surrogate gradient for spike function.
+    Uses fast sigmoid as smooth approximation.
+
+    Forward: hard threshold
+    Backward: smooth derivative
+    """
+    return beta * np.exp(-beta * np.abs(v - v_thresh)) / 2
+
+class SurrogateSNN:
+    """
+    SNN trained with surrogate gradients.
+    """
+    def __init__(self, layer_sizes, tau_m=20.0, v_thresh=1.0, beta=5.0):
+        self.tau_m = tau_m
+        self.v_thresh = v_thresh
+        self.beta = beta
+
+        self.weights = []
+        for i in range(len(layer_sizes) - 1):
+            W = np.random.randn(layer_sizes[i+1], layer_sizes[i]) * 0.1
+            self.weights.append(W)
+
+    def forward(self, x, T=20):
+        """
+        Forward pass with spike recording.
+
+        Parameters:
+        -----------
+        x : array, input (presented at each timestep)
+        T : int, number of timesteps
+
+        Returns:
+        --------
+        output_spikes : array, output spike trains
+        membrane_potentials : list, for surrogate gradient computation
+        """
+        self.spike_history = []
+        self.membrane_history = []
+
+        # Initialize membrane potentials
+        membrane = [np.zeros(W.shape[0]) for W in self.weights]
+
+        for t in range(T):
+            current_input = x
+            layer_spikes = []
+            layer_membranes = []
+
+            for l, W in enumerate(self.weights):
+                # Leaky integration
+                membrane[l] = (1 - 1/self.tau_m) * membrane[l] + \
+                              np.dot(W, current_input)
+
+                layer_membranes.append(membrane[l].copy())
+
+                # Spike generation
+                spikes = spike_function(membrane[l], self.v_thresh)
+                layer_spikes.append(spikes)
+
+                # Reset after spike
+                membrane[l] = membrane[l] * (1 - spikes)
+
+                current_input = spikes
+
+            self.spike_history.append(layer_spikes)
+            self.membrane_history.append(layer_membranes)
+
+        # Output: spike rate of last layer
+        output_spikes = np.array([s[-1] for s in self.spike_history])
+        return np.mean(output_spikes, axis=0)
+
+    def backward_surrogate(self, target, learning_rate=0.01):
+        """
+        Backward pass using surrogate gradients.
+        """
+        T = len(self.spike_history)
+        output = np.mean([s[-1] for s in self.spike_history], axis=0)
+
+        # Output error
+        error = output - target
+
+        # Backprop through time with surrogate gradients
+        for t in range(T - 1, -1, -1):
+            delta = error.copy()
+
+            for l in range(len(self.weights) - 1, -1, -1):
+                # Surrogate gradient of spike function
+                sg = surrogate_gradient(
+                    self.membrane_history[t][l],
+                    self.v_thresh,
+                    self.beta
+                )
+
+                delta = delta * sg
+
+                # Weight gradient
+                if l &gt; 0:
+                    input_spikes = self.spike_history[t][l-1]
+                else:
+                    input_spikes = self.spike_history[t][0]  # Simplified
+
+                dW = np.outer(delta, input_spikes) / T
+                self.weights[l] -= learning_rate * dW
+
+                # Propagate error
+                if l &gt; 0:
+                    delta = np.dot(self.weights[l].T, delta)
+</Code>
+
+  <SingleSelect id="q4">
+    <Prompt>What is the main challenge in training spiking neural networks (SNNs) directly with gradient descent?</Prompt>
+    <Options>
+      <Option>SNNs cannot represent complex functions</Option>
+      <Option correct="true">The spike generation function is non-differentiable</Option>
+      <Option>SNNs are too slow to simulate</Option>
+      <Option>SNNs cannot use multiple layers</Option>
+    </Options>
+  </SingleSelect>
+
+  <FillBlanks id="q5">
+    <Prompt>In ANN-to-SNN conversion, the <Blank>ReLU</Blank> activation function in ANNs is approximated by the <Blank>firing rate</Blank> of integrate-and-fire neurons. Surrogate gradient methods replace the non-differentiable spike function with a <Blank>smooth</Blank> approximation during the backward pass.</Prompt>
+    <Distractors>
+      <Distractor>sigmoid</Distractor>
+      <Distractor>membrane potential</Distractor>
+      <Distractor>discrete</Distractor>
+      <Distractor>linear</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Energy Efficiency: Biological vs. Artificial Computation</H2>
+
+  <Body>One of the most striking differences between biological and artificial neural networks is energy efficiency. The human brain operates on approximately 20 watts while performing remarkable feats of perception, cognition, and motor control. In contrast, training a large language model can consume megawatts of power. Understanding these efficiency differences has implications for both neuroscience and sustainable AI.</Body>
+
+  <H3>Sources of Biological Efficiency</H3>
+
+  <Body>Several factors contribute to the brain's remarkable energy efficiency:</Body>
+
+  <Body>**Sparse coding**: Biological neurons are mostly silent, with only a small fraction active at any time. Cortical neurons fire at average rates of 1-10 Hz, far below their maximum capacity. This sparse activity minimizes metabolic costs while enabling high-capacity representations.</Body>
+
+  <Body>**Event-driven computation**: Neurons compute only when they receive input spikes, unlike artificial neurons that compute at every timestep. This asynchronous, event-driven computation avoids redundant calculations.</Body>
+
+  <Body>**Local learning**: Biological synaptic plasticity rules like STDP use only locally available information, eliminating the need for global error signals and reducing communication costs.</Body>
+
+  <Body>**Analog computation**: Many neural computations exploit the physical properties of membranes and synapses, performing analog computation "for free" in terms of metabolic cost.</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def estimate_energy_costs():
+    """
+    Rough comparison of energy costs for biological vs. artificial computation.
+    """
+    # Biological parameters
+    brain_power_watts = 20  # Total brain power consumption
+    n_neurons_brain = 86e9  # Number of neurons
+    n_synapses_brain = 150e12  # Number of synapses
+    avg_firing_rate_hz = 5  # Average cortical firing rate
+
+    # Energy per spike (estimated)
+    # ATP cost of action potential + synaptic transmission
+    energy_per_spike_joules = 1e-12  # ~1 picojoule per spike
+
+    # Total spikes per second in brain
+    total_spikes_per_sec = n_neurons_brain * avg_firing_rate_hz
+    spike_energy = total_spikes_per_sec * energy_per_spike_joules
+
+    print("Biological brain:")
+    print(f"  Total power: {brain_power_watts} W")
+    print(f"  Neurons: {n_neurons_brain:.2e}")
+    print(f"  Synapses: {n_synapses_brain:.2e}")
+    print(f"  Spikes/sec: {total_spikes_per_sec:.2e}")
+    print(f"  Energy per spike: {energy_per_spike_joules*1e12:.1f} pJ")
+
+    # Artificial neural network (GPU-based)
+    gpu_power_watts = 300  # Single high-end GPU
+    n_parameters = 1e9  # 1 billion parameter model
+    flops_per_forward = 2 * n_parameters  # Rough estimate
+    gpu_flops = 100e12  # 100 TFLOPS
+
+    # Energy per FLOP
+    energy_per_flop = gpu_power_watts / gpu_flops
+
+    # Forward passes per second
+    forward_passes_per_sec = gpu_flops / flops_per_forward
+
+    print("\nArtificial neural network (GPU):")
+    print(f"  GPU power: {gpu_power_watts} W")
+    print(f"  Parameters: {n_parameters:.2e}")
+    print(f"  Energy per FLOP: {energy_per_flop*1e12:.2f} pJ")
+    print(f"  Forward passes/sec: {forward_passes_per_sec:.1f}")
+
+    # Comparison: operations per joule
+    brain_ops_per_joule = total_spikes_per_sec / brain_power_watts
+    gpu_ops_per_joule = gpu_flops / gpu_power_watts
+
+    print(f"\nEfficiency comparison:")
+    print(f"  Brain: {brain_ops_per_joule:.2e} spikes/joule")
+    print(f"  GPU: {gpu_ops_per_joule:.2e} FLOPS/joule")
+    print(f"  Note: Direct comparison is difficult due to different")
+    print(f"        operational semantics (spikes vs floating point)")
+
+estimate_energy_costs()
+</Code>
+
+  <H3>Neuromorphic Computing</H3>
+
+  <Body>Neuromorphic computing aims to build hardware that emulates brain-like computation, potentially achieving biological levels of energy efficiency. Key approaches include:</Body>
+
+  <Body>**Intel's Loihi**: A neuromorphic chip implementing spiking neurons with on-chip learning. Uses asynchronous, event-driven computation and achieves orders of magnitude better energy efficiency than GPUs for certain tasks.</Body>
+
+  <Body>**IBM's TrueNorth**: A million-neuron chip operating at milliwatt power levels, demonstrating that brain-inspired architectures can be implemented in silicon.</Body>
+
+  <Body>**Memristive devices**: Resistive memory elements that can implement synaptic weights in analog hardware, potentially enabling ultra-efficient neural computation through physical properties of materials.</Body>
+
+  <Code lang="python">
+class NeuromorphicSimulation:
+    """
+    Simplified model of neuromorphic computation
+    emphasizing event-driven processing and sparsity.
+    """
+    def __init__(self, n_neurons, connectivity=0.1):
+        self.n_neurons = n_neurons
+        self.W = np.random.randn(n_neurons, n_neurons) * 0.1
+        # Sparse connectivity (biological-like)
+        mask = np.random.rand(n_neurons, n_neurons) &gt; (1 - connectivity)
+        self.W *= mask
+
+        # State
+        self.v = np.zeros(n_neurons)
+        self.v_thresh = 1.0
+
+        # Event queue (event-driven computation)
+        self.event_queue = []
+
+        # Energy tracking
+        self.spike_count = 0
+        self.synop_count = 0  # Synaptic operations
+
+    def inject_spikes(self, spike_indices, time):
+        """Add input spikes to event queue."""
+        for idx in spike_indices:
+            self.event_queue.append((time, idx))
+        self.event_queue.sort(key=lambda x: x[0])
+
+    def process_events(self, duration, dt=0.1):
+        """
+        Event-driven simulation: only compute when events occur.
+        """
+        t = 0
+        output_spikes = []
+
+        while t &lt; duration:
+            # Process events at current time
+            while self.event_queue and self.event_queue[0][0] &lt;= t:
+                event_time, neuron_idx = self.event_queue.pop(0)
+
+                # This neuron spiked - propagate to targets
+                targets = np.where(self.W[:, neuron_idx] != 0)[0]
+                for target in targets:
+                    self.v[target] += self.W[target, neuron_idx]
+                    self.synop_count += 1  # Count synaptic operation
+
+                    # Check for threshold crossing
+                    if self.v[target] &gt;= self.v_thresh:
+                        self.v[target] = 0
+                        self.spike_count += 1
+                        # Add new spike event
+                        self.event_queue.append((t + dt, target))
+                        output_spikes.append((t, target))
+
+                self.event_queue.sort(key=lambda x: x[0])
+
+            t += dt
+
+        return output_spikes
+
+    def report_energy(self, energy_per_spike=1e-12, energy_per_synop=0.1e-12):
+        """Report estimated energy consumption."""
+        total_energy = (self.spike_count * energy_per_spike +
+                       self.synop_count * energy_per_synop)
+        print(f"Spikes: {self.spike_count}")
+        print(f"Synaptic operations: {self.synop_count}")
+        print(f"Estimated energy: {total_energy*1e12:.2f} pJ")
+        return total_energy
+</Code>
+
+  <SortQuiz id="q6">
+    <Prompt>Order the following computational approaches from MOST to LEAST energy-efficient (per equivalent operation):</Prompt>
+    <SortedItems>
+      <Item>Biological neurons (brain)</Item>
+      <Item>Neuromorphic hardware (e.g., Intel Loihi)</Item>
+      <Item>Optimized GPU inference</Item>
+      <Item>Large-scale GPU training</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <FlashCard id="fc7">
+    <Front>What are the main sources of energy efficiency in biological neural computation?</Front>
+    <Back>Biological neural computation achieves efficiency through: (1) sparse coding—most neurons are silent most of the time; (2) event-driven computation—neurons only compute when receiving spikes; (3) local learning rules—plasticity uses only locally available information; and (4) analog computation—exploiting physical properties for computation rather than digital operations.</Back>
+  </FlashCard>
+
+  <H2>Future Directions: Brain-Inspired AI</H2>
+
+  <Body>The intersection of neuroscience and artificial intelligence continues to yield new insights and algorithms. Several promising directions are emerging:</Body>
+
+  <Body>**Hybrid architectures**: Combining the strengths of artificial and biological neural networks—using ANNs for training and SNNs for efficient inference, or developing architectures that blend rate and temporal coding.</Body>
+
+  <Body>**Continual learning**: Biological systems learn continuously without catastrophic forgetting. Developing AI systems with similar properties requires understanding biological mechanisms like synaptic consolidation and complementary learning systems.</Body>
+
+  <Body>**Embodied intelligence**: Brains evolved for embodied agents interacting with environments. Studying sensorimotor loops and active inference may yield insights for robotics and reinforcement learning.</Body>
+
+  <Body>**Neuromodulation**: Biological learning is heavily modulated by dopamine, acetylcholine, and other neuromodulators that adjust plasticity based on behavioral context. Incorporating similar mechanisms into artificial systems may improve their adaptability.</Body>
+
+  <SingleSelect id="q7">
+    <Prompt>Which statement best characterizes the relationship between biological plausibility and AI performance?</Prompt>
+    <Options>
+      <Option>More biologically plausible algorithms always perform better</Option>
+      <Option>Biological plausibility and performance are completely unrelated</Option>
+      <Option correct="true">Biological plausibility may provide insights but doesn't guarantee better performance</Option>
+      <Option>Artificial approaches will always outperform biologically plausible ones</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q8">
+    <Prompt>Which of the following are advantages of neuromorphic computing systems? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Event-driven computation reduces energy consumption</Option>
+      <Option>They can run standard TensorFlow models without modification</Option>
+      <Option correct="true">Naturally suited for temporal and sparse data</Option>
+      <Option correct="true">Can implement local learning rules efficiently</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Summary and Key Takeaways</H2>
+
+  <Body>This lesson examined the biological plausibility of deep learning, revealing both fundamental challenges and promising alternatives:</Body>
+
+  <Body>1. **Artificial vs. biological neurons**: ANNs abstract away temporal dynamics, spike-based communication, and dendritic computation present in biological neurons.</Body>
+
+  <Body>2. **Backpropagation's challenges**: The weight transport problem, separate forward/backward phases, and non-local error signals make backpropagation biologically implausible in its standard form.</Body>
+
+  <Body>3. **Feedback alignment**: Using fixed random feedback matrices addresses weight transport while still enabling learning, as forward weights learn to align with feedback.</Body>
+
+  <Body>4. **Predictive coding**: Hierarchical prediction and error minimization offers a biologically plausible framework that can approximate backpropagation through local computations.</Body>
+
+  <Body>5. **Spiking neural networks**: SNNs offer biological realism and potential efficiency gains, with ANN-to-SNN conversion and surrogate gradients enabling their training.</Body>
+
+  <Body>6. **Energy efficiency**: Biological computation achieves remarkable efficiency through sparsity, event-driven processing, and local learning—principles inspiring neuromorphic hardware.</Body>
+
+  <FlashCard id="fc8">
+    <Front>Why is studying biological plausibility of deep learning important?</Front>
+    <Back>Studying biological plausibility is important because: (1) it may reveal new, more efficient learning algorithms; (2) understanding how brains learn could improve AI systems; (3) neuromorphic implementations require biologically realistic algorithms; (4) it advances our scientific understanding of neural computation; and (5) it may help develop AI systems with properties like continual learning and energy efficiency that biological systems achieve.</Back>
+  </FlashCard>
+
+  <Subjective id="q9">
+    <Prompt>Explain why the weight transport problem is considered a fundamental challenge to the biological plausibility of backpropagation, and describe how feedback alignment addresses this problem. In your answer, discuss what the weight transport problem is, why it's biologically implausible, and the key insight that makes feedback alignment work despite using random feedback weights.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly explains the weight transport problem: backpropagation requires feedback pathways to use the transpose (W^T) of forward weights, meaning feedback synapses must know exact values of feedforward synapses</Requirement>
+        <Indicators>transpose, W^T, weight transport, feedback pathway, forward weights, symmetric</Indicators>
+      </Criterion>
+      <Criterion points="2" required="true">
+        <Requirement>Explains why weight transport is biologically implausible: separate physical synapses would need to maintain identical strengths, no known mechanism for this coordination</Requirement>
+        <Indicators>implausible, biological, separate synapses, coordination, mechanism, physically separate</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Describes feedback alignment solution: uses fixed random matrices B instead of W^T for error propagation</Requirement>
+        <Indicators>random, fixed, feedback alignment, B, random matrices, random feedback</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains why feedback alignment works: forward weights learn to align with random feedback, network "learns to be taught"</Requirement>
+        <Indicators>align, alignment, learn to align, adapt, learns to be taught, approximate gradient</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q10">
+    <Prompt>Compare and contrast the energy efficiency of biological neural computation with artificial neural networks running on GPUs. What are the key sources of biological efficiency, and what implications do these have for the development of neuromorphic computing systems?</Prompt>
+    <Rubric>
+      <Criterion points="2" required="true">
+        <Requirement>Acknowledges the significant energy difference between biological brains (~20W) and artificial systems (hundreds to thousands of watts)</Requirement>
+        <Indicators>20 watts, power, energy, biological, GPU, difference, orders of magnitude</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Identifies key sources of biological efficiency: sparse coding, event-driven computation, local learning rules, analog computation</Requirement>
+        <Indicators>sparse, sparsity, event-driven, local, analog, firing rate, silent, asynchronous</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses implications for neuromorphic computing: need to implement sparsity, event-driven processing, local learning in hardware</Requirement>
+        <Indicators>neuromorphic, hardware, implementation, Loihi, TrueNorth, chip, silicon</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Shows understanding that biological efficiency comes from computational principles (sparsity, locality) not just implementation details</Requirement>
+        <Indicators>principles, algorithm, computational, architecture, design</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+</Lesson>

@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-05-01</Id>
+    <Title>Phase Reduction Theory</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>phase reduction</Tag>
+      <Tag>limit cycles</Tag>
+      <Tag>phase response curve</Tag>
+      <Tag>isochrons</Tag>
+      <Tag>oscillators</Tag>
+      <Tag>synchronization</Tag>
+      <Tag>computational neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Phase Reduction Theory</H1>
+
+  <Body>Oscillatory neurons near limit cycles can be reduced to a single phase variable, dramatically simplifying analysis while preserving essential synchronization dynamics. This powerful dimensionality reduction technique transforms high-dimensional neuronal models into tractable one-dimensional phase equations, enabling rigorous analysis of network synchronization phenomena.</Body>
+
+  <Body>In previous lessons, you studied the FitzHugh-Nagumo (FHN) model and its limit cycle dynamics. While these multi-dimensional systems capture rich biophysical detail, analyzing networks of such oscillators becomes computationally intractable. Phase reduction provides the mathematical framework to distill the essential dynamics into a single variable: the phase θ ∈ [0, 2π).</Body>
+
+  <H2>Limit Cycle Oscillators</H2>
+
+  <Body>A limit cycle is an isolated closed trajectory in phase space to which neighboring trajectories converge (stable limit cycle) or diverge (unstable limit cycle). For neuronal oscillators, stable limit cycles correspond to sustained periodic firing patterns. Mathematically, consider a system of ordinary differential equations:</Body>
+
+  <Code lang="python">
+# General form of an autonomous dynamical system
+# dx/dt = F(x), where x ∈ R^n
+
+import numpy as np
+from scipy.integrate import solve_ivp
+
+def fhn_system(t, state, I_ext=0.5, a=0.7, b=0.8, tau=12.5):
+    """FitzHugh-Nagumo model exhibiting limit cycle behavior."""
+    v, w = state
+    dvdt = v - (v**3)/3 - w + I_ext
+    dwdt = (v + a - b*w) / tau
+    return [dvdt, dwdt]
+
+# Solve to find the limit cycle
+t_span = [0, 200]
+t_eval = np.linspace(0, 200, 5000)
+y0 = [0.0, 0.0]
+sol = solve_ivp(fhn_system, t_span, y0, t_eval=t_eval, method='RK45')
+
+# After transients, the trajectory settles onto the limit cycle
+v_cycle = sol.y[0, -1000:]  # Last portion on limit cycle
+w_cycle = sol.y[1, -1000:]
+</Code>
+
+  <Body>A periodic orbit x₀(t) with period T satisfies x₀(t + T) = x₀(t) for all t. The limit cycle is an attractor if all trajectories starting in its neighborhood asymptotically approach it.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is a limit cycle?</Front>
+    <Back>An isolated closed trajectory (periodic orbit) in phase space. A stable limit cycle attracts nearby trajectories, while an unstable one repels them. In neurons, stable limit cycles correspond to sustained oscillatory firing.</Back>
+  </FlashCard>
+
+  <H2>Phase Variable Definition</H2>
+
+  <Body>The phase variable θ ∈ [0, 2π) parameterizes position along the limit cycle. We define θ such that it increases uniformly in time on the unperturbed limit cycle:</Body>
+
+  <Code lang="python">
+# On the limit cycle, phase evolves as:
+# dθ/dt = ω = 2π/T
+# where T is the natural period of oscillation
+
+def compute_natural_frequency(period):
+    """Natural angular frequency from period."""
+    return 2 * np.pi / period
+
+# For FHN with I_ext=0.5, typical period ≈ 20 time units
+T = 20.0  # approximate period
+omega = compute_natural_frequency(T)
+print(f"Natural frequency ω = {omega:.4f} rad/time unit")
+</Code>
+
+  <Body>The phase θ = 0 is conventionally assigned to a specific point on the limit cycle, often the maximum of the membrane potential (spike peak) or threshold crossing. Any point on the limit cycle corresponds to a unique phase value.</Body>
+
+  <FlashCard id="fc2">
+    <Front>How does phase evolve on an unperturbed limit cycle?</Front>
+    <Back>Phase increases uniformly: dθ/dt = ω = 2π/T, where T is the natural oscillation period. This means phase advances at a constant rate, independent of the specific location on the cycle.</Back>
+  </FlashCard>
+
+  <H2>Isochrons: Surfaces of Constant Phase</H2>
+
+  <Body>The concept of phase can be extended beyond the limit cycle itself through isochrons. An isochron is a surface (or curve in 2D) in state space consisting of all points that have the same asymptotic phase—that is, all initial conditions that would reach the same point on the limit cycle at the same time as they converge to it.</Body>
+
+  <Code lang="python">
+def compute_isochron_backward(fhn_system, limit_cycle_point, phase,
+                               T_backward=100, dt=0.01):
+    """
+    Compute isochron by backward integration.
+
+    The isochron through a point x₀ on the limit cycle consists of
+    all points that asymptotically approach the limit cycle with
+    the same phase as x₀.
+
+    Method: Integrate backward in time from the limit cycle point.
+    """
+    from scipy.integrate import solve_ivp
+
+    # Backward integration (reverse time)
+    def fhn_backward(t, state):
+        return [-f for f in fhn_system(t, state)]
+
+    t_span = [0, T_backward]
+    sol = solve_ivp(fhn_backward, t_span, limit_cycle_point,
+                    max_step=dt, method='RK45')
+
+    # The trajectory traces out points on the isochron
+    return sol.y[0], sol.y[1]  # v, w coordinates along isochron
+
+# Isochrons foliate the basin of attraction
+# Points on the same isochron have identical phase
+</Code>
+
+  <Body>Isochrons foliate the basin of attraction of the limit cycle—every point in the basin lies on exactly one isochron. Mathematically, the phase function Θ(x) satisfies ∇Θ · F(x) = ω throughout the basin, where F is the vector field defining the dynamics.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is an isochron?</Front>
+    <Back>An isochron is a surface of constant asymptotic phase in state space. All points on an isochron converge to the limit cycle and reach the same phase simultaneously. Isochrons foliate the basin of attraction, assigning a unique phase to every point near the limit cycle.</Back>
+  </FlashCard>
+
+  <H2>Phase Response Curve (PRC)</H2>
+
+  <Body>The phase response curve (PRC), denoted Z(θ), quantifies how a brief perturbation shifts the phase of an oscillator depending on when the perturbation is applied. If an infinitesimal perturbation ε is applied at phase θ, the resulting phase shift is:</Body>
+
+  <Body>Δθ = εZ(θ)</Body>
+
+  <Body>The PRC is fundamental to understanding synchronization because it determines how oscillators respond to inputs from other neurons or external stimuli.</Body>
+
+  <Code lang="python">
+def compute_prc_direct(model, limit_cycle, period, n_phases=100,
+                       perturbation_size=0.001, perturbation_direction=[1, 0]):
+    """
+    Compute PRC by direct perturbation method.
+
+    For each phase θ on the limit cycle:
+    1. Apply a small perturbation ε in direction p
+    2. Let system return to limit cycle
+    3. Measure phase shift Δθ
+    4. PRC: Z(θ) = Δθ/ε
+    """
+    from scipy.integrate import solve_ivp
+
+    phases = np.linspace(0, 2*np.pi, n_phases, endpoint=False)
+    prc = np.zeros(n_phases)
+    T = period
+
+    for i, theta in enumerate(phases):
+        # Find point on limit cycle at phase theta
+        idx = int(theta / (2*np.pi) * len(limit_cycle[0]))
+        x0 = [limit_cycle[0][idx], limit_cycle[1][idx]]
+
+        # Apply perturbation
+        x_pert = [x0[0] + perturbation_size * perturbation_direction[0],
+                  x0[1] + perturbation_size * perturbation_direction[1]]
+
+        # Integrate and measure asymptotic phase shift
+        # (Compare arrival times at reference point)
+        sol_pert = solve_ivp(model, [0, 10*T], x_pert, max_step=0.01)
+        sol_unpert = solve_ivp(model, [0, 10*T], x0, max_step=0.01)
+
+        # Phase shift computed from timing difference
+        # Δθ = -ω * Δt (negative because delay = phase advance)
+        delta_t = compute_timing_difference(sol_pert, sol_unpert)
+        prc[i] = -2*np.pi/T * delta_t / perturbation_size
+
+    return phases, prc
+</Code>
+
+  <FlashCard id="fc4">
+    <Front>What does the Phase Response Curve (PRC) measure?</Front>
+    <Back>The PRC Z(θ) quantifies the phase shift Δθ caused by an infinitesimal perturbation applied at phase θ: Δθ = εZ(θ). It reveals how sensitive the oscillator's timing is to inputs at different points in its cycle, which is crucial for understanding synchronization.</Back>
+  </FlashCard>
+
+  <H2>Type I vs. Type II PRCs</H2>
+
+  <Body>PRCs are classified into two fundamental types based on their shape, which directly relates to the bifurcation structure underlying the oscillation:</Body>
+
+  <H3>Type I PRC (SNIC Bifurcation)</H3>
+  <Body>Type I PRCs are strictly non-negative (or non-positive for inhibition). They arise from saddle-node on invariant circle (SNIC) bifurcations, where oscillations emerge as a saddle-node pair annihilates on a limit cycle. The canonical example is the theta neuron model.</Body>
+
+  <Code lang="python">
+def theta_neuron_prc():
+    """
+    Type I PRC from theta neuron (SNIC bifurcation).
+
+    Model: dθ/dt = (1 - cos(θ)) + (1 + cos(θ))I
+    PRC: Z(θ) = 1 - cos(θ)  (always ≥ 0)
+    """
+    theta = np.linspace(0, 2*np.pi, 100)
+    prc_type1 = 1 - np.cos(theta)
+    return theta, prc_type1
+
+# Type I characteristics:
+# - Always positive (excitation only advances phase)
+# - Peak sensitivity near θ = π (late in cycle)
+# - Neurons can synchronize but only through phase advancement
+</Code>
+
+  <H3>Type II PRC (Hopf Bifurcation)</H3>
+  <Body>Type II PRCs are biphasic, with both positive and negative regions. They arise from Hopf bifurcations, where oscillations emerge as a fixed point loses stability. The FHN model near Hopf bifurcation exhibits Type II PRC.</Body>
+
+  <Code lang="python">
+def hopf_model_prc():
+    """
+    Type II PRC from Hopf bifurcation oscillator.
+
+    Near Hopf bifurcation, the PRC is approximately sinusoidal:
+    Z(θ) ≈ sin(θ)  (positive and negative regions)
+    """
+    theta = np.linspace(0, 2*np.pi, 100)
+    prc_type2 = np.sin(theta)
+    return theta, prc_type2
+
+# Type II characteristics:
+# - Biphasic: positive and negative regions
+# - Can advance OR delay phase depending on timing
+# - Enables both synchronization and desynchronization
+# - More flexible response repertoire
+</Code>
+
+  <FlashCard id="fc5">
+    <Front>What distinguishes Type I from Type II PRCs?</Front>
+    <Back>Type I PRCs (from SNIC bifurcations) are strictly non-negative—perturbations can only advance phase. Type II PRCs (from Hopf bifurcations) are biphasic with positive and negative regions—perturbations can either advance or delay phase depending on timing. This fundamentally affects synchronization properties.</Back>
+  </FlashCard>
+
+  <H2>Weak Coupling and Phase Dynamics</H2>
+
+  <Body>Phase reduction is valid under the weak coupling assumption: perturbations must be small compared to the limit cycle dynamics. Under this assumption, the phase dynamics of a single oscillator receiving input I(t) reduce to:</Body>
+
+  <Body>dθ/dt = ω + εZ(θ)I(t)</Body>
+
+  <Body>where ω is the natural frequency, ε is a small coupling parameter, Z(θ) is the PRC, and I(t) is the input signal.</Body>
+
+  <Code lang="python">
+def phase_reduced_dynamics(t, theta, omega, Z_func, I_func, epsilon=0.01):
+    """
+    Phase dynamics under weak coupling.
+
+    dθ/dt = ω + ε·Z(θ)·I(t)
+
+    Parameters:
+    - omega: natural frequency
+    - Z_func: PRC as function of phase
+    - I_func: input as function of time
+    - epsilon: coupling strength (must be small!)
+    """
+    return omega + epsilon * Z_func(theta) * I_func(t)
+
+def simulate_phase_model(T_sim, omega, Z_func, I_func, epsilon, theta0=0):
+    """Simulate the phase-reduced model."""
+    from scipy.integrate import solve_ivp
+
+    def dynamics(t, theta):
+        return [phase_reduced_dynamics(t, theta[0], omega, Z_func, I_func, epsilon)]
+
+    sol = solve_ivp(dynamics, [0, T_sim], [theta0], max_step=0.01)
+    return sol.t, sol.y[0]
+
+# Validation: compare phase model to full model
+# Agreement confirms weak coupling assumption holds
+</Code>
+
+  <FlashCard id="fc6">
+    <Front>What is the weak coupling assumption in phase reduction?</Front>
+    <Back>The weak coupling assumption requires that perturbations (coupling, inputs) are small compared to the intrinsic limit cycle dynamics. Mathematically, coupling strength ε must satisfy ε &lt;&lt; 1. When violated, higher-order terms become significant and the phase reduction loses accuracy.</Back>
+  </FlashCard>
+
+  <H2>Phase Reduction for Coupled Oscillators</H2>
+
+  <Body>For two weakly coupled oscillators, phase reduction yields a pair of coupled equations that can be further simplified by considering the phase difference ψ = θ₁ - θ₂:</Body>
+
+  <Code lang="python">
+def coupled_phase_oscillators(t, phases, omega1, omega2, Z1, Z2,
+                               coupling_func, epsilon):
+    """
+    Two coupled phase oscillators.
+
+    dθ₁/dt = ω₁ + ε·Z₁(θ₁)·g(θ₂ - θ₁)
+    dθ₂/dt = ω₂ + ε·Z₂(θ₂)·g(θ₁ - θ₂)
+
+    where g is the coupling function (e.g., synaptic current).
+    """
+    theta1, theta2 = phases
+
+    dtheta1 = omega1 + epsilon * Z1(theta1) * coupling_func(theta2 - theta1)
+    dtheta2 = omega2 + epsilon * Z2(theta2) * coupling_func(theta1 - theta2)
+
+    return [dtheta1, dtheta2]
+
+def phase_interaction_function(Z, g, n_points=100):
+    """
+    Compute the phase interaction function H(ψ).
+
+    H(ψ) = (1/2π) ∫₀^{2π} Z(θ)·g(ψ - θ) dθ
+
+    This averaging simplifies coupled oscillator analysis.
+    """
+    psi = np.linspace(0, 2*np.pi, n_points)
+    theta = np.linspace(0, 2*np.pi, n_points)
+    dtheta = theta[1] - theta[0]
+
+    H = np.zeros(n_points)
+    for i, p in enumerate(psi):
+        integrand = Z(theta) * g(p - theta)
+        H[i] = np.sum(integrand) * dtheta / (2*np.pi)
+
+    return psi, H
+</Code>
+
+  <Body>The phase interaction function H(ψ) determines whether oscillators will synchronize (phase-lock) or drift apart. Stable synchronization occurs when H'(ψ*) &lt; 0 at a fixed point ψ* where H(ψ*) = Δω/ε (the frequency mismatch).</Body>
+
+  <H2>Practical Validation of Phase Reduction</H2>
+
+  <Body>To validate phase reduction, compare the predictions of the reduced model against the full high-dimensional dynamics:</Body>
+
+  <Code lang="python">
+def validate_phase_reduction(full_model, phase_model, T_sim,
+                              initial_full, initial_phase,
+                              extract_phase_from_full):
+    """
+    Validate phase reduction by comparing full and reduced models.
+
+    Steps:
+    1. Simulate full model
+    2. Extract instantaneous phase from full model
+    3. Simulate phase-reduced model
+    4. Compare phase trajectories
+    """
+    from scipy.integrate import solve_ivp
+
+    # Full model simulation
+    sol_full = solve_ivp(full_model, [0, T_sim], initial_full,
+                         max_step=0.01)
+    phase_from_full = extract_phase_from_full(sol_full.y)
+
+    # Phase model simulation
+    sol_phase = solve_ivp(phase_model, [0, T_sim], [initial_phase],
+                          max_step=0.01)
+
+    # Compare: compute phase error over time
+    # Small error validates the reduction
+    phase_error = np.abs(phase_from_full - sol_phase.y[0])
+
+    # Wrap to [-π, π] for proper comparison
+    phase_error = np.mod(phase_error + np.pi, 2*np.pi) - np.pi
+
+    return {
+        't': sol_full.t,
+        'phase_full': phase_from_full,
+        'phase_reduced': sol_phase.y[0],
+        'error': phase_error,
+        'max_error': np.max(np.abs(phase_error)),
+        'mean_error': np.mean(np.abs(phase_error))
+    }
+</Code>
+
+  <H2>Summary</H2>
+
+  <Body>Phase reduction transforms complex, high-dimensional oscillator dynamics into tractable one-dimensional phase equations. Key elements include: (1) the phase variable θ parameterizing position on the limit cycle, (2) isochrons extending phase throughout the basin of attraction, (3) the phase response curve Z(θ) quantifying sensitivity to perturbations, and (4) the weak coupling assumption enabling the reduction. Type I and Type II PRCs, arising from SNIC and Hopf bifurcations respectively, predict qualitatively different synchronization behaviors in neural networks.</Body>
+
+  <H2>Knowledge Assessment</H2>
+
+  <SingleSelect id="q1">
+    <Prompt>A neuron model undergoes a saddle-node on invariant circle (SNIC) bifurcation as a parameter increases. What type of PRC would you expect this oscillator to exhibit?</Prompt>
+    <Options>
+      <Option correct="true">Type I PRC (strictly non-negative)</Option>
+      <Option>Type II PRC (biphasic)</Option>
+      <Option>Flat PRC (no phase sensitivity)</Option>
+      <Option>Type I PRC at low frequencies, Type II at high frequencies</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>For the phase-reduced equation dθ/dt = ω + εZ(θ)I(t), what happens to the accuracy of this approximation as the coupling strength ε increases?</Prompt>
+    <Options>
+      <Option>Accuracy improves due to stronger signal</Option>
+      <Option correct="true">Accuracy decreases as weak coupling assumption is violated</Option>
+      <Option>Accuracy remains unchanged since Z(θ) adapts</Option>
+      <Option>Accuracy improves until ε = 1, then decreases</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>Two identical oscillators with Type II PRCs are coupled via excitatory synapses. At which relative phase is stable synchronization most likely to occur?</Prompt>
+    <Options>
+      <Option>ψ = 0 (in-phase) is always stable</Option>
+      <Option>ψ = π (anti-phase) is always stable</Option>
+      <Option correct="true">Stability depends on the phase interaction function H(ψ)</Option>
+      <Option>Type II PRCs cannot produce stable synchronization</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following statements about isochrons are correct? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">All points on an isochron have the same asymptotic phase</Option>
+      <Option correct="true">Isochrons foliate the basin of attraction of the limit cycle</Option>
+      <Option>Isochrons are only defined on the limit cycle itself</Option>
+      <Option correct="true">Isochrons can be computed by backward integration from the limit cycle</Option>
+      <Option>Isochrons are parallel to the limit cycle trajectory</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5">
+    <Prompt>For a valid phase reduction, which conditions must be satisfied? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The unperturbed system must have a stable limit cycle</Option>
+      <Option correct="true">Perturbations must be small (weak coupling)</Option>
+      <Option>The system must be two-dimensional</Option>
+      <Option correct="true">The oscillator must remain near the limit cycle during perturbations</Option>
+      <Option>The limit cycle must be circular in phase space</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6">
+    <Prompt>Order the following steps for computing a PRC using the direct perturbation method:</Prompt>
+    <SortedItems>
+      <Item>Identify the stable limit cycle of the oscillator</Item>
+      <Item>Select phases θ at which to apply perturbations</Item>
+      <Item>Apply a small perturbation ε at each phase</Item>
+      <Item>Allow the perturbed trajectory to return to the limit cycle</Item>
+      <Item>Measure the resulting phase shift Δθ</Item>
+      <Item>Compute Z(θ) = Δθ/ε for each phase</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7">
+    <Prompt>Match each concept with its correct description:</Prompt>
+    <Pairs>
+      <Pair><Left>Type I PRC</Left><Right>Strictly positive, from SNIC bifurcation</Right></Pair>
+      <Pair><Left>Type II PRC</Left><Right>Biphasic with positive and negative regions</Right></Pair>
+      <Pair><Left>Isochron</Left><Right>Surface of constant asymptotic phase</Right></Pair>
+      <Pair><Left>Phase interaction function H(ψ)</Left><Right>Averaged coupling effect on phase difference</Right></Pair>
+      <Pair><Left>Natural frequency ω</Left><Right>Rate of phase advance on unperturbed cycle</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Measures spike threshold variability</Distractor>
+      <Distractor>Describes input-output firing rate relation</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q8">
+    <Prompt>Match each bifurcation type with its associated characteristics:</Prompt>
+    <Pairs>
+      <Pair><Left>SNIC bifurcation</Left><Right>Arbitrarily low frequency oscillations possible</Right></Pair>
+      <Pair><Left>Hopf bifurcation</Left><Right>Oscillations emerge with fixed frequency</Right></Pair>
+      <Pair><Left>SNIC bifurcation</Left><Right>Type I excitability</Right></Pair>
+      <Pair><Left>Hopf bifurcation</Left><Right>Type II excitability</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Produces chaotic dynamics</Distractor>
+      <Distractor>Requires three-dimensional state space</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q9">
+    <Prompt>
+      In phase reduction, the phase variable θ parameterizes position along the <Blank>limit cycle</Blank>.
+      The phase response curve Z(θ) quantifies the <Blank>phase shift</Blank> caused by perturbations at different phases.
+      For the reduction to be valid, the <Blank>weak coupling</Blank> assumption must hold, meaning perturbations are small compared to intrinsic dynamics.
+    </Prompt>
+    <Distractors>
+      <Distractor>nullcline</Distractor>
+      <Distractor>frequency change</Distractor>
+      <Distractor>strong coupling</Distractor>
+      <Distractor>bifurcation</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q10">
+    <Prompt>
+      Type I PRCs are always <Blank>non-negative</Blank> and arise from <Blank>SNIC</Blank> bifurcations.
+      In contrast, Type II PRCs are <Blank>biphasic</Blank> and arise from <Blank>Hopf</Blank> bifurcations,
+      enabling both phase advancement and delay.
+    </Prompt>
+    <Distractors>
+      <Distractor>sinusoidal</Distractor>
+      <Distractor>pitchfork</Distractor>
+      <Distractor>monotonic</Distractor>
+      <Distractor>transcritical</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q11">
+    <Prompt>Explain why Type I and Type II PRCs lead to different synchronization properties in coupled neural oscillators. Include in your answer: (1) the mathematical origin of each PRC type, (2) how the PRC shape affects the phase interaction function, and (3) specific predictions for network synchronization behavior.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly identifies SNIC bifurcation as origin of Type I (non-negative) and Hopf bifurcation as origin of Type II (biphasic) PRCs</Requirement>
+        <Indicators>SNIC, saddle-node, Hopf, bifurcation, non-negative, biphasic, positive and negative</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Explains how PRC shape affects the phase interaction function H(ψ) and its role in determining synchronization stability</Requirement>
+        <Indicators>phase interaction, H(ψ), averaging, convolution, stability, fixed point</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides specific predictions: Type I can only advance phase (limited synchronization modes), Type II can advance or delay (richer repertoire including anti-phase locking)</Requirement>
+        <Indicators>advance, delay, in-phase, anti-phase, synchronization, locking</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Demonstrates understanding with concrete examples or mathematical expressions</Requirement>
+        <Indicators>example, theta neuron, FHN, sinusoidal, 1-cos, integral</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="400" />
+  </Subjective>
+
+  <Subjective id="q12">
+    <Prompt>Describe the procedure for validating a phase-reduced model against the original high-dimensional system. What metrics would you use to quantify the accuracy of the reduction, and under what conditions would you expect the phase reduction to fail?</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Describes the validation procedure: simulate both models, extract phase from full model, compare phase trajectories</Requirement>
+        <Indicators>simulate, compare, extract phase, trajectory, full model, reduced model</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Identifies appropriate metrics for comparison (phase error, timing differences, correlation)</Requirement>
+        <Indicators>error, timing, correlation, difference, metric, quantify</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Explains conditions for failure: strong coupling, large perturbations, trajectory leaving neighborhood of limit cycle</Requirement>
+        <Indicators>weak coupling violated, strong, large perturbation, far from limit cycle, breakdown, failure</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions practical considerations such as phase extraction methods or numerical precision</Requirement>
+        <Indicators>Hilbert transform, threshold crossing, numerical, interpolation, practical</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="350" />
+  </Subjective>
+
+</Lesson>

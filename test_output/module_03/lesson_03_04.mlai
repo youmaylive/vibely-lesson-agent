@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-03-04</Id>
+    <Title>Large Deviation Theory for Rare Events</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>large-deviation-theory</Tag>
+      <Tag>rare-events</Tag>
+      <Tag>freidlin-wentzell</Tag>
+      <Tag>quasipotential</Tag>
+      <Tag>stochastic-dynamics</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Large Deviation Theory for Rare Events</H1>
+
+  <Body>Large deviation theory provides the mathematical framework to quantify probabilities of rare but significant neuronal events—spontaneous synchronization, rare bursts, or escape from attractors—that standard perturbation theory cannot address. While Kramers' escape rate formula (from lesson 02_03) handles simple one-dimensional potential wells, large deviation theory generalizes these ideas to complex, high-dimensional, and non-gradient dynamical systems that characterize realistic neuronal models.</Body>
+
+  <Body>In this lesson, we develop the rigorous mathematical machinery of large deviation principles, rate functions, and Freidlin-Wentzell theory. These tools allow us to compute the exponential scaling of rare event probabilities, identify the most probable paths by which these events occur, and connect these predictions to observable neurobiological phenomena such as spontaneous firing and synchronization.</Body>
+
+  <H2>The Large Deviation Principle</H2>
+
+  <Body>Consider a family of random variables {X_ε} parameterized by a small parameter ε (often related to noise intensity). The large deviation principle (LDP) describes the exponential decay of probabilities for rare events as ε → 0.</Body>
+
+  <H3>Formal Definition</H3>
+
+  <Body>A sequence of probability measures {μ_ε} on a metric space satisfies a large deviation principle with rate function I(x) if, for any measurable set A:</Body>
+
+  <Code lang="plaintext">
+-inf{I(x) : x ∈ A°} ≤ lim inf ε² log μ_ε(A) ≤ lim sup ε² log μ_ε(A) ≤ -inf{I(x) : x ∈ Ā}
+  </Code>
+
+  <Body>where A° is the interior and Ā is the closure of A. Informally, this means:</Body>
+
+  <Code lang="plaintext">
+P(X_ε ∈ A) ≈ exp(-I(A)/ε²)    as ε → 0
+  </Code>
+
+  <Body>The probability of rare events decays exponentially, and the rate function I(x) quantifies how unlikely different outcomes are. Events with higher rate function values are exponentially less probable.</Body>
+
+  <FlashCard id="fc-ldp">
+    <Front>What is the Large Deviation Principle (LDP)?</Front>
+    <Back>A mathematical framework describing how probabilities of rare events decay exponentially as noise intensity ε → 0. Formally: P(X ∈ A) ≈ exp(-I(A)/ε²), where I is the rate function quantifying the "cost" of rare events.</Back>
+  </FlashCard>
+
+  <H3>Properties of Rate Functions</H3>
+
+  <Body>A rate function I(x) must satisfy several key properties:</Body>
+
+  <Body>1. Non-negativity: I(x) ≥ 0 for all x</Body>
+  <Body>2. Minimum at typical behavior: I(x*) = 0 where x* is the most likely outcome</Body>
+  <Body>3. Lower semicontinuity: For convergent sequences, I(x) ≤ lim inf I(x_n)</Body>
+  <Body>4. Goodness (compact level sets): The sets {x : I(x) ≤ c} are compact for all c &lt; ∞</Body>
+
+  <Body>The rate function acts as a "cost function" for fluctuations away from typical behavior. Higher I(x) means the state x is exponentially less likely to be observed.</Body>
+
+  <FlashCard id="fc-rate-function">
+    <Front>What is the rate function I(x) in large deviation theory?</Front>
+    <Back>A non-negative function quantifying the exponential decay rate of rare event probabilities. I(x) = 0 at typical states (most likely outcomes), and I(x) > 0 indicates the "cost" of deviating to state x. Higher values mean exponentially lower probability.</Back>
+  </FlashCard>
+
+  <H2>Freidlin-Wentzell Theory</H2>
+
+  <Body>Freidlin-Wentzell theory applies large deviation principles to stochastic differential equations (SDEs), providing a systematic framework for computing escape rates and most probable paths.</Body>
+
+  <H3>The Setting: Small Noise SDEs</H3>
+
+  <Body>Consider the SDE with small noise intensity ε:</Body>
+
+  <Code lang="plaintext">
+dX_t = b(X_t)dt + εσ(X_t)dW_t
+  </Code>
+
+  <Body>where b(x) is the deterministic drift, σ(x) is the noise coefficient, and W_t is a Wiener process. In the limit ε → 0, the system approaches the deterministic dynamics ẋ = b(x). Freidlin-Wentzell theory quantifies how noise enables transitions between attractors.</Body>
+
+  <H3>The Action Functional</H3>
+
+  <Body>The central object in Freidlin-Wentzell theory is the action functional S[φ] for a path φ: [0,T] → ℝⁿ:</Body>
+
+  <Code lang="plaintext">
+S_T[φ] = (1/2) ∫₀ᵀ |σ⁻¹(φ_t)(φ̇_t - b(φ_t))|² dt
+  </Code>
+
+  <Body>This functional measures the "cost" of following path φ. When φ̇_t = b(φ_t), the path follows deterministic dynamics and S[φ] = 0. Any deviation from the deterministic flow incurs positive action cost.</Body>
+
+  <Body>The probability of observing a path close to φ scales as:</Body>
+
+  <Code lang="plaintext">
+P(X^ε ≈ φ) ≈ exp(-S[φ]/ε²)
+  </Code>
+
+  <FlashCard id="fc-action">
+    <Front>What is the action functional in Freidlin-Wentzell theory?</Front>
+    <Back>S_T[φ] = (1/2) ∫₀ᵀ |σ⁻¹(φ_t)(φ̇_t - b(φ_t))|² dt. It measures the "cost" of path φ deviating from deterministic dynamics. Zero action means following the drift; positive action measures deviation magnitude. Probability scales as exp(-S/ε²).</Back>
+  </FlashCard>
+
+  <H3>The Quasipotential</H3>
+
+  <Body>The quasipotential V(x, y) is the minimum action required to travel from x to y:</Body>
+
+  <Code lang="plaintext">
+V(x, y) = inf { S_T[φ] : φ_0 = x, φ_T = y, T > 0 }
+  </Code>
+
+  <Body>For gradient systems where b(x) = -∇U(x), the quasipotential reduces to the potential difference: V(x, y) = 2(U(y) - U(x)) when U(y) &gt; U(x).</Body>
+
+  <Body>However, for non-gradient systems (most neuronal models), the quasipotential is not symmetric: V(x, y) ≠ V(y, x). This asymmetry captures the directional nature of noise-induced transitions in neuronal dynamics.</Body>
+
+  <FlashCard id="fc-quasipotential">
+    <Front>What is the quasipotential, and how does it differ from thermodynamic potential?</Front>
+    <Back>The quasipotential V(x, y) is the minimum action cost to transition from x to y. Unlike thermodynamic potentials, it is generally asymmetric: V(x, y) ≠ V(y, x) for non-gradient systems. It generalizes potential energy to systems with non-conservative forces.</Back>
+  </FlashCard>
+
+  <H2>Escape Rates and Most Probable Paths</H2>
+
+  <Body>The primary application of Freidlin-Wentzell theory in neuroscience is computing escape rates from stable attractors and identifying the paths by which escape occurs.</Body>
+
+  <H3>Escape Rate Formula</H3>
+
+  <Body>For a system with stable fixed point x* inside domain D, the mean escape time T from D satisfies:</Body>
+
+  <Code lang="plaintext">
+E[T] ≈ C · exp(V*/ε²)    as ε → 0
+  </Code>
+
+  <Body>where V* = inf{V(x*, y) : y ∈ ∂D} is the minimum quasipotential barrier height to reach the boundary ∂D. The prefactor C depends on local curvature properties but the dominant behavior is the exponential term.</Body>
+
+  <Body>This generalizes Kramers' formula. In the special case of gradient dynamics b = -∇U with constant noise, we recover:</Body>
+
+  <Code lang="plaintext">
+E[T] ≈ C · exp(2ΔU/ε²)
+  </Code>
+
+  <Body>where ΔU is the potential barrier height—exactly Kramers' result.</Body>
+
+  <H3>The Most Probable Escape Path</H3>
+
+  <Body>The most probable escape path (MPEP) is the path φ* minimizing the action among all paths connecting the attractor to the boundary:</Body>
+
+  <Code lang="plaintext">
+φ* = argmin { S_T[φ] : φ_0 = x*, φ_T ∈ ∂D }
+  </Code>
+
+  <Body>The MPEP satisfies the Euler-Lagrange equations derived from the action functional. For gradient systems, the MPEP follows the time-reversed deterministic trajectory. For non-gradient systems, the MPEP can follow qualitatively different routes.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+
+def compute_action(path, dt, drift, diffusion):
+    """Compute Freidlin-Wentzell action for discretized path."""
+    n_steps = len(path) - 1
+    action = 0.0
+
+    for i in range(n_steps):
+        x = path[i]
+        x_next = path[i+1]
+        velocity = (x_next - x) / dt
+        b = drift(x)
+        sigma = diffusion(x)
+
+        # Action integrand: |σ⁻¹(v - b)|²
+        deviation = velocity - b
+        sigma_inv_dev = np.linalg.solve(sigma, deviation)
+        action += 0.5 * np.dot(sigma_inv_dev, sigma_inv_dev) * dt
+
+    return action
+
+def find_mpep(x_start, x_end, n_points, drift, diffusion, n_iter=1000):
+    """Find most probable escape path using gradient descent on action."""
+    dt = 1.0 / (n_points - 1)
+
+    # Initialize with straight line
+    path = np.array([x_start + t * (x_end - x_start)
+                     for t in np.linspace(0, 1, n_points)])
+
+    def objective(interior_flat):
+        interior = interior_flat.reshape(n_points - 2, -1)
+        full_path = np.vstack([x_start, interior, x_end])
+        return compute_action(full_path, dt, drift, diffusion)
+
+    result = minimize(objective, path[1:-1].flatten(),
+                      method='L-BFGS-B', options={'maxiter': n_iter})
+
+    interior = result.x.reshape(n_points - 2, -1)
+    optimal_path = np.vstack([x_start, interior, x_end])
+
+    return optimal_path, result.fun
+  </Code>
+
+  <FlashCard id="fc-mpep">
+    <Front>What is the Most Probable Escape Path (MPEP)?</Front>
+    <Back>The path that minimizes the action functional among all paths connecting an attractor to a target region. It represents how a rare escape event most likely occurs. Found by solving Euler-Lagrange equations or numerical optimization of the action.</Back>
+  </FlashCard>
+
+  <H2>Application: FitzHugh-Nagumo Model</H2>
+
+  <Body>The FitzHugh-Nagumo (FHN) model provides an excellent testbed for large deviation theory in neuroscience. In its stochastic form:</Body>
+
+  <Code lang="plaintext">
+dv = (v - v³/3 - w)dt + εdW_v
+dw = (v + a - bw)/τ dt + εdW_w
+  </Code>
+
+  <Body>For parameters a &gt; 1, the system has a single stable fixed point representing the resting state. Large deviation theory predicts how noise causes spontaneous "firing" events—excursions through the phase space mimicking action potentials.</Body>
+
+  <H3>Computing the Quasipotential</H3>
+
+  <Body>For the FHN model, the quasipotential is not available in closed form because the drift is non-gradient. We must compute it numerically using methods such as:</Body>
+
+  <Body>1. Geometric Minimum Action Method (gMAM): Reparameterizes paths to avoid time-dependence</Body>
+  <Body>2. Ordered Upwind Method: Solves the Hamilton-Jacobi equation for V</Body>
+  <Body>3. String Method: Evolves discretized paths toward the MPEP</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import solve_ivp
+
+def fhn_drift(x, a=1.05, b=0.8, tau=12.5):
+    """Deterministic drift for FitzHugh-Nagumo model."""
+    v, w = x
+    dv = v - v**3/3 - w
+    dw = (v + a - b*w) / tau
+    return np.array([dv, dw])
+
+def fhn_fixed_point(a=1.05, b=0.8, tau=12.5):
+    """Find the stable fixed point of FHN model."""
+    from scipy.optimize import fsolve
+    def equations(x):
+        return fhn_drift(x, a, b, tau)
+    x0 = fsolve(equations, [-1.0, -0.5])
+    return x0
+
+def compute_escape_rate_fhn(epsilon, quasipotential_barrier):
+    """Estimate escape rate using Freidlin-Wentzell theory."""
+    # Rate ~ exp(-V*/ε²)
+    return np.exp(-quasipotential_barrier / epsilon**2)
+
+# Example: estimate spontaneous firing rate
+epsilon = 0.1  # noise intensity
+V_barrier = 0.35  # quasipotential barrier (computed numerically)
+rate = compute_escape_rate_fhn(epsilon, V_barrier)
+print(f"Spontaneous firing rate ≈ {rate:.2e} per unit time")
+  </Code>
+
+  <Body>The MPEP for spontaneous firing in the FHN model reveals a fascinating structure: the system first moves slowly along the attracting "slow manifold" toward the firing threshold, then rapidly crosses the threshold—qualitatively matching the trajectory of noise-induced action potentials observed in neurons.</Body>
+
+  <H2>Numerical Methods for Large Deviations</H2>
+
+  <Body>Several numerical algorithms have been developed to compute quasipotentials and most probable paths:</Body>
+
+  <H3>Geometric Minimum Action Method (gMAM)</H3>
+
+  <Body>The gMAM reparameterizes paths by arc length, removing explicit time dependence. The geometric action becomes:</Body>
+
+  <Code lang="plaintext">
+S_g[φ] = ∫ |φ̇|⁻¹ · |σ⁻¹(φ)(φ̇ - b(φ))| · |φ̇| ds = ∫ |σ⁻¹(φ)(φ̂ - b̂(φ))| ds
+  </Code>
+
+  <Body>where φ̂ is the unit tangent and b̂ is the normalized drift projection. This formulation is better conditioned for numerical optimization.</Body>
+
+  <H3>String Method</H3>
+
+  <Body>The string method evolves a discretized path (string) toward the MPEP through iterative relaxation:</Body>
+
+  <Code lang="python">
+def string_method(path, drift, diffusion, n_iter=500, dt=0.01):
+    """
+    String method for finding minimum action paths.
+
+    Parameters:
+    - path: Initial guess for path (n_points x dim array)
+    - drift: Function b(x) returning drift vector
+    - diffusion: Function σ(x) returning diffusion matrix
+    - n_iter: Number of iterations
+    - dt: Time step for evolution
+    """
+    path = path.copy()
+    n_points = len(path)
+
+    for iteration in range(n_iter):
+        # Compute forces on interior points
+        new_path = path.copy()
+
+        for i in range(1, n_points - 1):
+            x = path[i]
+            b = drift(x)
+            sigma = diffusion(x)
+
+            # Tangent vector (central difference)
+            tangent = path[i+1] - path[i-1]
+            tangent = tangent / np.linalg.norm(tangent)
+
+            # Normal force: gradient of action perpendicular to path
+            sigma_inv = np.linalg.inv(sigma)
+
+            # Simplified: evolve toward drift direction perpendicular to path
+            drift_perp = b - np.dot(b, tangent) * tangent
+            new_path[i] = path[i] + dt * drift_perp
+
+        # Reparameterize: redistribute points equally along path
+        path = reparameterize_by_arclength(new_path)
+
+    return path
+
+def reparameterize_by_arclength(path):
+    """Redistribute path points equally by arc length."""
+    # Compute cumulative arc length
+    diffs = np.diff(path, axis=0)
+    segment_lengths = np.linalg.norm(diffs, axis=1)
+    cumulative_length = np.concatenate([[0], np.cumsum(segment_lengths)])
+    total_length = cumulative_length[-1]
+
+    # Interpolate at equal arc length intervals
+    n_points = len(path)
+    target_lengths = np.linspace(0, total_length, n_points)
+
+    new_path = np.zeros_like(path)
+    new_path[0] = path[0]
+    new_path[-1] = path[-1]
+
+    for i in range(1, n_points - 1):
+        # Find segment containing target length
+        idx = np.searchsorted(cumulative_length, target_lengths[i]) - 1
+        idx = max(0, min(idx, len(path) - 2))
+
+        # Linear interpolation within segment
+        if segment_lengths[idx] > 1e-10:
+            t = (target_lengths[i] - cumulative_length[idx]) / segment_lengths[idx]
+        else:
+            t = 0
+        new_path[i] = path[idx] + t * (path[idx + 1] - path[idx])
+
+    return new_path
+  </Code>
+
+  <H2>Large Deviations in Coupled Oscillators</H2>
+
+  <Body>Large deviation theory also applies to networks of coupled neurons. Consider N coupled oscillators with weak noise. Synchronization can be analyzed as an escape problem from the incoherent state to the synchronized state (or vice versa).</Body>
+
+  <Body>For the Kuramoto model with noise:</Body>
+
+  <Code lang="plaintext">
+dθᵢ = (ωᵢ + (K/N) Σⱼ sin(θⱼ - θᵢ))dt + εdWᵢ
+  </Code>
+
+  <Body>Large deviation theory predicts that the rate of spontaneous desynchronization scales as exp(-N·f(K)/ε²), where f(K) depends on coupling strength. This explains why large populations maintain synchronization more robustly—the action barrier scales with system size.</Body>
+
+  <FlashCard id="fc-coupled">
+    <Front>How does large deviation theory apply to coupled oscillator synchronization?</Front>
+    <Back>Synchronization transitions can be viewed as escape problems. The action barrier scales with network size N, so large populations maintain synchronization exponentially more robustly. Desynchronization rate ~ exp(-N·f(K)/ε²).</Back>
+  </FlashCard>
+
+  <H2>Validation and Experimental Connections</H2>
+
+  <Body>Large deviation predictions can be validated through:</Body>
+
+  <Body>1. Direct simulation: Monte Carlo estimation of rare event probabilities</Body>
+  <Body>2. Importance sampling: Biased simulations that enhance rare events</Body>
+  <Body>3. Experimental measurement: Recording spontaneous activity in neurons</Body>
+
+  <Code lang="python">
+def validate_large_deviation_scaling(epsilon_values, simulate_escape_time, n_trials=1000):
+    """
+    Validate exponential scaling predicted by large deviation theory.
+
+    If escape time ~ exp(V*/ε²), then log(escape_time) should scale as 1/ε².
+    """
+    mean_escape_times = []
+
+    for eps in epsilon_values:
+        times = [simulate_escape_time(eps) for _ in range(n_trials)]
+        mean_escape_times.append(np.mean(times))
+
+    # Plot log(T) vs 1/ε² - should be linear
+    inv_eps_sq = 1 / np.array(epsilon_values)**2
+    log_times = np.log(mean_escape_times)
+
+    # Linear regression
+    slope, intercept = np.polyfit(inv_eps_sq, log_times, 1)
+
+    print(f"Estimated quasipotential barrier: V* ≈ {slope:.3f}")
+
+    return slope, intercept
+  </Code>
+
+  <Body>A key prediction is the exponential scaling: plotting log(mean escape time) versus 1/ε² should yield a straight line with slope equal to the quasipotential barrier V*. Deviations indicate either finite-noise corrections or breakdown of the small-noise approximation.</Body>
+
+  <H2>Connection to Kramers' Theory</H2>
+
+  <Body>Kramers' escape rate formula is a special case of Freidlin-Wentzell theory for one-dimensional gradient systems:</Body>
+
+  <Code lang="plaintext">
+Kramers:          r = (ω_a ω_b)/(2πγ) exp(-ΔU/D)
+Freidlin-Wentzell: r ~ exp(-V*/ε²)
+  </Code>
+
+  <Body>For dx = -U'(x)dt + εdW with ε² = 2D, the quasipotential V* = 2ΔU, recovering Kramers' result. Large deviation theory extends this to:</Body>
+
+  <Body>• Multi-dimensional systems</Body>
+  <Body>• Non-gradient dynamics (neuronal models)</Body>
+  <Body>• Complex basins of attraction</Body>
+  <Body>• Path-dependent quantities (most probable trajectory)</Body>
+
+  <H2>Summary</H2>
+
+  <Body>Large deviation theory provides the essential mathematical framework for understanding rare events in stochastic neuronal systems. The key concepts are:</Body>
+
+  <Body>• Rate function I(x): Quantifies exponential decay of rare event probabilities</Body>
+  <Body>• Action functional S[φ]: Measures the cost of following a particular path</Body>
+  <Body>• Quasipotential V(x,y): Minimum action for transitions, generalizing potential energy</Body>
+  <Body>• Most probable path: The path minimizing action for rare transitions</Body>
+  <Body>• Freidlin-Wentzell theory: Rigorous framework connecting these concepts for SDEs</Body>
+
+  <Body>These tools enable quantitative predictions of spontaneous neural activity, escape from attractors, and noise-induced synchronization that are validated by both simulation and experiment.</Body>
+
+  <H1>Knowledge Check</H1>
+
+  <SingleSelect id="q1-ldp-definition">
+    <Prompt>In the large deviation principle P(X_ε ∈ A) ≈ exp(-I(A)/ε²), what does the rate function I(A) represent?</Prompt>
+    <Options>
+      <Option correct="true">The exponential cost of observing the rare event, with higher values indicating exponentially lower probability</Option>
+      <Option>The probability of event A occurring in a single trial</Option>
+      <Option>The variance of the random variable X_ε</Option>
+      <Option>The mean first passage time to reach set A</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2-quasipotential-symmetry">
+    <Prompt>For the quasipotential V(x, y) in a non-gradient neuronal model, which statement is correct?</Prompt>
+    <Options>
+      <Option correct="true">V(x, y) ≠ V(y, x) in general, reflecting directional asymmetry of transitions</Option>
+      <Option>V(x, y) = V(y, x) always, as required by detailed balance</Option>
+      <Option>V(x, y) + V(y, x) = 0, conserving total action</Option>
+      <Option>V(x, y) = -V(y, x), like a potential energy difference</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3-action-zero">
+    <Prompt>When does the action functional S[φ] equal zero?</Prompt>
+    <Options>
+      <Option correct="true">When the path φ follows the deterministic dynamics exactly: φ̇_t = b(φ_t)</Option>
+      <Option>When the path connects two fixed points</Option>
+      <Option>When the noise intensity ε equals zero</Option>
+      <Option>When the path is the most probable escape path</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4-fw-applications">
+    <Prompt>Which of the following are valid applications of Freidlin-Wentzell theory in neuroscience? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Computing mean escape times from attractor states</Option>
+      <Option correct="true">Identifying most probable paths for spontaneous firing</Option>
+      <Option correct="true">Predicting exponential scaling of rare event probabilities with noise</Option>
+      <Option>Solving the Hodgkin-Huxley equations analytically</Option>
+      <Option correct="true">Analyzing synchronization stability in coupled oscillator networks</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5-rate-function-properties">
+    <Prompt>Which properties must a rate function I(x) satisfy? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Non-negativity: I(x) ≥ 0 for all x</Option>
+      <Option correct="true">Zero at typical states: I(x*) = 0 where x* is most likely</Option>
+      <Option>Symmetry: I(x) = I(-x)</Option>
+      <Option correct="true">Lower semicontinuity</Option>
+      <Option>Differentiability everywhere</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6-escape-process">
+    <Prompt>Order the steps in applying Freidlin-Wentzell theory to compute escape rates from first to last:</Prompt>
+    <SortedItems>
+      <Item>Identify the stable attractor and escape target region</Item>
+      <Item>Formulate the action functional for the stochastic system</Item>
+      <Item>Compute the quasipotential (minimum action) to the boundary</Item>
+      <Item>Find the most probable escape path by minimizing action</Item>
+      <Item>Apply the escape rate formula: rate ~ exp(-V*/ε²)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <SortQuiz id="q7-noise-dependence">
+    <Prompt>Order these noise intensity values (ε) from longest to shortest expected escape time, assuming V* = 1:</Prompt>
+    <SortedItems>
+      <Item>ε = 0.1 (longest: exp(-100)⁻¹)</Item>
+      <Item>ε = 0.2</Item>
+      <Item>ε = 0.5</Item>
+      <Item>ε = 1.0 (shortest: exp(-1)⁻¹)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q8-concepts-definitions">
+    <Prompt>Match each large deviation concept with its correct definition or property:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>Rate function I(x)</Left>
+        <Right>Measures exponential cost of observing state x</Right>
+      </Pair>
+      <Pair>
+        <Left>Action functional S[φ]</Left>
+        <Right>Cost of following path φ deviating from drift</Right>
+      </Pair>
+      <Pair>
+        <Left>Quasipotential V(x,y)</Left>
+        <Right>Minimum action to travel from x to y</Right>
+      </Pair>
+      <Pair>
+        <Left>Most probable escape path</Left>
+        <Right>Path minimizing action between attractor and boundary</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Maximum likelihood estimator for parameters</Distractor>
+      <Distractor>Equilibrium Boltzmann distribution</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q9-methods-purposes">
+    <Prompt>Match each numerical method with its primary purpose in large deviation computations:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>Geometric Minimum Action Method</Left>
+        <Right>Arc-length parameterization for path optimization</Right>
+      </Pair>
+      <Pair>
+        <Left>String Method</Left>
+        <Right>Iterative relaxation toward minimum action path</Right>
+      </Pair>
+      <Pair>
+        <Left>Ordered Upwind Method</Left>
+        <Right>Solving Hamilton-Jacobi equation for quasipotential</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Monte Carlo sampling of transition probabilities</Distractor>
+      <Distractor>Direct numerical integration of SDEs</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q10-escape-formula">
+    <Prompt>In Freidlin-Wentzell theory, the mean escape time from an attractor scales as E[T] ≈ C · exp(<Blank>V*</Blank>/<Blank>ε²</Blank>), where V* is the <Blank>quasipotential</Blank> barrier height and ε is the <Blank>noise</Blank> intensity.</Prompt>
+    <Distractors>
+      <Distractor>temperature</Distractor>
+      <Distractor>action</Distractor>
+      <Distractor>rate function</Distractor>
+      <Distractor>diffusion</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q11-gradient-special">
+    <Prompt>For gradient systems where b(x) = -∇U(x), the <Blank>quasipotential</Blank> reduces to twice the potential difference, and Freidlin-Wentzell theory recovers <Blank>Kramers'</Blank> escape rate formula as a special case.</Prompt>
+    <Distractors>
+      <Distractor>Langevin</Distractor>
+      <Distractor>rate function</Distractor>
+      <Distractor>action</Distractor>
+      <Distractor>Fokker-Planck</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q12-gradient-vs-nongradient">
+    <Prompt>Explain why the quasipotential is asymmetric (V(x,y) ≠ V(y,x)) for non-gradient systems, and discuss why this matters for neuronal models. Provide a concrete example of how this asymmetry manifests in a neuroscience context.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Explains that non-gradient systems lack detailed balance, causing different action costs for forward vs. reverse transitions</Requirement>
+        <Indicators>detailed balance, non-conservative, rotational flow, irreversible, asymmetric drift</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Connects asymmetry to neuronal dynamics, noting that most realistic neuronal models (e.g., FHN, Hodgkin-Huxley) have non-gradient structure</Requirement>
+        <Indicators>FitzHugh-Nagumo, Hodgkin-Huxley, excitability, neuronal model, limit cycle</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Provides a concrete example, such as firing vs. recovery having different transition costs, or escape from vs. return to resting state</Requirement>
+        <Indicators>firing, recovery, action potential, resting state, excursion, threshold</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses implications for computing escape rates or most probable paths in neural circuits</Requirement>
+        <Indicators>escape rate, MPEP, spontaneous activity, transition path, numerical method</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q13-validation">
+    <Prompt>Describe how you would experimentally or computationally validate the predictions of large deviation theory for spontaneous firing in a neuronal model. What specific scaling relationship would you test, and what would constitute evidence supporting or refuting the theory?</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Identifies the key prediction: log(mean escape time) should scale linearly with 1/ε², with slope equal to quasipotential barrier V*</Requirement>
+        <Indicators>exponential scaling, log linear, 1/ε², barrier height, slope</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes a validation approach: varying noise intensity and measuring escape times through simulation or experiment</Requirement>
+        <Indicators>Monte Carlo, simulation, noise intensity, escape time, measurement, experiment</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Discusses what would constitute supporting evidence (linear plot) vs. refuting evidence (deviations from linearity at moderate noise)</Requirement>
+        <Indicators>linear, deviation, breakdown, moderate noise, small noise limit, corrections</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions practical considerations such as rare event sampling challenges, importance sampling, or experimental noise sources</Requirement>
+        <Indicators>importance sampling, rare event, sampling, statistics, experimental noise</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+</Lesson>

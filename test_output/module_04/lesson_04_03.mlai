@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-04-03</Id>
+    <Title>Multi-Compartment Models: Detailed Morphology</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>multi-compartment</Tag>
+      <Tag>neuronal-morphology</Tag>
+      <Tag>cable-equation</Tag>
+      <Tag>sparse-matrices</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>numerical-methods</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Multi-Compartment Models: Detailed Morphology</H1>
+
+  <Body>Multi-compartment models represent one of the most powerful approaches in computational neuroscience, bridging the gap between abstract point neuron models and the rich biophysical reality of neurons with complex dendritic arbors. By discretizing the continuous cable equation into a system of coupled ordinary differential equations, we can simulate realistic neurons while maintaining computational tractability through sparse matrix methods.</Body>
+
+  <Body>In this lesson, we build upon the cable equation theory from Lesson 4.1 and extend it to handle arbitrary neuronal morphologies. You will learn to construct compartmental models from morphological reconstructions, implement efficient numerical methods using sparse linear algebra, and incorporate realistic distributions of ion channels across different neuronal compartments.</Body>
+
+  <H2>From Continuous Cable to Discrete Compartments</H2>
+
+  <Body>The cable equation provides a continuous description of voltage propagation along neuronal processes. However, real neurons have complex branching structures that make analytical solutions intractable. The compartmental approach discretizes the neuron into small isopotential segments, converting the partial differential equation into a system of coupled ordinary differential equations.</Body>
+
+  <H3>Spatial Discretization</H3>
+
+  <Body>Consider a neuronal cable segment of length L. We divide it into N compartments, each of length Δx = L/N. For the discretization to be valid, we require Δx to be much smaller than the electrotonic length constant λ (typically Δx &lt; 0.1λ). This ensures that each compartment can be treated as approximately isopotential.</Body>
+
+  <Body>The continuous cable equation:</Body>
+
+  <Code lang="plaintext">
+λ² ∂²V/∂x² = τ_m ∂V/∂t + V - V_rest
+  </Code>
+
+  <Body>becomes, after spatial discretization using central differences:</Body>
+
+  <Code lang="plaintext">
+C_i dV_i/dt = G_i,i-1(V_{i-1} - V_i) + G_i,i+1(V_{i+1} - V_i) + I_ion,i + I_syn,i
+  </Code>
+
+  <Body>where C_i is the membrane capacitance of compartment i, G_ij is the coupling conductance between compartments i and j, I_ion,i represents ionic currents, and I_syn,i represents synaptic inputs.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the fundamental requirement for valid compartmental discretization in terms of segment length?</Front>
+    <Back>The compartment length Δx must be much smaller than the electrotonic length constant λ, typically Δx &lt; 0.1λ, ensuring each compartment is approximately isopotential.</Back>
+  </FlashCard>
+
+  <H3>Coupling Conductance</H3>
+
+  <Body>The coupling conductance G_ij between adjacent compartments depends on the axial resistance of the cytoplasm and the geometry of the connecting segment. For a cylindrical compartment:</Body>
+
+  <Code lang="plaintext">
+G_ij = π * r_ij² / (R_a * L_ij)
+  </Code>
+
+  <Body>where r_ij is the radius of the connecting segment, R_a is the axial resistivity (typically 100-200 Ω·cm), and L_ij is the distance between compartment centers. At branch points, multiple compartments connect, leading to a row in the coupling matrix with multiple non-zero entries.</Body>
+
+  <FlashCard id="fc2">
+    <Front>What physical parameters determine the coupling conductance between adjacent compartments?</Front>
+    <Back>The coupling conductance G_ij = π * r² / (R_a * L) depends on: (1) the radius r of the connecting segment, (2) the axial resistivity R_a of the cytoplasm, and (3) the distance L between compartment centers.</Back>
+  </FlashCard>
+
+  <H2>The Coupled ODE System</H2>
+
+  <Body>For a neuron discretized into N compartments, we obtain a system of N coupled ODEs. This can be written in compact matrix form:</Body>
+
+  <Code lang="plaintext">
+C dV/dt = G·V + I_ion(V) + I_syn
+  </Code>
+
+  <Body>where V is an N-dimensional voltage vector, C is a diagonal matrix of membrane capacitances, G is the coupling matrix encoding the morphological connectivity, and I_ion(V) and I_syn are vectors of ionic and synaptic currents.</Body>
+
+  <H3>Structure of the Coupling Matrix</H3>
+
+  <Body>The coupling matrix G has a special structure determined by the neuronal morphology. For a linear unbranched cable, G is tridiagonal. For branched structures, G remains sparse but has additional non-zero entries at branch points. The diagonal entries are always negative (sum of outgoing conductances), while off-diagonal entries are positive (coupling to neighbors).</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.sparse import lil_matrix, csr_matrix
+
+def build_coupling_matrix(compartments, connections, conductances):
+    """
+    Build the sparse coupling matrix from morphological data.
+
+    Parameters:
+    -----------
+    compartments : int
+        Number of compartments
+    connections : list of tuples
+        List of (i, j) pairs indicating connected compartments
+    conductances : list of floats
+        Conductance values G_ij for each connection
+
+    Returns:
+    --------
+    G : scipy.sparse.csr_matrix
+        Sparse coupling matrix
+    """
+    N = compartments
+    G = lil_matrix((N, N))
+
+    for (i, j), g_ij in zip(connections, conductances):
+        # Off-diagonal: positive coupling
+        G[i, j] += g_ij
+        G[j, i] += g_ij
+        # Diagonal: negative sum of outgoing conductances
+        G[i, i] -= g_ij
+        G[j, j] -= g_ij
+
+    return csr_matrix(G)
+</Code>
+
+  <Body>The key insight is that the coupling matrix is symmetric and has the structure of a graph Laplacian. Each row sums to zero (or nearly zero, accounting for boundary conditions), reflecting current conservation.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is the mathematical structure of the coupling matrix in multi-compartment models?</Front>
+    <Back>The coupling matrix G is symmetric and has a graph Laplacian structure: diagonal entries are negative (sum of outgoing conductances), off-diagonal entries are positive (coupling to neighbors), and each row sums to zero (current conservation). For unbranched cables, G is tridiagonal; branching adds non-zero entries at branch points.</Back>
+  </FlashCard>
+
+  <H2>Morphology Reconstruction and Data Formats</H2>
+
+  <Body>Realistic multi-compartment models require accurate morphological data. Neuronal morphologies are typically obtained through histological staining and microscopic reconstruction or, increasingly, through automated imaging techniques. The standard file format for storing morphological reconstructions is SWC.</Body>
+
+  <H3>SWC Format</H3>
+
+  <Body>The SWC format represents neuronal morphology as a series of connected cylindrical segments. Each line contains:</Body>
+
+  <Code lang="plaintext">
+ID  TYPE  X  Y  Z  RADIUS  PARENT_ID
+
+Where TYPE codes are:
+1 = soma
+2 = axon
+3 = basal dendrite
+4 = apical dendrite
+  </Code>
+
+  <Body>The PARENT_ID field establishes connectivity, creating a tree structure rooted at the soma (which has PARENT_ID = -1). Major repositories like NeuroMorpho.org provide thousands of reconstructed morphologies in this format.</Body>
+
+  <Code lang="python">
+def parse_swc(filename):
+    """
+    Parse an SWC morphology file.
+
+    Returns:
+    --------
+    compartments : list of dicts
+        Each dict contains: id, type, x, y, z, radius, parent
+    """
+    compartments = []
+
+    with open(filename, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('#') or not line:
+                continue
+
+            parts = line.split()
+            comp = {
+                'id': int(parts[0]),
+                'type': int(parts[1]),
+                'x': float(parts[2]),
+                'y': float(parts[3]),
+                'z': float(parts[4]),
+                'radius': float(parts[5]),
+                'parent': int(parts[6])
+            }
+            compartments.append(comp)
+
+    return compartments
+
+def swc_to_coupling_matrix(compartments, R_a=150.0):
+    """
+    Convert SWC data to a coupling matrix.
+
+    Parameters:
+    -----------
+    compartments : list of dicts
+        Parsed SWC data
+    R_a : float
+        Axial resistivity in Ohm*cm
+
+    Returns:
+    --------
+    G : coupling matrix
+    lengths : compartment lengths
+    radii : compartment radii
+    """
+    import numpy as np
+    from scipy.sparse import lil_matrix, csr_matrix
+
+    N = len(compartments)
+    G = lil_matrix((N, N))
+
+    # Build parent-child relationships and compute conductances
+    for comp in compartments:
+        i = comp['id'] - 1  # Convert to 0-indexed
+        parent_id = comp['parent']
+
+        if parent_id == -1:  # Root node (soma)
+            continue
+
+        j = parent_id - 1  # Parent index (0-indexed)
+        parent = compartments[j]
+
+        # Compute distance between compartments
+        dx = comp['x'] - parent['x']
+        dy = comp['y'] - parent['y']
+        dz = comp['z'] - parent['z']
+        length = np.sqrt(dx**2 + dy**2 + dz**2) * 1e-4  # μm to cm
+
+        # Average radius for conductance calculation
+        r_avg = 0.5 * (comp['radius'] + parent['radius']) * 1e-4  # μm to cm
+
+        # Coupling conductance: G = π*r²/(R_a*L)
+        if length > 0:
+            g_ij = np.pi * r_avg**2 / (R_a * length)
+        else:
+            g_ij = 1e-6  # Small conductance for coincident points
+
+        # Fill coupling matrix
+        G[i, j] += g_ij
+        G[j, i] += g_ij
+        G[i, i] -= g_ij
+        G[j, j] -= g_ij
+
+    return csr_matrix(G)
+</Code>
+
+  <FlashCard id="fc4">
+    <Front>What information does each line of an SWC morphology file contain?</Front>
+    <Back>Each SWC line contains: ID (compartment number), TYPE (1=soma, 2=axon, 3=basal dendrite, 4=apical dendrite), X, Y, Z coordinates, RADIUS of the segment, and PARENT_ID (the connected parent compartment, or -1 for the root soma).</Back>
+  </FlashCard>
+
+  <H2>Sparse Matrix Methods</H2>
+
+  <Body>For realistic neurons with hundreds to thousands of compartments, the coupling matrix G is predominantly zeros. Direct matrix operations would waste computational resources and memory. Sparse matrix representations store only non-zero elements, enabling efficient computation.</Body>
+
+  <H3>Sparse Storage Formats</H3>
+
+  <Body>Common sparse matrix formats include:</Body>
+
+  <Body>1. **COO (Coordinate)**: Stores (row, col, value) triplets. Good for construction but inefficient for arithmetic.</Body>
+
+  <Body>2. **CSR (Compressed Sparse Row)**: Stores values row-by-row with index pointers. Excellent for matrix-vector products and row slicing.</Body>
+
+  <Body>3. **CSC (Compressed Sparse Column)**: Column-wise variant of CSR. Better for column operations and some solvers.</Body>
+
+  <Code lang="python">
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
+import numpy as np
+
+# Example: Create sparse matrix for 3-compartment cable
+# Compartments: 0 -- 1 -- 2
+g = 1.0  # Coupling conductance
+
+# COO format - good for construction
+row = [0, 0, 1, 1, 1, 2, 2]
+col = [0, 1, 0, 1, 2, 1, 2]
+data = [-g, g, g, -2*g, g, g, -g]
+G_coo = coo_matrix((data, (row, col)), shape=(3, 3))
+
+# Convert to CSR for efficient computation
+G_csr = csr_matrix(G_coo)
+
+# Matrix-vector product is O(nnz), not O(n²)
+V = np.array([0.0, -0.01, -0.02])
+I_coupling = G_csr @ V  # Efficient sparse matrix-vector product
+</Code>
+
+  <Body>For a neuron with N compartments, the coupling matrix has O(N) non-zero entries (since each compartment connects to only a few neighbors). This gives O(N) storage and O(N) matrix-vector multiplication, compared to O(N²) for dense matrices.</Body>
+
+  <FlashCard id="fc5">
+    <Front>Why is CSR (Compressed Sparse Row) format preferred for multi-compartment simulations?</Front>
+    <Back>CSR format is optimal for matrix-vector products, which dominate the computation in time-stepping. It stores values row-by-row with index pointers, enabling O(nnz) operations instead of O(N²). Since the coupling matrix has O(N) non-zeros, this gives linear scaling with compartment count.</Back>
+  </FlashCard>
+
+  <H2>Numerical Integration for Stiff Systems</H2>
+
+  <Body>Multi-compartment models with active conductances are typically stiff systems, meaning they contain both fast and slow timescales. The fast timescales arise from the coupling between compartments (especially with high coupling conductances), while slow timescales come from membrane time constants and channel kinetics.</Body>
+
+  <H3>Explicit vs. Implicit Methods</H3>
+
+  <Body>Explicit methods (like forward Euler or RK4) require very small time steps to remain stable for stiff systems, making them computationally expensive. Implicit methods (like backward Euler or Crank-Nicolson) are unconditionally stable, allowing larger time steps at the cost of solving a linear system each step.</Body>
+
+  <Code lang="python">
+from scipy.sparse import eye
+from scipy.sparse.linalg import spsolve
+
+def backward_euler_step(V, G, C_inv, I_ext, dt):
+    """
+    Single backward Euler step for compartmental model.
+
+    Solves: C dV/dt = G·V + I_ext
+    Using: (C - dt*G)·V_{n+1} = C·V_n + dt*I_ext
+
+    Parameters:
+    -----------
+    V : ndarray
+        Current voltage vector
+    G : sparse matrix
+        Coupling matrix
+    C_inv : sparse matrix
+        Inverse capacitance (diagonal)
+    I_ext : ndarray
+        External current vector
+    dt : float
+        Time step
+
+    Returns:
+    --------
+    V_new : ndarray
+        Voltage at next time step
+    """
+    N = len(V)
+    I = eye(N, format='csr')
+
+    # Form the system matrix: (I - dt*C_inv*G)
+    A = I - dt * C_inv @ G
+
+    # Right-hand side: V + dt*C_inv*I_ext
+    b = V + dt * C_inv @ I_ext
+
+    # Solve the sparse linear system
+    V_new = spsolve(A, b)
+
+    return V_new
+
+def simulate_compartmental_model(V0, G, C, I_func, T, dt):
+    """
+    Simulate a passive compartmental model.
+
+    Parameters:
+    -----------
+    V0 : ndarray
+        Initial voltage vector
+    G : sparse matrix
+        Coupling matrix
+    C : ndarray
+        Membrane capacitances
+    I_func : callable
+        Function I_func(t) returning external current vector
+    T : float
+        Total simulation time
+    dt : float
+        Time step
+
+    Returns:
+    --------
+    t : ndarray
+        Time points
+    V : ndarray
+        Voltage matrix (time x compartments)
+    """
+    from scipy.sparse import diags
+
+    N = len(V0)
+    n_steps = int(T / dt)
+
+    t = np.linspace(0, T, n_steps + 1)
+    V = np.zeros((n_steps + 1, N))
+    V[0] = V0
+
+    # Inverse capacitance matrix (diagonal)
+    C_inv = diags(1.0 / C, format='csr')
+
+    for i in range(n_steps):
+        I_ext = I_func(t[i])
+        V[i+1] = backward_euler_step(V[i], G, C_inv, I_ext, dt)
+
+    return t, V
+</Code>
+
+  <Body>For models with voltage-dependent conductances (active channels), the system becomes nonlinear. Common approaches include linearizing the conductances at each time step or using specialized methods like the Hines algorithm, which exploits the tree structure of neuronal morphologies for O(N) solution of the tridiagonal-like system.</Body>
+
+  <FlashCard id="fc6">
+    <Front>Why are implicit methods preferred over explicit methods for multi-compartment simulations?</Front>
+    <Back>Multi-compartment models are typically stiff (containing both fast and slow timescales). Explicit methods require extremely small time steps for stability, while implicit methods like backward Euler are unconditionally stable, allowing much larger time steps despite the overhead of solving a linear system each step.</Back>
+  </FlashCard>
+
+  <H2>Channel Distribution Across Compartments</H2>
+
+  <Body>Real neurons exhibit heterogeneous distributions of ion channels across their morphology. The soma, dendrites, and axon each have distinct channel compositions that support their specialized functions. Incorporating realistic channel distributions is essential for accurate simulations.</Body>
+
+  <H3>Regional Specialization</H3>
+
+  <Body>**Soma**: High density of Na+ and K+ channels for action potential initiation, Ca²+ channels for burst firing, and Ca²+-activated K+ channels for spike frequency adaptation.</Body>
+
+  <Body>**Axon Initial Segment (AIS)**: Highest density of Na+ channels in the neuron (up to 50x higher than soma), responsible for action potential initiation.</Body>
+
+  <Body>**Dendrites**: Lower Na+ channel density, prominent A-type K+ channels (dampening back-propagating APs), HCN channels (h-current), and various Ca²+ channels for dendritic electrogenesis.</Body>
+
+  <Body>**Axon**: Na+ and K+ channels for reliable AP propagation, with densities tuned to conduction velocity requirements.</Body>
+
+  <Code lang="python">
+def distribute_channels(compartments, channel_params):
+    """
+    Assign channel densities based on compartment type.
+
+    Parameters:
+    -----------
+    compartments : list of dicts
+        SWC-parsed compartment data
+    channel_params : dict
+        Channel densities by type:
+        {'soma': {'gNa': 120, 'gK': 36, 'gL': 0.3},
+         'axon': {'gNa': 200, 'gK': 50, 'gL': 0.3},
+         'basal': {'gNa': 20, 'gK': 10, 'gL': 0.3},
+         'apical': {'gNa': 15, 'gK': 8, 'gL': 0.3}}
+
+    Returns:
+    --------
+    channel_densities : list of dicts
+        Channel densities for each compartment
+    """
+    type_map = {1: 'soma', 2: 'axon', 3: 'basal', 4: 'apical'}
+
+    channel_densities = []
+    for comp in compartments:
+        comp_type = type_map.get(comp['type'], 'basal')  # Default to basal
+        densities = channel_params.get(comp_type, channel_params['basal'])
+        channel_densities.append(densities.copy())
+
+    return channel_densities
+
+# Example: Compare uniform vs. realistic distributions
+uniform_params = {
+    'soma': {'gNa': 50, 'gK': 20, 'gL': 0.3},
+    'axon': {'gNa': 50, 'gK': 20, 'gL': 0.3},
+    'basal': {'gNa': 50, 'gK': 20, 'gL': 0.3},
+    'apical': {'gNa': 50, 'gK': 20, 'gL': 0.3}
+}
+
+realistic_params = {
+    'soma': {'gNa': 100, 'gK': 40, 'gL': 0.3},
+    'axon': {'gNa': 200, 'gK': 60, 'gL': 0.3},  # High Na for AP initiation
+    'basal': {'gNa': 20, 'gK': 15, 'gL': 0.3},  # Lower in dendrites
+    'apical': {'gNa': 15, 'gK': 10, 'gL': 0.3}  # Lowest in distal apical
+}
+</Code>
+
+  <FlashCard id="fc7">
+    <Front>Which neuronal region typically has the highest density of voltage-gated Na+ channels, and why?</Front>
+    <Back>The axon initial segment (AIS) has the highest Na+ channel density (up to 50x higher than soma). This ensures reliable action potential initiation at the AIS and subsequent propagation down the axon, while preventing dendritic spikes from inappropriately triggering somatic APs.</Back>
+  </FlashCard>
+
+  <H2>Simulation Tools and Software</H2>
+
+  <Body>Several sophisticated software tools are available for multi-compartment modeling:</Body>
+
+  <Body>**NEURON**: The most widely used tool, developed by Michael Hines and colleagues. Features a domain-specific language (hoc) and Python interface. Highly optimized for realistic simulations.</Body>
+
+  <Body>**Brian2**: Python-based simulator with flexible equation specification. Good for custom models but may be slower for large morphologies.</Body>
+
+  <Body>**Arbor**: Modern C++ library with Python bindings, designed for high-performance computing and GPU acceleration. Excellent for large-scale network simulations.</Body>
+
+  <Body>**GENESIS**: Classic simulator with detailed biophysical modeling capabilities, though less actively developed than NEURON.</Body>
+
+  <Code lang="python">
+# Example: Simple NEURON simulation setup (pseudocode/outline)
+"""
+from neuron import h
+
+# Load morphology
+h.load_file('cell.hoc')  # or use Import3d for SWC files
+
+# Access sections
+soma = h.soma
+dendrite = h.dend[0]
+axon = h.axon
+
+# Insert channels
+soma.insert('hh')  # Hodgkin-Huxley channels
+soma.gnabar_hh = 0.12
+soma.gkbar_hh = 0.036
+soma.gl_hh = 0.0003
+
+# Stimulus
+stim = h.IClamp(soma(0.5))
+stim.delay = 10
+stim.dur = 50
+stim.amp = 0.5  # nA
+
+# Recording
+v_vec = h.Vector()
+t_vec = h.Vector()
+v_vec.record(soma(0.5)._ref_v)
+t_vec.record(h._ref_t)
+
+# Run simulation
+h.finitialize(-65)
+h.continuerun(100)
+"""
+</Code>
+
+  <H2>Putting It All Together: Complete Example</H2>
+
+  <Body>Let's construct a simple 5-compartment model representing a minimal neuron with soma, two dendritic branches, and an axon.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.sparse import lil_matrix, csr_matrix, diags
+from scipy.sparse.linalg import spsolve
+import matplotlib.pyplot as plt
+
+class SimpleCompartmentalModel:
+    """
+    A 5-compartment model: soma (0), proximal dendrite (1),
+    two distal dendrites (2, 3), and axon (4).
+
+    Morphology:
+        dend2 (2)
+             \
+              prox_dend (1) -- soma (0) -- axon (4)
+             /
+        dend3 (3)
+    """
+
+    def __init__(self, params=None):
+        self.N = 5
+
+        # Default parameters (in consistent units)
+        self.params = params or {
+            'C_m': 1.0,      # μF/cm²
+            'g_L': 0.3,      # mS/cm²
+            'E_L': -65.0,    # mV
+            'R_a': 150.0,    # Ω·cm
+        }
+
+        # Compartment properties: [soma, prox_dend, dend2, dend3, axon]
+        self.lengths = np.array([20, 100, 150, 150, 200]) * 1e-4  # μm to cm
+        self.radii = np.array([10, 2, 1.5, 1.5, 1]) * 1e-4  # μm to cm
+
+        # Compute membrane areas and capacitances
+        self.areas = 2 * np.pi * self.radii * self.lengths  # cm²
+        self.capacitances = self.params['C_m'] * self.areas  # μF
+
+        # Build coupling matrix
+        self.G = self._build_coupling_matrix()
+
+        # Build leak conductance matrix
+        self.G_leak = diags(self.params['g_L'] * self.areas, format='csr')
+
+    def _build_coupling_matrix(self):
+        """Build the coupling matrix from morphology."""
+        G = lil_matrix((self.N, self.N))
+        R_a = self.params['R_a']
+
+        # Connections: (i, j) pairs
+        connections = [(0, 1), (1, 2), (1, 3), (0, 4)]  # soma-prox, prox-dend2, prox-dend3, soma-axon
+
+        for i, j in connections:
+            # Average radius and half-lengths for coupling
+            r_avg = 0.5 * (self.radii[i] + self.radii[j])
+            L_ij = 0.5 * (self.lengths[i] + self.lengths[j])
+
+            # Coupling conductance
+            g_ij = np.pi * r_avg**2 / (R_a * L_ij)
+
+            # Fill matrix
+            G[i, j] += g_ij
+            G[j, i] += g_ij
+            G[i, i] -= g_ij
+            G[j, j] -= g_ij
+
+        return csr_matrix(G)
+
+    def simulate(self, T=100, dt=0.025, I_inj=None):
+        """
+        Simulate the passive model.
+
+        Parameters:
+        -----------
+        T : float
+            Simulation time (ms)
+        dt : float
+            Time step (ms)
+        I_inj : dict
+            Injection current: {'compartment': idx, 'onset': t, 'duration': d, 'amplitude': a}
+        """
+        n_steps = int(T / dt)
+        t = np.linspace(0, T, n_steps + 1)
+        V = np.zeros((n_steps + 1, self.N))
+        V[0] = self.params['E_L']  # Initialize at rest
+
+        C_inv = diags(1.0 / self.capacitances, format='csr')
+        E_L = self.params['E_L']
+
+        for i in range(n_steps):
+            # External current
+            I_ext = np.zeros(self.N)
+            if I_inj is not None:
+                if I_inj['onset'] &lt;= t[i] &lt; I_inj['onset'] + I_inj['duration']:
+                    I_ext[I_inj['compartment']] = I_inj['amplitude'] * 1e-3  # nA to μA
+
+            # Leak current: I_L = g_L * A * (V - E_L)
+            I_leak = -self.G_leak @ (V[i] - E_L)
+
+            # Total current
+            I_total = I_leak + I_ext
+
+            # Backward Euler step
+            A = diags(self.capacitances, format='csr') - dt * self.G
+            b = self.capacitances * V[i] + dt * I_total
+            V[i+1] = spsolve(A, b)
+
+        return t, V
+
+# Example usage
+model = SimpleCompartmentalModel()
+
+# Inject current into soma
+I_inj = {'compartment': 0, 'onset': 20, 'duration': 30, 'amplitude': 0.5}  # nA
+t, V = model.simulate(T=100, dt=0.025, I_inj=I_inj)
+
+# Plot results
+compartment_names = ['Soma', 'Prox. Dend', 'Dist. Dend 1', 'Dist. Dend 2', 'Axon']
+# plt.figure(figsize=(10, 6))
+# for i in range(5):
+#     plt.plot(t, V[:, i], label=compartment_names[i])
+# plt.xlabel('Time (ms)')
+# plt.ylabel('Membrane Potential (mV)')
+# plt.legend()
+# plt.title('Multi-Compartment Model Response to Somatic Current Injection')
+# plt.show()
+</Code>
+
+  <H2>Summary</H2>
+
+  <Body>Multi-compartment models provide a powerful framework for simulating neurons with realistic morphology. The key concepts include:</Body>
+
+  <Body>1. **Spatial discretization**: Converting the continuous cable equation into coupled ODEs by dividing the neuron into isopotential compartments (Δx &lt;&lt; λ).</Body>
+
+  <Body>2. **Coupling matrix**: A sparse, symmetric matrix with graph Laplacian structure encoding morphological connectivity.</Body>
+
+  <Body>3. **Morphology reconstruction**: Using standardized formats (SWC) and databases (NeuroMorpho.org) for realistic neuronal shapes.</Body>
+
+  <Body>4. **Sparse methods**: Essential for computational efficiency, reducing storage and computation from O(N²) to O(N).</Body>
+
+  <Body>5. **Implicit integration**: Necessary for stable simulation of stiff systems with multiple timescales.</Body>
+
+  <Body>6. **Channel distributions**: Incorporating region-specific ion channel densities for biologically accurate behavior.</Body>
+
+  <H1>Knowledge Assessment</H1>
+
+  <H2>Key Concept Review</H2>
+
+  <SingleSelect id="q1">
+    <Prompt>In a multi-compartment model, what determines the maximum allowable compartment length Δx?</Prompt>
+    <Options>
+      <Option correct="true">The electrotonic length constant λ (require Δx &lt;&lt; λ)</Option>
+      <Option>The membrane time constant τ_m</Option>
+      <Option>The total length of the dendrite</Option>
+      <Option>The number of ion channels in the compartment</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>Which property of the coupling matrix G ensures current conservation in the compartmental model?</Prompt>
+    <Options>
+      <Option>G is positive definite</Option>
+      <Option correct="true">Each row of G sums to zero (graph Laplacian structure)</Option>
+      <Option>G is diagonal</Option>
+      <Option>G is upper triangular</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>For a neuron with N compartments, what is the computational complexity of a matrix-vector product using sparse matrix representation?</Prompt>
+    <Options>
+      <Option>O(N³)</Option>
+      <Option>O(N²)</Option>
+      <Option correct="true">O(N)</Option>
+      <Option>O(log N)</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following are valid reasons to use implicit integration methods (like backward Euler) for multi-compartment simulations? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The system is stiff due to fast coupling timescales</Option>
+      <Option correct="true">Implicit methods allow larger time steps while maintaining stability</Option>
+      <Option>Implicit methods are always faster than explicit methods</Option>
+      <Option correct="true">Active conductances create additional stiffness requiring stable integration</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5">
+    <Prompt>Which statements about ion channel distributions in real neurons are correct? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The axon initial segment has the highest Na+ channel density</Option>
+      <Option>Dendrites typically have higher Na+ density than the soma</Option>
+      <Option correct="true">HCN channels (h-current) are prominent in dendrites</Option>
+      <Option correct="true">Channel distributions vary between soma, dendrites, and axon</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6">
+    <Prompt>Order the following compartment types from HIGHEST to LOWEST typical Na+ channel density:</Prompt>
+    <SortedItems>
+      <Item>Axon initial segment (AIS)</Item>
+      <Item>Soma</Item>
+      <Item>Proximal dendrite</Item>
+      <Item>Distal apical dendrite</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <SortQuiz id="q7">
+    <Prompt>Order the steps for building a multi-compartment simulation from morphological data:</Prompt>
+    <SortedItems>
+      <Item>Parse SWC file to extract compartment coordinates and connectivity</Item>
+      <Item>Compute coupling conductances from geometry and axial resistivity</Item>
+      <Item>Construct sparse coupling matrix G</Item>
+      <Item>Assign channel densities to compartments based on type</Item>
+      <Item>Integrate the coupled ODEs using implicit method</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q8">
+    <Prompt>Match each component of the compartmental model equation to its physical meaning:</Prompt>
+    <Pairs>
+      <Pair><Left>C_i dV_i/dt</Left><Right>Capacitive current (membrane charging)</Right></Pair>
+      <Pair><Left>G_ij(V_j - V_i)</Left><Right>Axial current from neighboring compartment</Right></Pair>
+      <Pair><Left>I_ion,i</Left><Right>Voltage-dependent ionic currents</Right></Pair>
+      <Pair><Left>I_syn,i</Left><Right>Synaptic input current</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Extracellular potential</Distractor>
+      <Distractor>Temperature coefficient</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q9">
+    <Prompt>Match each sparse matrix format to its primary advantage:</Prompt>
+    <Pairs>
+      <Pair><Left>COO (Coordinate)</Left><Right>Efficient for incremental matrix construction</Right></Pair>
+      <Pair><Left>CSR (Compressed Sparse Row)</Left><Right>Optimal for matrix-vector products</Right></Pair>
+      <Pair><Left>CSC (Compressed Sparse Column)</Left><Right>Efficient for column-oriented operations</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Supports negative indices</Distractor>
+      <Distractor>Enables parallel decomposition</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q10">
+    <Prompt>
+      In the SWC morphology format, compartment type code 1 represents the <Blank>soma</Blank>,
+      type code 2 represents the <Blank>axon</Blank>, and a compartment with PARENT_ID = -1
+      indicates the <Blank>root</Blank> of the morphological tree.
+    </Prompt>
+    <Distractors>
+      <Distractor>dendrite</Distractor>
+      <Distractor>synapse</Distractor>
+      <Distractor>branch</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q11">
+    <Prompt>
+      The coupling conductance between compartments is computed as G_ij = π·r²/(<Blank>R_a</Blank>·L),
+      where r is the segment radius, L is the distance between compartment centers, and the denominator
+      includes the <Blank>axial</Blank> resistivity of the cytoplasm.
+    </Prompt>
+    <Distractors>
+      <Distractor>membrane</Distractor>
+      <Distractor>capacitance</Distractor>
+      <Distractor>R_m</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q12">
+    <Prompt>Explain why sparse matrix methods are essential for simulating realistic multi-compartment neuron models. In your answer, discuss (1) the structure of the coupling matrix, (2) the computational benefits, and (3) what would happen without sparse methods for a neuron with 1000 compartments.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that the coupling matrix has O(N) non-zero entries due to local connectivity (each compartment connects to few neighbors)</Requirement>
+        <Indicators>sparse, few neighbors, local, O(N) non-zeros, connectivity pattern</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies computational benefits: O(N) storage and O(N) matrix-vector operations instead of O(N²)</Requirement>
+        <Indicators>O(N), linear, storage, matrix-vector, efficiency, complexity</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides concrete example for 1000 compartments (e.g., 1000 vs 1,000,000 operations/entries)</Requirement>
+        <Indicators>1000, million, 10^6, concrete, example, comparison</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions that without sparse methods, large models would be computationally prohibitive or impractical</Requirement>
+        <Indicators>prohibitive, impractical, memory, infeasible, bottleneck</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="250" />
+  </Subjective>
+
+  <Subjective id="q13">
+    <Prompt>A researcher simulates a pyramidal neuron but obtains unrealistic results: action potentials initiate in the distal dendrites rather than at the axon initial segment. What is the most likely cause, and how would you fix the model?</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Identifies incorrect channel distribution as the likely cause (uniform Na+ density or too high dendritic Na+ density)</Requirement>
+        <Indicators>channel distribution, Na+ density, uniform, dendritic, distribution</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Proposes increasing AIS Na+ density and/or decreasing dendritic Na+ density to fix the problem</Requirement>
+        <Indicators>increase AIS, decrease dendritic, realistic distribution, heterogeneous</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains the biological rationale: AIS should have highest Na+ density for proper AP initiation</Requirement>
+        <Indicators>initiation site, AIS, biological, realistic, threshold</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>May mention checking compartment discretization or other potential issues</Requirement>
+        <Indicators>discretization, Δx, compartment size, other checks</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="40" maxWords="200" />
+  </Subjective>
+
+</Lesson>

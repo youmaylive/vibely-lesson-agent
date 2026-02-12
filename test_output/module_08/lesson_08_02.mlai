@@ -1,0 +1,1019 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-08-02</Id>
+    <Title>Bayesian Inference with Jeffreys Priors</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>Bayesian inference</Tag>
+      <Tag>Jeffreys prior</Tag>
+      <Tag>Fisher information</Tag>
+      <Tag>MCMC</Tag>
+      <Tag>posterior distribution</Tag>
+      <Tag>credible intervals</Tag>
+      <Tag>computational neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Bayesian Inference with Jeffreys Priors</H1>
+
+  <Body>In the previous lesson, we explored Maximum Likelihood Estimation (MLE), which provides point estimates of parameters by maximizing the likelihood function. While MLE is powerful, it gives us only a single "best guess" without quantifying our uncertainty about parameter values. Bayesian inference addresses this limitation by providing full posterior distributions over parameters, naturally incorporating prior knowledge and yielding principled uncertainty quantification.</Body>
+
+  <Body>This lesson develops the Bayesian framework for parameter estimation in computational neuroscience, with particular emphasis on Jeffreys priors—non-informative priors derived from Fisher information that possess remarkable invariance properties under reparameterization.</Body>
+
+  <H2>Bayes' Theorem: The Foundation of Bayesian Inference</H2>
+
+  <Body>Bayes' theorem provides the mathematical foundation for updating our beliefs about parameters θ given observed data D. The theorem states:</Body>
+
+  <Code lang="plaintext">
+P(θ|D) = P(D|θ) · P(θ) / P(D)
+
+Where:
+- P(θ|D) is the posterior distribution (what we want)
+- P(D|θ) is the likelihood (from our probabilistic model)
+- P(θ) is the prior distribution (our initial beliefs)
+- P(D) is the marginal likelihood or evidence (normalizing constant)
+  </Code>
+
+  <Body>Since P(D) is constant with respect to θ, we often write the unnormalized form:</Body>
+
+  <Code lang="plaintext">
+P(θ|D) ∝ P(D|θ) · P(θ)
+
+posterior ∝ likelihood × prior
+  </Code>
+
+  <Body>This proportionality relationship is the workhorse of Bayesian computation. The posterior combines information from both the data (through the likelihood) and our prior knowledge or assumptions (through the prior).</Body>
+
+  <FlashCard id="fc1">
+    <Front>What does Bayes' theorem compute in parameter estimation?</Front>
+    <Back>Bayes' theorem computes the posterior distribution P(θ|D), which represents our updated beliefs about parameter θ after observing data D. It combines the likelihood P(D|θ) with the prior P(θ).</Back>
+  </FlashCard>
+
+  <H2>Prior Distributions: Encoding Prior Knowledge</H2>
+
+  <Body>The prior distribution P(θ) encodes our beliefs about parameters before observing data. Priors can be categorized along several dimensions:</Body>
+
+  <Body>Informative vs. Non-informative: Informative priors incorporate substantial prior knowledge (e.g., physiological constraints on membrane time constants). Non-informative priors attempt to "let the data speak" by minimizing the influence of the prior.</Body>
+
+  <Body>Conjugate Priors: A prior is conjugate to a likelihood if the posterior belongs to the same distributional family as the prior. This enables closed-form posterior computation:</Body>
+
+  <Code lang="plaintext">
+Common conjugate pairs:
+- Binomial likelihood + Beta prior → Beta posterior
+- Poisson likelihood + Gamma prior → Gamma posterior
+- Gaussian likelihood (known σ²) + Gaussian prior → Gaussian posterior
+- Gaussian likelihood (known μ) + Inverse-Gamma prior on σ² → Inverse-Gamma posterior
+  </Code>
+
+  <Body>The Problem with "Flat" Priors: A seemingly natural choice for a non-informative prior is the flat (uniform) prior P(θ) = constant. However, flat priors are not invariant under reparameterization. If θ has a flat prior, then φ = g(θ) for some nonlinear function g does not have a flat prior:</Body>
+
+  <Code lang="python">
+# Example: If θ has a flat prior and φ = log(θ)
+# Then by change of variables:
+# P(φ) = P(θ) |dθ/dφ| = constant × exp(φ) ≠ constant
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Flat prior on θ ∈ [1, 10]
+theta = np.linspace(1, 10, 1000)
+p_theta = np.ones_like(theta) / 9  # Uniform
+
+# Transformed variable φ = log(θ)
+phi = np.log(theta)
+p_phi = p_theta * theta  # Jacobian |dθ/dφ| = exp(φ) = θ
+
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+plt.plot(theta, p_theta)
+plt.title('Flat prior on θ')
+plt.xlabel('θ')
+
+plt.subplot(1, 2, 2)
+plt.plot(phi, p_phi / np.trapezoid(p_phi, phi))
+plt.title('Induced prior on φ = log(θ)')
+plt.xlabel('φ')
+  </Code>
+
+  <FlashCard id="fc2">
+    <Front>Why are flat priors problematic for objective Bayesian inference?</Front>
+    <Back>Flat priors are not reparameterization invariant. A uniform prior on θ does not yield a uniform prior on φ = g(θ) for nonlinear g. This means conclusions depend on the arbitrary choice of parameterization rather than the data alone.</Back>
+  </FlashCard>
+
+  <H2>Jeffreys Prior: Reparameterization Invariance from Fisher Information</H2>
+
+  <Body>Harold Jeffreys proposed a principled non-informative prior that is invariant under smooth reparameterizations. The Jeffreys prior is defined using the Fisher information matrix:</Body>
+
+  <Code lang="plaintext">
+Jeffreys Prior:
+P(θ) ∝ √det(I(θ))
+
+Where I(θ) is the Fisher information matrix:
+I(θ)ᵢⱼ = E[-∂²log P(D|θ)/∂θᵢ∂θⱼ]
+  </Code>
+
+  <Body>Why Jeffreys Prior is Reparameterization Invariant:</Body>
+
+  <Body>Consider a reparameterization φ = g(θ). Under change of variables, the prior transforms as:</Body>
+
+  <Code lang="plaintext">
+P(φ) = P(θ) |det(∂θ/∂φ)|
+
+The Fisher information transforms as:
+I(φ) = (∂θ/∂φ)ᵀ I(θ) (∂θ/∂φ)
+
+Therefore:
+√det(I(φ)) = √det(I(θ)) · |det(∂θ/∂φ)|
+
+The Jacobian |det(∂θ/∂φ)| appears in both the prior transformation
+and the Fisher information transformation, ensuring:
+
+P(φ) ∝ √det(I(φ))
+
+The Jeffreys prior in the new parameterization has the same functional form!
+  </Code>
+
+  <Body>This invariance property makes Jeffreys priors the canonical choice for objective Bayesian analysis when prior information is genuinely absent.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is the Jeffreys prior formula and what property makes it special?</Front>
+    <Back>The Jeffreys prior is P(θ) ∝ √det(I(θ)), where I(θ) is the Fisher information matrix. Its special property is reparameterization invariance: the prior maintains the same functional form under any smooth change of variables.</Back>
+  </FlashCard>
+
+  <H3>Example: Jeffreys Prior for Gaussian Parameters</H3>
+
+  <Body>Let's derive the Jeffreys prior for a Gaussian distribution with unknown mean μ and variance σ².</Body>
+
+  <Code lang="python">
+"""
+Derivation of Jeffreys prior for Gaussian(μ, σ²)
+
+Log-likelihood for n observations:
+ℓ(μ, σ²) = -n/2 log(2πσ²) - 1/(2σ²) Σᵢ(xᵢ - μ)²
+
+Fisher information matrix (parameterized by μ, σ²):
+I(μ, σ²) = [[n/σ²,      0      ],
+            [0,    n/(2σ⁴)]]
+
+Determinant:
+det(I) = n²/(2σ⁶)
+
+Jeffreys prior:
+P(μ, σ²) ∝ √(n²/(2σ⁶)) ∝ 1/σ³
+
+If we parameterize by (μ, σ) instead:
+Using Jacobian transformation, I(μ,σ) changes, but:
+P(μ, σ) ∝ 1/σ² (Jeffreys prior in σ parameterization)
+
+Both yield the same posterior inference!
+"""
+
+import numpy as np
+from scipy import stats
+
+def jeffreys_prior_gaussian_variance(sigma_sq):
+    """Jeffreys prior for Gaussian variance parameter."""
+    return 1 / (sigma_sq ** 1.5)
+
+def jeffreys_prior_gaussian_std(sigma):
+    """Jeffreys prior for Gaussian standard deviation parameter."""
+    return 1 / (sigma ** 2)
+
+# Verify: these are related by the Jacobian
+sigma_values = np.linspace(0.5, 3, 100)
+sigma_sq_values = sigma_values ** 2
+
+# P(σ²) and P(σ) should give same inference
+# P(σ) = P(σ²) × |dσ²/dσ| = P(σ²) × 2σ
+p_sigma_sq = jeffreys_prior_gaussian_variance(sigma_sq_values)
+p_sigma_from_transformation = p_sigma_sq * 2 * sigma_values
+p_sigma_direct = jeffreys_prior_gaussian_std(sigma_values)
+
+# These should be proportional (they are!)
+print("Ratio (should be constant):", p_sigma_from_transformation / p_sigma_direct)
+  </Code>
+
+  <SingleSelect id="q1">
+    <Prompt>What is the Jeffreys prior for the variance σ² of a Gaussian distribution?</Prompt>
+    <Options>
+      <Option>P(σ²) ∝ 1</Option>
+      <Option>P(σ²) ∝ 1/σ²</Option>
+      <Option correct="true">P(σ²) ∝ 1/σ³</Option>
+      <Option>P(σ²) ∝ σ²</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Posterior Distribution and Point Estimates</H2>
+
+  <Body>Once we have the posterior distribution P(θ|D), we can extract various point estimates and intervals:</Body>
+
+  <Body>Posterior Mean: θ̂_mean = E[θ|D] = ∫ θ · P(θ|D) dθ. The posterior mean minimizes expected squared error loss and is optimal under quadratic loss.</Body>
+
+  <Body>Posterior Mode (MAP estimate): θ̂_MAP = argmax_θ P(θ|D). The Maximum A Posteriori estimate is the most probable value under the posterior. It minimizes 0-1 loss and is computationally convenient as it requires only optimization, not integration.</Body>
+
+  <Body>Posterior Median: The value θ̂_med such that P(θ &lt; θ̂_med|D) = 0.5. The posterior median minimizes expected absolute error loss and is robust to skewed posteriors.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import stats
+from scipy.optimize import minimize_scalar
+
+def bayesian_inference_gaussian_mean(data, prior_mean, prior_var, likelihood_var):
+    """
+    Conjugate Bayesian inference for Gaussian mean with known variance.
+
+    Prior: μ ~ N(prior_mean, prior_var)
+    Likelihood: xᵢ|μ ~ N(μ, likelihood_var)
+
+    Returns posterior parameters and point estimates.
+    """
+    n = len(data)
+    x_bar = np.mean(data)
+
+    # Posterior precision = prior precision + data precision
+    prior_precision = 1 / prior_var
+    data_precision = n / likelihood_var
+    posterior_precision = prior_precision + data_precision
+    posterior_var = 1 / posterior_precision
+
+    # Posterior mean = precision-weighted average
+    posterior_mean = posterior_var * (prior_precision * prior_mean +
+                                       data_precision * x_bar)
+
+    return {
+        'posterior_mean': posterior_mean,  # Also the MAP for Gaussian
+        'posterior_var': posterior_var,
+        'posterior_std': np.sqrt(posterior_var),
+        # For symmetric distributions, mean = median = mode
+        'posterior_median': posterior_mean,
+        'posterior_mode': posterior_mean
+    }
+
+# Example: Inferring membrane potential from noisy measurements
+np.random.seed(42)
+true_potential = -65  # mV
+measurement_noise = 5  # mV standard deviation
+
+# Prior: typical resting potential is around -70 mV
+prior_mean = -70
+prior_std = 10
+
+# Simulate 10 measurements
+data = np.random.normal(true_potential, measurement_noise, size=10)
+
+result = bayesian_inference_gaussian_mean(
+    data, prior_mean, prior_std**2, measurement_noise**2
+)
+
+print(f"Data mean: {np.mean(data):.2f} mV")
+print(f"Prior mean: {prior_mean} mV")
+print(f"Posterior mean: {result['posterior_mean']:.2f} mV")
+print(f"Posterior std: {result['posterior_std']:.2f} mV")
+print(f"True value: {true_potential} mV")
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>What loss function does each Bayesian point estimate minimize?</Front>
+    <Back>Posterior mean minimizes squared error (quadratic) loss. Posterior mode (MAP) minimizes 0-1 loss. Posterior median minimizes absolute error loss. The choice of point estimate should match the relevant loss function for your application.</Back>
+  </FlashCard>
+
+  <H2>Credible Intervals: Bayesian Uncertainty Quantification</H2>
+
+  <Body>Credible intervals are the Bayesian analogue of confidence intervals, but with a fundamentally different interpretation:</Body>
+
+  <Code lang="plaintext">
+Frequentist 95% Confidence Interval:
+"If we repeated this experiment many times, 95% of the computed intervals
+would contain the true parameter value."
+(The parameter is fixed; the interval is random)
+
+Bayesian 95% Credible Interval:
+"Given the observed data, there is a 95% probability that the parameter
+lies within this interval."
+(The data is fixed; the parameter is random)
+  </Code>
+
+  <Body>There are two main types of credible intervals:</Body>
+
+  <Body>Equal-tailed Credible Interval: Contains equal probability (e.g., 2.5%) in each tail.</Body>
+
+  <Body>Highest Posterior Density (HPD) Interval: The shortest interval containing the specified probability. Every point inside the HPD has higher posterior density than every point outside.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import stats
+from scipy.optimize import brentq
+
+def equal_tailed_interval(samples, alpha=0.05):
+    """
+    Compute equal-tailed credible interval from posterior samples.
+    """
+    lower = np.percentile(samples, 100 * alpha / 2)
+    upper = np.percentile(samples, 100 * (1 - alpha / 2))
+    return lower, upper
+
+def hpd_interval(samples, alpha=0.05):
+    """
+    Compute Highest Posterior Density interval from posterior samples.
+    Uses the shortest interval approach.
+    """
+    samples_sorted = np.sort(samples)
+    n = len(samples)
+    n_included = int(np.ceil((1 - alpha) * n))
+
+    # Find the shortest interval containing n_included samples
+    interval_widths = samples_sorted[n_included:] - samples_sorted[:-n_included]
+    min_idx = np.argmin(interval_widths)
+
+    return samples_sorted[min_idx], samples_sorted[min_idx + n_included - 1]
+
+# Example with skewed posterior (e.g., variance parameter)
+np.random.seed(42)
+# Posterior samples for a variance parameter (Inverse-Gamma-like)
+posterior_samples = stats.invgamma.rvs(a=5, scale=2, size=10000)
+
+et_lower, et_upper = equal_tailed_interval(posterior_samples)
+hpd_lower, hpd_upper = hpd_interval(posterior_samples)
+
+print(f"Equal-tailed 95% CI: [{et_lower:.3f}, {et_upper:.3f}]")
+print(f"Width: {et_upper - et_lower:.3f}")
+print(f"\nHPD 95% CI: [{hpd_lower:.3f}, {hpd_upper:.3f}]")
+print(f"Width: {hpd_upper - hpd_lower:.3f}")
+print(f"\nHPD is shorter by: {(et_upper - et_lower) - (hpd_upper - hpd_lower):.3f}")
+  </Code>
+
+  <MultiSelect id="q2">
+    <Prompt>Which statements correctly describe the difference between Bayesian credible intervals and frequentist confidence intervals? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">A 95% credible interval means there is 95% posterior probability that θ lies in the interval</Option>
+      <Option>Credible intervals and confidence intervals always give identical numerical values</Option>
+      <Option correct="true">Credible intervals treat the parameter as random, while confidence intervals treat the interval as random</Option>
+      <Option correct="true">HPD intervals are always the shortest credible intervals for a given probability</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Markov Chain Monte Carlo (MCMC) Methods</H2>
+
+  <Body>For most realistic models, the posterior distribution cannot be computed analytically. MCMC methods generate samples from the posterior by constructing a Markov chain whose stationary distribution is the target posterior.</Body>
+
+  <H3>Metropolis-Hastings Algorithm</H3>
+
+  <Body>The Metropolis-Hastings algorithm is the foundational MCMC method:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def metropolis_hastings(log_posterior, initial_theta, proposal_std, n_samples, burnin=1000):
+    """
+    Metropolis-Hastings sampler for posterior inference.
+
+    Parameters:
+    -----------
+    log_posterior : callable
+        Function computing log P(θ|D) up to a constant
+    initial_theta : ndarray
+        Starting parameter values
+    proposal_std : ndarray
+        Standard deviation for Gaussian proposal distribution
+    n_samples : int
+        Number of samples to generate
+    burnin : int
+        Number of initial samples to discard
+
+    Returns:
+    --------
+    samples : ndarray
+        Posterior samples after burn-in
+    acceptance_rate : float
+        Fraction of proposals accepted
+    """
+    theta = np.array(initial_theta, dtype=float)
+    n_params = len(theta)
+    samples = np.zeros((n_samples + burnin, n_params))
+    n_accepted = 0
+
+    current_log_p = log_posterior(theta)
+
+    for i in range(n_samples + burnin):
+        # Propose new state (symmetric Gaussian proposal)
+        theta_proposed = theta + np.random.normal(0, proposal_std)
+        proposed_log_p = log_posterior(theta_proposed)
+
+        # Compute acceptance ratio (in log space for numerical stability)
+        log_alpha = proposed_log_p - current_log_p
+
+        # Accept or reject
+        if np.log(np.random.random()) &lt; log_alpha:
+            theta = theta_proposed
+            current_log_p = proposed_log_p
+            n_accepted += 1
+
+        samples[i] = theta
+
+    acceptance_rate = n_accepted / (n_samples + burnin)
+    return samples[burnin:], acceptance_rate
+
+
+# Example: Bayesian inference for IF neuron time constant
+def if_neuron_log_likelihood(theta, voltage_data, dt, I_ext):
+    """
+    Log-likelihood for leaky integrate-and-fire neuron.
+    θ = [τ_m, V_rest, R_m, σ_noise]
+    """
+    tau_m, V_rest, R_m, sigma = theta
+
+    # Ensure parameters are positive
+    if tau_m &lt;= 0 or R_m &lt;= 0 or sigma &lt;= 0:
+        return -np.inf
+
+    # Predicted voltage dynamics: dV/dt = (V_rest - V + R_m * I)/τ_m
+    n_points = len(voltage_data)
+    V_pred = np.zeros(n_points)
+    V_pred[0] = voltage_data[0]
+
+    for t in range(1, n_points):
+        dV = (V_rest - V_pred[t-1] + R_m * I_ext) / tau_m * dt
+        V_pred[t] = V_pred[t-1] + dV
+
+    # Gaussian observation noise
+    residuals = voltage_data - V_pred
+    log_likelihood = -0.5 * np.sum((residuals / sigma)**2) - n_points * np.log(sigma)
+
+    return log_likelihood
+
+def if_neuron_log_prior(theta):
+    """Jeffreys-inspired prior for IF neuron parameters."""
+    tau_m, V_rest, R_m, sigma = theta
+
+    # Bounds check
+    if tau_m &lt; 1 or tau_m &gt; 100:  # ms
+        return -np.inf
+    if V_rest &lt; -90 or V_rest &gt; -40:  # mV
+        return -np.inf
+    if R_m &lt; 1 or R_m &gt; 1000:  # MΩ
+        return -np.inf
+    if sigma &lt; 0.01 or sigma &gt; 10:  # mV
+        return -np.inf
+
+    # Jeffreys-like prior: 1/σ for scale parameters
+    log_prior = -np.log(tau_m) - np.log(R_m) - np.log(sigma)
+    return log_prior
+
+def if_neuron_log_posterior(theta, voltage_data, dt, I_ext):
+    """Combined log-posterior."""
+    return if_neuron_log_likelihood(theta, voltage_data, dt, I_ext) + if_neuron_log_prior(theta)
+  </Code>
+
+  <H3>MCMC Diagnostics: Ensuring Convergence</H3>
+
+  <Body>MCMC samples are only valid if the chain has converged to the stationary distribution. Key diagnostics include:</Body>
+
+  <Body>Trace Plots: Visual inspection of parameter values over iterations. A converged chain should look like "white noise" around the posterior mean.</Body>
+
+  <Body>Gelman-Rubin Diagnostic (R̂): Compares within-chain and between-chain variance for multiple chains. R̂ ≈ 1 indicates convergence; R̂ &gt; 1.1 suggests non-convergence.</Body>
+
+  <Body>Effective Sample Size (ESS): Accounts for autocorrelation in MCMC samples. ESS &gt; 400 is often recommended for reliable posterior summaries.</Body>
+
+  <Code lang="python">
+def gelman_rubin(chains):
+    """
+    Compute Gelman-Rubin diagnostic R-hat for MCMC convergence.
+
+    Parameters:
+    -----------
+    chains : list of ndarray
+        Multiple MCMC chains, each of shape (n_samples, n_params)
+
+    Returns:
+    --------
+    r_hat : ndarray
+        R-hat statistic for each parameter (should be close to 1)
+    """
+    n_chains = len(chains)
+    n_samples = chains[0].shape[0]
+    n_params = chains[0].shape[1]
+
+    r_hat = np.zeros(n_params)
+
+    for p in range(n_params):
+        # Extract parameter p from all chains
+        chain_means = np.array([chain[:, p].mean() for chain in chains])
+        chain_vars = np.array([chain[:, p].var(ddof=1) for chain in chains])
+
+        # Between-chain variance
+        B = n_samples * chain_means.var(ddof=1)
+
+        # Within-chain variance
+        W = chain_vars.mean()
+
+        # Pooled variance estimate
+        var_hat = (n_samples - 1) / n_samples * W + B / n_samples
+
+        # R-hat
+        r_hat[p] = np.sqrt(var_hat / W)
+
+    return r_hat
+
+def effective_sample_size(samples):
+    """
+    Compute effective sample size accounting for autocorrelation.
+    """
+    n = len(samples)
+
+    # Compute autocorrelation
+    mean = samples.mean()
+    var = samples.var()
+
+    if var == 0:
+        return n
+
+    # Autocorrelation at lag k
+    max_lag = min(n // 2, 1000)
+    rho = np.zeros(max_lag)
+
+    for k in range(max_lag):
+        rho[k] = np.mean((samples[:n-k] - mean) * (samples[k:] - mean)) / var
+
+        # Stop when autocorrelation becomes negligible
+        if k &gt; 1 and rho[k] + rho[k-1] &lt; 0:
+            break
+
+    # ESS = n / (1 + 2 * sum of autocorrelations)
+    tau = 1 + 2 * np.sum(rho[:k])
+    ess = n / tau
+
+    return ess
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What does the Gelman-Rubin R̂ statistic measure and what value indicates convergence?</Front>
+    <Back>The Gelman-Rubin R̂ statistic compares between-chain variance to within-chain variance across multiple MCMC chains. R̂ ≈ 1.0 indicates convergence (chains are sampling the same distribution). R̂ &gt; 1.1 suggests the chains have not yet converged and more samples are needed.</Back>
+  </FlashCard>
+
+  <SortQuiz id="q3">
+    <Prompt>Order the steps of the Metropolis-Hastings algorithm from first to last:</Prompt>
+    <SortedItems>
+      <Item>Initialize θ at starting value and compute log P(θ|D)</Item>
+      <Item>Propose new state θ* from proposal distribution Q(θ*|θ)</Item>
+      <Item>Compute acceptance ratio α = P(θ*|D)Q(θ|θ*) / P(θ|D)Q(θ*|θ)</Item>
+      <Item>Accept θ* with probability min(1, α), otherwise keep θ</Item>
+      <Item>Store current θ and repeat from proposal step</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H3>Hamiltonian Monte Carlo</H3>
+
+  <Body>Hamiltonian Monte Carlo (HMC) uses gradient information to make more efficient proposals, especially in high dimensions. It treats the parameter space as a physical system and simulates Hamiltonian dynamics:</Body>
+
+  <Code lang="python">
+def hamiltonian_monte_carlo(log_posterior, grad_log_posterior, initial_theta,
+                            n_samples, step_size, n_leapfrog, burnin=1000):
+    """
+    Hamiltonian Monte Carlo sampler.
+
+    Parameters:
+    -----------
+    log_posterior : callable
+        Log posterior function
+    grad_log_posterior : callable
+        Gradient of log posterior
+    initial_theta : ndarray
+        Starting parameter values
+    n_samples : int
+        Number of samples to generate
+    step_size : float
+        Leapfrog integration step size (ε)
+    n_leapfrog : int
+        Number of leapfrog steps (L)
+    """
+    theta = np.array(initial_theta, dtype=float)
+    n_params = len(theta)
+    samples = np.zeros((n_samples + burnin, n_params))
+    n_accepted = 0
+
+    for i in range(n_samples + burnin):
+        # Sample momentum
+        momentum = np.random.normal(size=n_params)
+
+        # Store initial state
+        theta_init = theta.copy()
+        momentum_init = momentum.copy()
+
+        # Initial Hamiltonian
+        H_init = -log_posterior(theta) + 0.5 * np.sum(momentum**2)
+
+        # Leapfrog integration
+        grad = grad_log_posterior(theta)
+
+        for _ in range(n_leapfrog):
+            # Half step for momentum
+            momentum = momentum + 0.5 * step_size * grad
+
+            # Full step for position
+            theta = theta + step_size * momentum
+
+            # Recompute gradient
+            grad = grad_log_posterior(theta)
+
+            # Half step for momentum
+            momentum = momentum + 0.5 * step_size * grad
+
+        # Final Hamiltonian
+        H_final = -log_posterior(theta) + 0.5 * np.sum(momentum**2)
+
+        # Metropolis acceptance
+        if np.log(np.random.random()) &lt; H_init - H_final:
+            n_accepted += 1
+        else:
+            theta = theta_init
+
+        samples[i] = theta
+
+    acceptance_rate = n_accepted / (n_samples + burnin)
+    return samples[burnin:], acceptance_rate
+  </Code>
+
+  <Body>HMC requires tuning the step size ε and number of leapfrog steps L. Modern implementations like Stan and PyMC use adaptive schemes (NUTS - No-U-Turn Sampler) that automatically tune these parameters.</Body>
+
+  <MatchPairs id="q4">
+    <Prompt>Match each MCMC concept with its correct description:</Prompt>
+    <Pairs>
+      <Pair><Left>Burn-in period</Left><Right>Initial samples discarded before chain reaches stationarity</Right></Pair>
+      <Pair><Left>Effective sample size</Left><Right>Number of independent samples accounting for autocorrelation</Right></Pair>
+      <Pair><Left>Acceptance rate</Left><Right>Fraction of proposals accepted by the algorithm</Right></Pair>
+      <Pair><Left>Leapfrog integration</Left><Right>Numerical scheme for simulating Hamiltonian dynamics in HMC</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Variance of the posterior distribution</Distractor>
+      <Distractor>Number of parameters in the model</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Bayesian Model Comparison</H2>
+
+  <Body>Bayesian inference provides principled methods for comparing competing models. Given models M₁ and M₂, we can compute posterior model probabilities:</Body>
+
+  <Code lang="plaintext">
+P(M₁|D) / P(M₂|D) = [P(D|M₁) / P(D|M₂)] × [P(M₁) / P(M₂)]
+
+posterior odds = Bayes factor × prior odds
+
+The Bayes factor BF₁₂ = P(D|M₁) / P(D|M₂) quantifies the evidence
+provided by data in favor of M₁ over M₂.
+
+Interpretation (Kass &amp; Raftery, 1995):
+BF &lt; 1         : Evidence for M₂
+1 &lt; BF &lt; 3     : Barely worth mentioning (for M₁)
+3 &lt; BF &lt; 20    : Positive evidence
+20 &lt; BF &lt; 150  : Strong evidence
+BF &gt; 150       : Very strong evidence
+  </Code>
+
+  <Body>Computing the Marginal Likelihood: The marginal likelihood (evidence) P(D|M) requires integrating over the parameter space:</Body>
+
+  <Code lang="plaintext">
+P(D|M) = ∫ P(D|θ,M) P(θ|M) dθ
+  </Code>
+
+  <Body>This integral is often intractable but can be approximated using:</Body>
+
+  <Body>1. Laplace approximation: Approximate the posterior as Gaussian around the MAP. 2. Harmonic mean estimator: Use posterior samples (but can be unstable). 3. Bridge sampling: More stable MCMC-based approach. 4. Nested sampling: Transforms integration into nested contours.</Body>
+
+  <Code lang="python">
+def laplace_approximation_log_evidence(log_posterior, theta_map, hessian_at_map):
+    """
+    Laplace approximation to log marginal likelihood.
+
+    P(D) ≈ P(D|θ_MAP) P(θ_MAP) × (2π)^(d/2) / √det(-H)
+
+    where H is the Hessian of log posterior at MAP.
+    """
+    d = len(theta_map)
+
+    # Log posterior at MAP
+    log_p_map = log_posterior(theta_map)
+
+    # Determinant of negative Hessian
+    neg_hessian = -hessian_at_map
+    sign, log_det = np.linalg.slogdet(neg_hessian)
+
+    if sign &lt;= 0:
+        raise ValueError("Hessian is not negative definite at MAP")
+
+    # Laplace approximation
+    log_evidence = log_p_map + d/2 * np.log(2 * np.pi) - 0.5 * log_det
+
+    return log_evidence
+
+def compute_bayes_factor(log_evidence_1, log_evidence_2):
+    """Compute Bayes factor from log evidences."""
+    return np.exp(log_evidence_1 - log_evidence_2)
+  </Code>
+
+  <H3>Information Criteria for Model Comparison</H3>
+
+  <Body>When computing exact Bayes factors is intractable, information criteria provide computationally convenient alternatives:</Body>
+
+  <Body>Deviance Information Criterion (DIC):</Body>
+  <Code lang="plaintext">
+DIC = D(θ̄) + 2 p_D
+
+where:
+- D(θ) = -2 log P(D|θ) is the deviance
+- θ̄ is the posterior mean
+- p_D = E[D(θ)] - D(θ̄) is the effective number of parameters
+  </Code>
+
+  <Body>Widely Applicable Information Criterion (WAIC):</Body>
+  <Code lang="plaintext">
+WAIC = -2 (LPPD - p_WAIC)
+
+where:
+- LPPD = Σᵢ log(1/S Σₛ P(yᵢ|θₛ)) is log pointwise predictive density
+- p_WAIC = Σᵢ Var_s[log P(yᵢ|θₛ)] is effective parameters
+
+Lower DIC/WAIC indicates better predictive performance.
+  </Code>
+
+  <SingleSelect id="q5">
+    <Prompt>A Bayes factor of BF₁₂ = 50 comparing Model 1 to Model 2 indicates:</Prompt>
+    <Options>
+      <Option>The evidence is inconclusive between models</Option>
+      <Option>Weak evidence favoring Model 2</Option>
+      <Option correct="true">Strong evidence favoring Model 1</Option>
+      <Option>Model 1 has 50 more parameters than Model 2</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Practical Example: Bayesian Parameter Estimation for Neuron Models</H2>
+
+  <Body>Let's apply Bayesian inference to compare integrate-and-fire (IF) and FitzHugh-Nagumo (FHN) models using simulated spike timing data.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
+
+class BayesianNeuronInference:
+    """
+    Bayesian inference framework for neuron model parameters.
+    """
+
+    def __init__(self, model_type='IF'):
+        self.model_type = model_type
+        self.samples = None
+        self.acceptance_rate = None
+
+    def simulate_if_neuron(self, params, I_ext, dt, T):
+        """Simulate leaky IF neuron."""
+        tau_m, V_rest, V_thresh, R_m = params[:4]
+
+        n_steps = int(T / dt)
+        V = np.zeros(n_steps)
+        V[0] = V_rest
+        spike_times = []
+
+        for t in range(1, n_steps):
+            dV = (V_rest - V[t-1] + R_m * I_ext) / tau_m * dt
+            V[t] = V[t-1] + dV
+
+            if V[t] &gt;= V_thresh:
+                spike_times.append(t * dt)
+                V[t] = V_rest
+
+        return np.array(spike_times)
+
+    def log_likelihood_if(self, params, observed_isis, I_ext, dt):
+        """
+        Log-likelihood based on inter-spike intervals.
+        Assumes ISIs follow inverse Gaussian distribution.
+        """
+        if np.any(np.array(params[:4]) &lt;= 0):
+            return -np.inf
+
+        tau_m, V_rest, V_thresh, R_m = params[:4]
+        sigma = params[4] if len(params) &gt; 4 else 1.0
+
+        if sigma &lt;= 0:
+            return -np.inf
+
+        # Theoretical mean ISI for IF neuron
+        if R_m * I_ext &lt;= V_thresh - V_rest:
+            return -np.inf  # No spiking possible
+
+        mean_isi = tau_m * np.log(R_m * I_ext / (R_m * I_ext - (V_thresh - V_rest)))
+
+        if mean_isi &lt;= 0 or not np.isfinite(mean_isi):
+            return -np.inf
+
+        # Log-likelihood for inverse Gaussian ISI distribution
+        mu = mean_isi
+        lam = mean_isi**3 / sigma**2
+
+        log_lik = 0
+        for isi in observed_isis:
+            if isi &lt;= 0:
+                continue
+            # Inverse Gaussian PDF
+            log_lik += 0.5 * np.log(lam / (2 * np.pi * isi**3))
+            log_lik -= lam * (isi - mu)**2 / (2 * mu**2 * isi)
+
+        return log_lik
+
+    def log_prior_if(self, params):
+        """Jeffreys-inspired prior for IF parameters."""
+        tau_m, V_rest, V_thresh, R_m = params[:4]
+        sigma = params[4] if len(params) &gt; 4 else 1.0
+
+        # Bounds
+        if not (1 &lt; tau_m &lt; 100):
+            return -np.inf
+        if not (-90 &lt; V_rest &lt; -40):
+            return -np.inf
+        if not (-60 &lt; V_thresh &lt; -20):
+            return -np.inf
+        if not (1 &lt; R_m &lt; 500):
+            return -np.inf
+        if not (0.1 &lt; sigma &lt; 50):
+            return -np.inf
+        if not (V_thresh &gt; V_rest):
+            return -np.inf
+
+        # Jeffreys prior for scale parameters
+        return -np.log(tau_m) - np.log(R_m) - np.log(sigma)
+
+    def run_mcmc(self, observed_isis, I_ext, dt, n_samples=5000, burnin=1000):
+        """Run MCMC for posterior inference."""
+
+        # Initial guess
+        theta = np.array([20.0, -65.0, -50.0, 100.0, 5.0])
+        proposal_std = np.array([2.0, 2.0, 2.0, 10.0, 1.0])
+
+        def log_posterior(params):
+            return (self.log_likelihood_if(params, observed_isis, I_ext, dt) +
+                    self.log_prior_if(params))
+
+        self.samples, self.acceptance_rate = metropolis_hastings(
+            log_posterior, theta, proposal_std, n_samples, burnin
+        )
+
+        return self.samples
+
+    def posterior_summary(self):
+        """Compute posterior summaries."""
+        if self.samples is None:
+            raise ValueError("Run MCMC first")
+
+        param_names = ['τ_m (ms)', 'V_rest (mV)', 'V_thresh (mV)', 'R_m (MΩ)', 'σ']
+
+        summary = {}
+        for i, name in enumerate(param_names):
+            samples_i = self.samples[:, i]
+            summary[name] = {
+                'mean': np.mean(samples_i),
+                'std': np.std(samples_i),
+                'median': np.median(samples_i),
+                '95% CI': equal_tailed_interval(samples_i),
+                'ESS': effective_sample_size(samples_i)
+            }
+
+        return summary
+
+
+# Demonstration
+np.random.seed(42)
+
+# True parameters
+true_params = [20.0, -65.0, -50.0, 100.0, 3.0]  # τ_m, V_rest, V_thresh, R_m, σ
+
+# Simulate observed ISIs (in practice, from experimental data)
+n_spikes = 100
+true_mean_isi = true_params[0] * np.log(
+    true_params[3] * 10 / (true_params[3] * 10 - (true_params[2] - true_params[1]))
+)
+observed_isis = stats.invgauss.rvs(
+    mu=true_mean_isi / (true_mean_isi**3 / true_params[4]**2)**0.5,
+    scale=(true_mean_isi**3 / true_params[4]**2)**0.5,
+    size=n_spikes
+)
+
+# Run inference
+inference = BayesianNeuronInference(model_type='IF')
+samples = inference.run_mcmc(observed_isis, I_ext=10, dt=0.1, n_samples=5000)
+summary = inference.posterior_summary()
+
+print("Posterior Summary:")
+print("-" * 60)
+for param, stats_dict in summary.items():
+    print(f"{param}:")
+    print(f"  Mean: {stats_dict['mean']:.2f}, Std: {stats_dict['std']:.2f}")
+    print(f"  95% CI: [{stats_dict['95% CI'][0]:.2f}, {stats_dict['95% CI'][1]:.2f}]")
+    print(f"  ESS: {stats_dict['ESS']:.0f}")
+  </Code>
+
+  <FillBlanks id="q6">
+    <Prompt>In Bayesian inference, the posterior distribution is proportional to the product of the <Blank>likelihood</Blank> and the <Blank>prior</Blank>. The normalizing constant P(D) is called the <Blank>marginal likelihood</Blank> or evidence. When the prior and posterior belong to the same family of distributions, the prior is called a <Blank>conjugate</Blank> prior.</Prompt>
+    <Distractors>
+      <Distractor>variance</Distractor>
+      <Distractor>confidence interval</Distractor>
+      <Distractor>point estimate</Distractor>
+      <Distractor>sufficient</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Bayesian vs. Frequentist: A Comparison</H2>
+
+  <Body>Understanding when to use Bayesian vs. frequentist methods is crucial for applied work:</Body>
+
+  <Code lang="plaintext">
+┌─────────────────────────┬────────────────────────────┬───────────────────────────┐
+│ Aspect                  │ Frequentist                │ Bayesian                  │
+├─────────────────────────┼────────────────────────────┼───────────────────────────┤
+│ Parameter interpretation│ Fixed but unknown          │ Random variable           │
+│ Probability meaning     │ Long-run frequency         │ Degree of belief          │
+│ Prior information       │ Not formally incorporated  │ Explicit through P(θ)     │
+│ Uncertainty             │ Confidence intervals       │ Credible intervals        │
+│ Point estimate          │ MLE                        │ MAP, posterior mean       │
+│ Model comparison        │ Likelihood ratio, AIC, BIC │ Bayes factors, DIC, WAIC  │
+│ Small samples           │ Can be unreliable          │ Prior helps regularize    │
+│ Computation             │ Often closed-form          │ Often requires MCMC       │
+│ Interpretation          │ Operational/procedural     │ Direct probability        │
+└─────────────────────────┴────────────────────────────┴───────────────────────────┘
+  </Code>
+
+  <Body>When to prefer Bayesian methods: When prior information is available and should be incorporated; when you need full uncertainty quantification (not just point estimates); for small sample sizes where priors provide regularization; when direct probability statements about parameters are needed; for hierarchical/multilevel models with partial pooling.</Body>
+
+  <Body>When frequentist methods may be preferred: When computational simplicity is important; when prior specification is controversial or difficult; for hypothesis testing with controlled Type I error rates; when large sample asymptotics are applicable.</Body>
+
+  <FlashCard id="fc6">
+    <Front>How do credible intervals differ from confidence intervals in interpretation?</Front>
+    <Back>A 95% credible interval has 95% posterior probability of containing θ (direct probability statement about the parameter). A 95% confidence interval means that 95% of intervals computed from repeated experiments would contain the true θ (statement about the procedure, not this specific interval). Credible intervals treat θ as random; confidence intervals treat the interval as random.</Back>
+  </FlashCard>
+
+  <H2>Common Pitfalls and Best Practices</H2>
+
+  <Body>Pitfall 1: Confusing Credible and Confidence Intervals</Body>
+  <Body>A 95% credible interval is NOT the same as a 95% confidence interval. The Bayesian interval provides direct probability statements about parameters; the frequentist interval provides coverage guarantees under repeated sampling.</Body>
+
+  <Body>Pitfall 2: Assuming Jeffreys Prior is Always Appropriate</Body>
+  <Body>Jeffreys priors can be improper (non-integrable) and may lead to improper posteriors in some cases. They can also give counterintuitive results in multiparameter settings. Always verify that your posterior is proper.</Body>
+
+  <Body>Pitfall 3: Neglecting MCMC Diagnostics</Body>
+  <Body>Never trust MCMC results without checking convergence. Always run multiple chains, compute R̂, check trace plots, and verify adequate effective sample size.</Body>
+
+  <Body>Pitfall 4: Misinterpreting Bayes Factors</Body>
+  <Body>A Bayes factor BF₁₂ = 10 does NOT mean P(M₁|D) = 0.91. The posterior model probability depends on the prior model probabilities. If P(M₁) = P(M₂) = 0.5, then P(M₁|D) = 10/11 ≈ 0.91. But if P(M₁) = 0.1, then P(M₁|D) = 0.53.</Body>
+
+  <Subjective id="q7">
+    <Prompt>Explain why Jeffreys priors are considered "non-informative" and describe a situation in computational neuroscience where using a Jeffreys prior might be problematic. What alternative approach would you suggest?</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly explains that Jeffreys priors are non-informative because they are derived from Fisher information and are invariant under reparameterization, meaning they don't favor any particular parameter value based on the choice of parameterization</Requirement>
+        <Indicators>Fisher information, reparameterization invariant, non-informative, objective, let data speak</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies a valid problematic scenario such as: improper posteriors with limited data, multiparameter paradoxes, or cases where weak prior information exists and should be used</Requirement>
+        <Indicators>improper, limited data, multiparameter, paradox, physiological constraints, prior knowledge</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Suggests a reasonable alternative such as weakly informative priors based on physiological constraints, hierarchical priors, or penalized complexity priors</Requirement>
+        <Indicators>weakly informative, physiological bounds, hierarchical, regularizing prior, penalized complexity</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides concrete neuroscience example (e.g., membrane time constants must be positive and bounded, firing rates have natural scales)</Requirement>
+        <Indicators>time constant, firing rate, conductance, membrane potential, positive, bounded</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="75" maxWords="250" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>Bayesian inference provides a principled framework for parameter estimation that naturally quantifies uncertainty through posterior distributions. Key takeaways from this lesson:</Body>
+
+  <Body>Bayes' theorem combines prior knowledge with data: posterior ∝ likelihood × prior.</Body>
+
+  <Body>Jeffreys priors P(θ) ∝ √det(I(θ)) are non-informative priors derived from Fisher information that are invariant under reparameterization.</Body>
+
+  <Body>Credible intervals provide direct probability statements about parameters, unlike frequentist confidence intervals.</Body>
+
+  <Body>MCMC methods (Metropolis-Hastings, HMC) enable posterior sampling when analytical solutions are unavailable.</Body>
+
+  <Body>Convergence diagnostics (R̂, ESS, trace plots) are essential for validating MCMC results.</Body>
+
+  <Body>Bayes factors quantify evidence for model comparison, while DIC and WAIC provide practical alternatives.</Body>
+
+  <Body>In the next lesson, we will explore how Fisher information connects to optimal experimental design, enabling us to design experiments that maximize the information gained about model parameters.</Body>
+
+  <SingleSelect id="q8">
+    <Prompt>Which of the following is NOT a valid reason to prefer Bayesian over frequentist inference?</Prompt>
+    <Options>
+      <Option>Bayesian methods can incorporate prior knowledge formally</Option>
+      <Option>Credible intervals provide direct probability statements about parameters</Option>
+      <Option correct="true">Bayesian methods always give numerically identical results to MLE</Option>
+      <Option>Bayesian inference is well-suited for small sample sizes when informative priors exist</Option>
+    </Options>
+  </SingleSelect>
+
+</Lesson>

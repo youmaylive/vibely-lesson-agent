@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-03</Id>
+    <Title>Hodgkin-Huxley Model: Biophysical Foundation</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>hodgkin-huxley</Tag>
+      <Tag>action-potential</Tag>
+      <Tag>ion-channels</Tag>
+      <Tag>gating-variables</Tag>
+      <Tag>conductance-based-models</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Hodgkin-Huxley Model: Biophysical Foundation</H1>
+
+  <Body>The Hodgkin-Huxley (HH) model represents one of the most significant achievements in computational neuroscience—a quantitative framework that explains how voltage-gated ion channels generate action potentials through the precise orchestration of sodium activation, sodium inactivation, and potassium activation. Developed by Alan Hodgkin and Andrew Huxley in 1952 based on their voltage-clamp experiments on the giant squid axon, this model earned them the Nobel Prize in Physiology or Medicine in 1963 and remains foundational to all modern neuronal modeling.</Body>
+
+  <Body>In the previous lesson on the Integrate-and-Fire model, we treated threshold as an abstract parameter. The Hodgkin-Huxley model provides a mechanistic explanation for threshold behavior through the dynamics of voltage-gated ion channels. Understanding these dynamics is essential for modeling realistic neuronal behavior and interpreting experimental data.</Body>
+
+  <H2>Ionic Current Formulation</H2>
+
+  <Body>The foundation of the HH model rests on Ohm's law applied to ionic currents across the membrane. Each ionic current is proportional to both a conductance (which may be voltage-dependent) and the driving force—the difference between the membrane potential V and the reversal potential E for that ion species:</Body>
+
+  <Code lang="plaintext">
+I_ion = g_ion × (V - E_ion)
+  </Code>
+
+  <Body>The reversal potential (also called equilibrium potential) for each ion is determined by the Nernst equation and reflects the concentration gradient across the membrane. For a typical mammalian neuron at 37°C:</Body>
+
+  <Body>• E_Na ≈ +55 mV (sodium tends to flow inward, depolarizing the cell)</Body>
+  <Body>• E_K ≈ -77 mV (potassium tends to flow outward, hyperpolarizing the cell)</Body>
+  <Body>• E_L ≈ -65 mV (leak current, primarily chloride)</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the reversal potential (equilibrium potential) and what determines its value?</Front>
+    <Back>The reversal potential is the membrane voltage at which the electrical and concentration gradients for an ion species are balanced, resulting in zero net current for that ion. Its value is determined by the Nernst equation based on the concentration gradient of the ion across the membrane.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>Why does sodium have a positive reversal potential (~+55 mV) while potassium has a negative one (~-77 mV)?</Front>
+    <Back>Sodium is concentrated outside the cell (high [Na⁺]_out / [Na⁺]_in ratio), so its equilibrium requires a positive interior to oppose inward diffusion. Potassium is concentrated inside (high [K⁺]_in / [K⁺]_out ratio), so its equilibrium requires a negative interior to oppose outward diffusion. These concentration gradients are maintained by the Na⁺/K⁺-ATPase pump.</Back>
+  </FlashCard>
+
+  <H2>The Complete Hodgkin-Huxley Equation</H2>
+
+  <Body>The HH model describes the membrane potential dynamics through a differential equation that accounts for capacitive current and three ionic currents—sodium (Na), potassium (K), and leak (L):</Body>
+
+  <Code lang="plaintext">
+C_m × dV/dt = -g_Na × m³ × h × (V - E_Na) - g_K × n⁴ × (V - E_K) - g_L × (V - E_L) + I_ext
+  </Code>
+
+  <Body>Here, C_m is the membrane capacitance (typically ~1 μF/cm²), g_Na, g_K, and g_L are maximal conductances, and I_ext represents externally applied current. The variables m, h, and n are dimensionless gating variables (ranging from 0 to 1) that describe the state of voltage-gated ion channels.</Body>
+
+  <Body>The key insight is that sodium and potassium conductances are not fixed but depend on voltage through the gating variables:</Body>
+
+  <Body>• Sodium conductance: g_Na(V,t) = ḡ_Na × m³ × h</Body>
+  <Body>• Potassium conductance: g_K(V,t) = ḡ_K × n⁴</Body>
+  <Body>• Leak conductance: g_L (constant, voltage-independent)</Body>
+
+  <H2>Gating Variable Kinetics</H2>
+
+  <Body>Each gating variable follows first-order kinetics described by voltage-dependent rate constants α(V) and β(V):</Body>
+
+  <Code lang="plaintext">
+dm/dt = α_m(V) × (1 - m) - β_m(V) × m
+dh/dt = α_h(V) × (1 - h) - β_h(V) × h
+dn/dt = α_n(V) × (1 - n) - β_n(V) × n
+  </Code>
+
+  <Body>These equations can be rewritten in terms of the steady-state activation x_∞(V) and time constant τ_x(V):</Body>
+
+  <Code lang="plaintext">
+dx/dt = (x_∞(V) - x) / τ_x(V)
+
+where:
+x_∞(V) = α_x(V) / (α_x(V) + β_x(V))
+τ_x(V) = 1 / (α_x(V) + β_x(V))
+  </Code>
+
+  <Body>This formulation makes clear that each gating variable relaxes exponentially toward its steady-state value with a characteristic time constant that depends on voltage.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is the physical interpretation of the gating variable m in the HH model?</Front>
+    <Back>The variable m represents the probability that a sodium channel activation gate is open. Since HH assumed three independent activation gates per channel (based on fitting experimental data), the probability that all three are open is m³. This m variable activates rapidly upon depolarization, opening the sodium channels.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc4">
+    <Front>What distinguishes the h gating variable from m and n?</Front>
+    <Back>The h variable represents sodium channel inactivation, not activation. Unlike m and n which increase with depolarization (opening channels), h decreases with depolarization (closing/inactivating sodium channels). Inactivation via h is also slower than activation via m, creating the transient nature of sodium current during an action potential.</Back>
+  </FlashCard>
+
+  <H2>Voltage-Dependent Rate Functions</H2>
+
+  <Body>Hodgkin and Huxley derived empirical expressions for the rate functions from their voltage-clamp experiments on squid giant axon at 6.3°C. The original formulations (with V measured relative to resting potential) are:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def alpha_m(V):
+    """Sodium activation rate (ms⁻¹)"""
+    return 0.1 * (25 - V) / (np.exp((25 - V) / 10) - 1)
+
+def beta_m(V):
+    """Sodium activation rate (ms⁻¹)"""
+    return 4 * np.exp(-V / 18)
+
+def alpha_h(V):
+    """Sodium inactivation rate (ms⁻¹)"""
+    return 0.07 * np.exp(-V / 20)
+
+def beta_h(V):
+    """Sodium inactivation rate (ms⁻¹)"""
+    return 1 / (np.exp((30 - V) / 10) + 1)
+
+def alpha_n(V):
+    """Potassium activation rate (ms⁻¹)"""
+    return 0.01 * (10 - V) / (np.exp((10 - V) / 10) - 1)
+
+def beta_n(V):
+    """Potassium activation rate (ms⁻¹)"""
+    return 0.125 * np.exp(-V / 80)
+  </Code>
+
+  <Body>Note: These formulations have potential numerical issues when the denominator approaches zero. Modern implementations handle these singularities using L'Hôpital's rule or by checking for values near the singularity.</Body>
+
+  <FlashCard id="fc5">
+    <Front>Why are the rate functions α(V) and β(V) empirically fitted rather than derived from first principles?</Front>
+    <Back>Hodgkin and Huxley used voltage-clamp experiments to measure ionic currents at different fixed voltages. They fitted the observed kinetics with mathematical functions that accurately reproduced the data. At the time (1952), the molecular structure of ion channels was unknown—their molecular basis wasn't established until decades later with cloning and crystallography studies.</Back>
+  </FlashCard>
+
+  <H2>Understanding the Gating Variables</H2>
+
+  <H3>Sodium Channel: m (Activation) and h (Inactivation)</H3>
+
+  <Body>The sodium channel has two types of gates that govern its behavior:</Body>
+
+  <Body>1. Activation gates (m): Three independent gates that open rapidly upon depolarization. The probability of all three being open is m³, giving the characteristic steep voltage dependence of sodium activation.</Body>
+
+  <Body>2. Inactivation gate (h): One gate that closes slowly during sustained depolarization. This creates the transient nature of sodium current—channels open quickly but then inactivate even if voltage remains depolarized.</Body>
+
+  <Body>At rest (~−65 mV): m ≈ 0.05 (mostly closed), h ≈ 0.60 (mostly not inactivated)</Body>
+  <Body>During depolarization: m increases rapidly (channels activate), h decreases slowly (channels inactivate)</Body>
+
+  <H3>Potassium Channel: n (Activation)</H3>
+
+  <Body>The potassium channel is simpler, with four independent activation gates (n⁴). Key features:</Body>
+
+  <Body>• Activates with depolarization (like m)</Body>
+  <Body>• Slower kinetics than sodium activation—this delay is crucial for repolarization</Body>
+  <Body>• No inactivation in the classical HH model (though some K⁺ channels do inactivate)</Body>
+
+  <Body>At rest: n ≈ 0.32 (some channels open, contributing to resting conductance)</Body>
+  <Body>During depolarization: n increases slowly, reaching peak after sodium current has peaked</Body>
+
+  <FlashCard id="fc6">
+    <Front>Why do sodium channels have both activation (m) AND inactivation (h) while potassium channels only have activation (n)?</Front>
+    <Back>Sodium channels need both gates to produce the transient inward current required for rapid depolarization followed by automatic termination. The fast activation (m) opens channels, while slow inactivation (h) closes them regardless of continued depolarization. Potassium channels' delayed activation alone suffices for repolarization—they open after the sodium current and don't need to inactivate because the cell naturally hyperpolarizes.</Back>
+  </FlashCard>
+
+  <H2>Action Potential Phases</H2>
+
+  <Body>The interplay of sodium and potassium channel dynamics produces the characteristic action potential waveform with distinct phases:</Body>
+
+  <Body>1. Resting state: V ≈ −65 mV, m low, h high, n moderate. The leak current and partial K⁺ conductance maintain resting potential.</Body>
+
+  <Body>2. Depolarization (rising phase): Stimulus causes initial depolarization → m increases rapidly → Na⁺ channels open → inward I_Na depolarizes membrane further (positive feedback) → V rapidly approaches E_Na.</Body>
+
+  <Body>3. Repolarization (falling phase): h decreases (Na⁺ inactivation) → I_Na decreases. Simultaneously, n increases (K⁺ activation) → I_K increases → outward current repolarizes membrane → V returns toward rest.</Body>
+
+  <Body>4. Hyperpolarization (undershoot): Because K⁺ channel deactivation is slow, I_K remains elevated even as V passes through rest → V undershoots to below resting potential (closer to E_K).</Body>
+
+  <Body>5. Recovery: n slowly decreases (K⁺ deactivation), h slowly increases (Na⁺ recovery from inactivation) → membrane returns to resting state.</Body>
+
+  <SingleSelect id="q1">
+    <Prompt>During the rising phase of an action potential, which of the following correctly describes the dominant ionic current and its direction?</Prompt>
+    <Options>
+      <Option correct="true">Inward sodium current dominates as Na⁺ flows into the cell</Option>
+      <Option>Outward potassium current dominates as K⁺ flows out of the cell</Option>
+      <Option>Inward potassium current dominates as K⁺ flows into the cell</Option>
+      <Option>Outward sodium current dominates as Na⁺ flows out of the cell</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>What causes the hyperpolarization (undershoot) phase following an action potential?</Prompt>
+    <Options>
+      <Option>Sodium channel activation persists longer than expected</Option>
+      <Option correct="true">Potassium channel deactivation is slower than repolarization, keeping K⁺ conductance elevated</Option>
+      <Option>Leak channels close temporarily during repolarization</Option>
+      <Option>The sodium-potassium pump transiently hyperpolarizes the membrane</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q3">
+    <Prompt>Which statements about sodium channel inactivation (the h gate) are TRUE? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">The h gate closes during sustained depolarization</Option>
+      <Option correct="true">Recovery from inactivation requires repolarization to negative potentials</Option>
+      <Option>The h gate responds faster than the m gate to voltage changes</Option>
+      <Option correct="true">Sodium channel inactivation contributes to the absolute refractory period</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q4">
+    <Prompt>Arrange the following events in the correct temporal order during a single action potential:</Prompt>
+    <SortedItems>
+      <Item>Rapid increase in m (Na⁺ activation)</Item>
+      <Item>Membrane potential reaches peak (~+40 mV)</Item>
+      <Item>Decrease in h (Na⁺ inactivation)</Item>
+      <Item>Increase in n (K⁺ activation)</Item>
+      <Item>Membrane potential undershoots rest</Item>
+      <Item>Recovery of h (Na⁺ de-inactivation)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Refractory Periods</H2>
+
+  <Body>The gating variable dynamics explain the refractory periods that limit action potential firing rate:</Body>
+
+  <Body>Absolute refractory period: Immediately after an action potential, sodium channels are inactivated (h ≈ 0). No stimulus, regardless of strength, can trigger another action potential because insufficient sodium channels are available for activation. Duration: ~1 ms.</Body>
+
+  <Body>Relative refractory period: As h recovers, some sodium channels become available, but not all. Additionally, residual K⁺ conductance (elevated n) makes the membrane harder to depolarize. A stronger-than-normal stimulus can trigger an action potential, but with reduced amplitude and increased threshold. Duration: several ms.</Body>
+
+  <MatchPairs id="q5">
+    <Prompt>Match each gating variable or parameter to its primary role in the HH model:</Prompt>
+    <Pairs>
+      <Pair><Left>m³ gating</Left><Right>Sodium channel activation</Right></Pair>
+      <Pair><Left>h gating</Left><Right>Sodium channel inactivation</Right></Pair>
+      <Pair><Left>n⁴ gating</Left><Right>Potassium channel activation</Right></Pair>
+      <Pair><Left>g_L</Left><Right>Voltage-independent leak conductance</Right></Pair>
+      <Pair><Left>E_K</Left><Right>Potassium reversal potential</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Potassium channel inactivation</Distractor>
+      <Distractor>Calcium channel activation</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Numerical Implementation</H2>
+
+  <Body>Implementing the HH model requires solving a system of four coupled ordinary differential equations (ODEs): one for V and three for the gating variables m, h, and n. The system is moderately stiff due to the different timescales of the gating variables.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+# Parameters (squid giant axon at 6.3°C)
+C_m = 1.0      # membrane capacitance (μF/cm²)
+g_Na = 120.0   # max sodium conductance (mS/cm²)
+g_K = 36.0     # max potassium conductance (mS/cm²)
+g_L = 0.3      # leak conductance (mS/cm²)
+E_Na = 50.0    # sodium reversal potential (mV)
+E_K = -77.0    # potassium reversal potential (mV)
+E_L = -54.4    # leak reversal potential (mV)
+
+# Rate functions with singularity handling
+def alpha_m(V):
+    x = 25.0 - V
+    return np.where(np.abs(x) &lt; 1e-7, 1.0, 0.1 * x / (np.exp(x / 10) - 1))
+
+def beta_m(V):
+    return 4.0 * np.exp(-V / 18)
+
+def alpha_h(V):
+    return 0.07 * np.exp(-V / 20)
+
+def beta_h(V):
+    return 1.0 / (np.exp((30 - V) / 10) + 1)
+
+def alpha_n(V):
+    x = 10.0 - V
+    return np.where(np.abs(x) &lt; 1e-7, 0.1, 0.01 * x / (np.exp(x / 10) - 1))
+
+def beta_n(V):
+    return 0.125 * np.exp(-V / 80)
+
+def hh_derivatives(t, y, I_ext_func):
+    """Compute derivatives for HH model"""
+    V, m, h, n = y
+
+    # External current
+    I_ext = I_ext_func(t)
+
+    # Ionic currents
+    I_Na = g_Na * (m**3) * h * (V - E_Na)
+    I_K = g_K * (n**4) * (V - E_K)
+    I_L = g_L * (V - E_L)
+
+    # Derivatives
+    dV = (I_ext - I_Na - I_K - I_L) / C_m
+    dm = alpha_m(V) * (1 - m) - beta_m(V) * m
+    dh = alpha_h(V) * (1 - h) - beta_h(V) * h
+    dn = alpha_n(V) * (1 - n) - beta_n(V) * n
+
+    return [dV, dm, dh, dn]
+
+# Initial conditions (resting state)
+V0 = -65.0  # mV
+m0 = alpha_m(V0) / (alpha_m(V0) + beta_m(V0))
+h0 = alpha_h(V0) / (alpha_h(V0) + beta_h(V0))
+n0 = alpha_n(V0) / (alpha_n(V0) + beta_n(V0))
+y0 = [V0, m0, h0, n0]
+
+# Stimulus: current pulse
+def I_ext(t):
+    if 5.0 &lt;= t &lt;= 5.5:  # 0.5 ms pulse starting at t=5 ms
+        return 10.0  # μA/cm²
+    return 0.0
+
+# Solve ODE
+t_span = (0, 30)  # 30 ms simulation
+t_eval = np.linspace(0, 30, 3000)
+sol = solve_ivp(
+    lambda t, y: hh_derivatives(t, y, I_ext),
+    t_span, y0, t_eval=t_eval, method='LSODA'  # LSODA handles stiffness
+)
+
+# Plot results
+fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+
+axes[0].plot(sol.t, sol.y[0])
+axes[0].set_ylabel('V (mV)')
+axes[0].set_title('Hodgkin-Huxley Action Potential')
+
+axes[1].plot(sol.t, sol.y[1], label='m')
+axes[1].plot(sol.t, sol.y[2], label='h')
+axes[1].plot(sol.t, sol.y[3], label='n')
+axes[1].set_ylabel('Gating variables')
+axes[1].legend()
+
+# Compute and plot ionic currents
+I_Na = g_Na * (sol.y[1]**3) * sol.y[2] * (sol.y[0] - E_Na)
+I_K = g_K * (sol.y[3]**4) * (sol.y[0] - E_K)
+axes[2].plot(sol.t, -I_Na, label='-I_Na')
+axes[2].plot(sol.t, -I_K, label='-I_K')
+axes[2].set_ylabel('Current (μA/cm²)')
+axes[2].set_xlabel('Time (ms)')
+axes[2].legend()
+
+plt.tight_layout()
+plt.show()
+  </Code>
+
+  <Body>Key implementation considerations:</Body>
+
+  <Body>• Stiff ODE solvers: The HH equations are moderately stiff because gating variable time constants vary from ~0.1 ms (fast m) to ~10 ms (slow n at some voltages). Use implicit methods (e.g., LSODA, Radau) or adaptive timestep solvers.</Body>
+
+  <Body>• Singularity handling: Rate functions like α_m(V) have removable singularities where the denominator approaches zero. Handle these with conditional logic or L'Hôpital's rule.</Body>
+
+  <Body>• Units consistency: Ensure all quantities use consistent units. Standard convention: V in mV, t in ms, C in μF/cm², g in mS/cm², I in μA/cm².</Body>
+
+  <FillBlanks id="q6">
+    <Prompt>
+      In the HH model, the sodium current is computed as I_Na = g_Na × m³ × <Blank>h</Blank> × (V - E_Na). The m variable represents <Blank>activation</Blank> while the h variable represents <Blank>inactivation</Blank>. At resting potential, m is approximately <Blank>0.05</Blank> (low/closed) while h is approximately 0.60 (high/not inactivated).
+    </Prompt>
+    <Distractors>
+      <Distractor>n</Distractor>
+      <Distractor>deactivation</Distractor>
+      <Distractor>permeability</Distractor>
+      <Distractor>0.95</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Parameter Sensitivity and Model Behavior</H2>
+
+  <Body>The HH model's behavior is sensitive to its parameters, providing insight into how channel properties shape neuronal excitability:</Body>
+
+  <Body>• Increasing ḡ_Na: Lower threshold, larger action potential amplitude, can lead to repetitive firing</Body>
+  <Body>• Decreasing ḡ_Na: Higher threshold, reduced amplitude, eventual failure of action potential generation</Body>
+  <Body>• Increasing ḡ_K: Faster repolarization, larger undershoot, shorter refractory period</Body>
+  <Body>• Decreasing ḡ_K: Slower repolarization, prolonged action potentials, possible plateau potentials</Body>
+  <Body>• Temperature: Rate constants scale with temperature (Q₁₀ ≈ 3), so action potentials are faster at higher temperatures</Body>
+
+  <SingleSelect id="q7">
+    <Prompt>A pharmacological agent selectively reduces the maximal sodium conductance (ḡ_Na) by 50%. What effect would you expect on action potential generation?</Prompt>
+    <Options>
+      <Option>Action potentials will have larger amplitude</Option>
+      <Option correct="true">Threshold for action potential initiation will increase</Option>
+      <Option>The refractory period will be eliminated</Option>
+      <Option>Resting membrane potential will depolarize significantly</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Understanding Threshold Mechanistically</H2>
+
+  <Body>Unlike the Integrate-and-Fire model where threshold is a fixed parameter, the HH model provides a mechanistic explanation for threshold behavior:</Body>
+
+  <Body>The effective threshold is the voltage at which the positive feedback from sodium current overcomes the negative feedback from potassium and leak currents. Mathematically, this occurs when:</Body>
+
+  <Code lang="plaintext">
+dI_Na/dV &gt; dI_K/dV + dI_L/dV
+
+The sodium current's voltage dependence (through m³h) creates a regenerative process:
+depolarization → increased m → increased I_Na → further depolarization
+  </Code>
+
+  <Body>This explains several observations:</Body>
+  <Body>• Threshold is not fixed but depends on the rate of depolarization (accommodation)</Body>
+  <Body>• Threshold increases during the relative refractory period (reduced h, elevated n)</Body>
+  <Body>• Different stimulation protocols can produce different apparent thresholds</Body>
+
+  <H2>Ionic Current Decomposition</H2>
+
+  <Body>Analyzing the individual ionic currents during an action potential reveals the precise timing and magnitude of each contribution:</Body>
+
+  <Body>1. At rest: Small outward I_K and I_L balance, I_Na negligible (low m)</Body>
+  <Body>2. Rising phase: Large inward I_Na (m rapidly increases, h still high), I_K slowly increasing</Body>
+  <Body>3. Peak: I_Na begins decreasing (h dropping), I_K continuing to increase</Body>
+  <Body>4. Falling phase: I_Na minimal (h ≈ 0), I_K maximal, net outward current</Body>
+  <Body>5. Undershoot: I_Na still inactivated, I_K elevated, driving V toward E_K</Body>
+  <Body>6. Recovery: Both currents return toward resting values</Body>
+
+  <MultiSelect id="q8">
+    <Prompt>Which of the following are valid reasons why the HH equations are considered "stiff" for numerical integration? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">The time constants of different gating variables span different orders of magnitude</Option>
+      <Option correct="true">The m gate has much faster dynamics than the n gate at depolarized potentials</Option>
+      <Option>The equations are nonlinear in voltage</Option>
+      <Option correct="true">Using explicit Euler with large timesteps can produce numerical instability</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Experimental Connections</H2>
+
+  <Body>The HH model was derived from and validated against specific experimental preparations and techniques:</Body>
+
+  <Body>Voltage clamp experiments: By holding membrane potential constant, Hodgkin and Huxley isolated ionic currents and determined their voltage dependence. This technique remains essential for characterizing channel properties.</Body>
+
+  <Body>Pharmacological dissection: Tetrodotoxin (TTX) blocks sodium channels; tetraethylammonium (TEA) blocks potassium channels. These tools allow experimental separation of current components.</Body>
+
+  <Body>The squid giant axon: Its large diameter (~500 μm) made it ideal for early electrophysiology. While parameter values differ for mammalian neurons, the fundamental mechanisms are conserved.</Body>
+
+  <FlashCard id="fc7">
+    <Front>What is the voltage clamp technique and why was it essential for developing the HH model?</Front>
+    <Back>Voltage clamp uses electronic feedback to hold membrane potential at a commanded value despite ionic currents. This allowed Hodgkin and Huxley to measure ionic currents at fixed voltages, separating the current-voltage relationship from the time-dependent dynamics. They could then determine how conductances depend on voltage and time—information impossible to extract from normal action potential recordings where voltage changes continuously.</Back>
+  </FlashCard>
+
+  <H2>Summary: Key Equations</H2>
+
+  <Body>The complete HH model consists of four coupled differential equations:</Body>
+
+  <Code lang="plaintext">
+Membrane potential:
+C_m × dV/dt = -g_Na × m³h × (V - E_Na) - g_K × n⁴ × (V - E_K) - g_L × (V - E_L) + I_ext
+
+Gating variables:
+dm/dt = α_m(V)(1-m) - β_m(V)m     [sodium activation, fast]
+dh/dt = α_h(V)(1-h) - β_h(V)h     [sodium inactivation, slow]
+dn/dt = α_n(V)(1-n) - β_n(V)n     [potassium activation, slow]
+
+Standard parameter values (squid axon, 6.3°C):
+C_m = 1 μF/cm², g_Na = 120 mS/cm², g_K = 36 mS/cm², g_L = 0.3 mS/cm²
+E_Na = 50 mV, E_K = -77 mV, E_L = -54.4 mV
+  </Code>
+
+  <Subjective id="q9">
+    <Prompt>Explain why the sodium current during an action potential is transient (rises and falls quickly) even though the membrane remains depolarized for several milliseconds. In your answer, discuss the roles of both activation and inactivation processes, their different time scales, and how this transient behavior is essential for action potential generation.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains that sodium current depends on BOTH activation (m) and inactivation (h), with the product m³h determining the current magnitude</Requirement>
+        <Indicators>m and h, activation and inactivation, m³h, both gates, product</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies that m (activation) is fast while h (inactivation) is slower, creating a window of high conductance</Requirement>
+        <Indicators>fast, slow, time constant, timescale, m faster than h, rapid activation, slower inactivation</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains that h decreases during sustained depolarization regardless of voltage, causing channels to close</Requirement>
+        <Indicators>sustained depolarization, h decreases, closes, inactivates, remains depolarized</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Connects transient I_Na to action potential function: rapid depolarization followed by allowing repolarization</Requirement>
+        <Indicators>depolarization, repolarization, action potential, allows K⁺, permits recovery</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <H2>Looking Forward</H2>
+
+  <Body>The Hodgkin-Huxley model provides the foundation for understanding neuronal excitability, but it is just the beginning. In subsequent lessons, we will explore:</Body>
+
+  <Body>• Reduced models: FitzHugh-Nagumo and other simplifications that capture essential dynamics</Body>
+  <Body>• Bifurcation analysis: How HH dynamics relate to different excitability types</Body>
+  <Body>• Channel diversity: Models with additional channel types (A-type K⁺, Ca²⁺, etc.)</Body>
+  <Body>• Spatial models: Cable equation and action potential propagation</Body>
+
+  <Body>Mastering the HH model—both its mathematical structure and its biological interpretation—is essential for any computational neuroscientist, as it represents the gold standard for biophysically realistic neuronal modeling.</Body>
+
+</Lesson>

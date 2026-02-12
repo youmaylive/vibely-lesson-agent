@@ -1,0 +1,780 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-06-01</Id>
+    <Title>Shannon Information and Entropy</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>information-theory</Tag>
+      <Tag>entropy</Tag>
+      <Tag>neural-coding</Tag>
+      <Tag>Shannon</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Shannon Information and Entropy</H1>
+
+  <Body>In this lesson, we develop Shannon's revolutionary framework for quantifying information. At its core lies a profound insight: information is the reduction of uncertainty. This mathematical formalization provides fundamental limits on how much information neurons can encode and transmit, and reveals that rare, surprising events carry more information than common, expected ones. These principles underpin our understanding of neural coding efficiency and capacity.</Body>
+
+  <Body>Recall from Module 3 that stochastic processes generate random spike trains with probabilistic structure. Information theory now gives us the tools to quantify exactly how much information these spike trains contain—connecting the statistical properties of neural activity to the fundamental limits of neural computation.</Body>
+
+  <H2>Shannon Information: Quantifying Surprise</H2>
+
+  <Body>Claude Shannon's 1948 paper "A Mathematical Theory of Communication" established the foundation of information theory. Shannon defined the information content of an event A as inversely related to its probability—the less likely an event, the more informative its occurrence.</Body>
+
+  <H3>The Self-Information Formula</H3>
+
+  <Body>The Shannon information (or self-information) of an event A with probability P(A) is defined as:</Body>
+
+  <Code lang="plaintext">
+S(A) = -log₂(P(A)) bits
+  </Code>
+
+  <Body>This definition satisfies several intuitive properties:</Body>
+
+  <Body>1. **Non-negativity**: S(A) ≥ 0 for all events (since P(A) ≤ 1)</Body>
+  <Body>2. **Certainty carries no information**: If P(A) = 1, then S(A) = 0</Body>
+  <Body>3. **Additivity for independent events**: S(A ∩ B) = S(A) + S(B) when A and B are independent</Body>
+  <Body>4. **Rare events are informative**: As P(A) → 0, S(A) → ∞</Body>
+
+  <Body>The logarithm base determines the units: base 2 gives bits, base e gives nats (1 nat ≈ 1.443 bits), and base 10 gives hartleys.</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def shannon_information(probability, base=2):
+    """
+    Compute Shannon information (self-information) of an event.
+
+    Parameters
+    ----------
+    probability : float
+        Probability of the event, must be in (0, 1]
+    base : float
+        Logarithm base (2 for bits, e for nats)
+
+    Returns
+    -------
+    float
+        Information content in bits (base=2) or nats (base=e)
+    """
+    if probability &lt;= 0 or probability &gt; 1:
+        raise ValueError("Probability must be in (0, 1]")
+    return -np.log(probability) / np.log(base)
+
+# Examples
+p_common = 0.9    # A neuron fires in 90% of trials
+p_rare = 0.01     # A specific spike pattern occurs in 1% of trials
+
+info_common = shannon_information(p_common)
+info_rare = shannon_information(p_rare)
+
+print(f"Information from common event (p=0.9): {info_common:.3f} bits")
+print(f"Information from rare event (p=0.01): {info_rare:.3f} bits")
+# Output: 0.152 bits vs 6.644 bits
+  </Code>
+
+  <FlashCard id="fc1">
+    <Front>What is the Shannon information formula for an event A with probability P(A)?</Front>
+    <Back>S(A) = -log₂(P(A)) bits. This quantifies the "surprise" or information gained upon observing event A. Lower probability events yield higher information content.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>Why does Shannon information use a logarithm?</Front>
+    <Back>The logarithm ensures additivity: information from independent events sums. It also transforms multiplicative probabilities into additive information measures, matching our intuition that learning two independent facts gives twice the information of one.</Back>
+  </FlashCard>
+
+  <H2>Entropy: Average Information Content</H2>
+
+  <Body>While self-information quantifies the information from a single event, we often want to characterize an entire random variable. Shannon entropy measures the average information content—or equivalently, the average uncertainty—of a random variable.</Body>
+
+  <H3>Discrete Entropy</H3>
+
+  <Body>For a discrete random variable X taking values x₁, x₂, ..., xₙ with probabilities P(x₁), P(x₂), ..., P(xₙ), the Shannon entropy is:</Body>
+
+  <Code lang="plaintext">
+H(X) = -Σᵢ P(xᵢ) log₂(P(xᵢ)) = E[S(X)] bits
+  </Code>
+
+  <Body>Entropy is the expected value of Shannon information—the average surprise. Key properties include:</Body>
+
+  <Body>• **Non-negativity**: H(X) ≥ 0</Body>
+  <Body>• **Maximum for uniform distribution**: H(X) ≤ log₂(n), with equality when all outcomes are equally likely</Body>
+  <Body>• **Zero for deterministic variables**: H(X) = 0 if and only if X is constant with probability 1</Body>
+  <Body>• **Concavity**: H is a concave function of the probability distribution</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def discrete_entropy(probabilities, base=2):
+    """
+    Compute Shannon entropy of a discrete distribution.
+
+    Parameters
+    ----------
+    probabilities : array-like
+        Probability distribution (must sum to 1)
+    base : float
+        Logarithm base (2 for bits, e for nats)
+
+    Returns
+    -------
+    float
+        Entropy in bits or nats
+    """
+    p = np.asarray(probabilities)
+
+    # Validate distribution
+    if not np.isclose(p.sum(), 1.0):
+        raise ValueError("Probabilities must sum to 1")
+    if np.any(p &lt; 0):
+        raise ValueError("Probabilities must be non-negative")
+
+    # Avoid log(0) by filtering zero probabilities
+    # Convention: 0 * log(0) = 0
+    p_nonzero = p[p &gt; 0]
+    return -np.sum(p_nonzero * np.log(p_nonzero)) / np.log(base)
+
+# Example: Bernoulli spike train
+# Neuron fires (1) or doesn't fire (0) in each time bin
+firing_prob = 0.3
+p_bernoulli = [1 - firing_prob, firing_prob]
+H_bernoulli = discrete_entropy(p_bernoulli)
+print(f"Entropy of Bernoulli(0.3): {H_bernoulli:.4f} bits")
+
+# Compare with maximum entropy (uniform)
+p_uniform = [0.5, 0.5]
+H_uniform = discrete_entropy(p_uniform)
+print(f"Maximum entropy (uniform): {H_uniform:.4f} bits")
+  </Code>
+
+  <H3>The Binary Entropy Function</H3>
+
+  <Body>For a Bernoulli random variable with success probability p, the entropy depends only on p:</Body>
+
+  <Code lang="plaintext">
+H(p) = -p log₂(p) - (1-p) log₂(1-p)
+  </Code>
+
+  <Body>This binary entropy function is symmetric around p = 0.5 and reaches its maximum of 1 bit at p = 0.5, where uncertainty is greatest. This has direct relevance for neural coding: a neuron that fires with probability 0.5 in each time bin achieves maximum entropy per bin.</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def binary_entropy(p):
+    """Binary entropy function H(p) in bits."""
+    if p == 0 or p == 1:
+        return 0
+    return -p * np.log2(p) - (1-p) * np.log2(1-p)
+
+# Vectorized version for plotting
+p_values = np.linspace(0.001, 0.999, 1000)
+H_values = np.array([binary_entropy(p) for p in p_values])
+
+plt.figure(figsize=(8, 5))
+plt.plot(p_values, H_values, 'b-', linewidth=2)
+plt.xlabel('Probability p', fontsize=12)
+plt.ylabel('H(p) [bits]', fontsize=12)
+plt.title('Binary Entropy Function', fontsize=14)
+plt.axvline(x=0.5, color='r', linestyle='--', alpha=0.5, label='Maximum at p=0.5')
+plt.axhline(y=1.0, color='g', linestyle='--', alpha=0.5, label='H_max = 1 bit')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.xlim(0, 1)
+plt.ylim(0, 1.1)
+plt.show()
+  </Code>
+
+  <FlashCard id="fc3">
+    <Front>What is the formula for Shannon entropy of a discrete random variable X?</Front>
+    <Back>H(X) = -Σᵢ P(xᵢ) log₂(P(xᵢ)) bits. This is the expected value of the self-information, representing the average uncertainty in X before observing its value.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc4">
+    <Front>When does a discrete random variable achieve maximum entropy?</Front>
+    <Back>A discrete random variable achieves maximum entropy when it has a uniform distribution. For n possible outcomes, H_max = log₂(n) bits. This represents maximum uncertainty—all outcomes are equally likely.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>A neuron can fire 0, 1, 2, or 3 spikes in a 50ms window with equal probability (p = 0.25 each). What is the entropy of this spike count distribution?</Prompt>
+    <Options>
+      <Option correct="true">2 bits</Option>
+      <Option>1 bit</Option>
+      <Option>4 bits</Option>
+      <Option>0.25 bits</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>If a neuron fires with probability p = 0.5 in each independent 1ms time bin, what is the entropy per bin?</Prompt>
+    <Options>
+      <Option correct="true">1 bit</Option>
+      <Option>0.5 bits</Option>
+      <Option>2 bits</Option>
+      <Option>0 bits</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Differential Entropy for Continuous Variables</H2>
+
+  <Body>When dealing with continuous random variables (like membrane potentials or firing rates), we cannot simply apply the discrete entropy formula. Shannon extended the concept to continuous distributions using differential entropy.</Body>
+
+  <H3>Definition and Caveats</H3>
+
+  <Body>For a continuous random variable X with probability density function f(x), the differential entropy is:</Body>
+
+  <Code lang="plaintext">
+h(X) = -∫ f(x) log₂(f(x)) dx
+  </Code>
+
+  <Body>**Critical difference from discrete entropy**: Differential entropy can be negative! This occurs because probability densities can exceed 1 (they integrate to 1, not sum to 1). Differential entropy is not an absolute measure of uncertainty but rather a relative one.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import integrate
+
+def differential_entropy_gaussian(sigma):
+    """
+    Analytical differential entropy of Gaussian distribution.
+
+    For X ~ N(μ, σ²): h(X) = 0.5 * log₂(2πeσ²)
+    Note: Independent of mean μ
+    """
+    return 0.5 * np.log2(2 * np.pi * np.e * sigma**2)
+
+def differential_entropy_uniform(a, b):
+    """
+    Analytical differential entropy of Uniform(a, b).
+
+    h(X) = log₂(b - a)
+    """
+    return np.log2(b - a)
+
+def differential_entropy_exponential(lambd):
+    """
+    Analytical differential entropy of Exponential(λ).
+
+    h(X) = 1 - log₂(λ) = log₂(e/λ)
+    """
+    return 1 - np.log2(lambd)
+
+# Examples
+sigma = 1.0
+h_gaussian = differential_entropy_gaussian(sigma)
+print(f"Gaussian (σ=1): h(X) = {h_gaussian:.4f} bits")
+
+# Narrow uniform distribution can have negative entropy
+h_uniform_narrow = differential_entropy_uniform(0, 0.1)
+print(f"Uniform(0, 0.1): h(X) = {h_uniform_narrow:.4f} bits")  # Negative!
+
+h_uniform_wide = differential_entropy_uniform(0, 10)
+print(f"Uniform(0, 10): h(X) = {h_uniform_wide:.4f} bits")
+  </Code>
+
+  <Body>The differential entropy of a Gaussian with variance σ² is h(X) = ½ log₂(2πeσ²). This formula appears frequently because the Gaussian is the maximum entropy distribution for a given variance—a key result we explore next.</Body>
+
+  <FlashCard id="fc5">
+    <Front>What is differential entropy, and how does it differ from discrete entropy?</Front>
+    <Back>Differential entropy h(X) = -∫ f(x) log₂(f(x)) dx is the continuous analog of Shannon entropy. Unlike discrete entropy, it can be negative and depends on the coordinate system. It measures uncertainty relative to a reference, not absolute uncertainty.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q3">
+    <Prompt>Which of the following statements about differential entropy are true? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Differential entropy can be negative</Option>
+      <Option correct="true">The Gaussian distribution maximizes differential entropy for fixed variance</Option>
+      <Option>Differential entropy is always non-negative like discrete entropy</Option>
+      <Option correct="true">Differential entropy changes under coordinate transformations</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>The Maximum Entropy Principle</H2>
+
+  <Body>E.T. Jaynes championed the maximum entropy principle: when constructing a probability distribution from limited information, choose the distribution that maximizes entropy subject to the known constraints. This yields the "least biased" or "most noncommittal" distribution consistent with what we know.</Body>
+
+  <H3>Maximum Entropy Distributions</H3>
+
+  <Body>Different constraints lead to different maximum entropy distributions:</Body>
+
+  <Body>• **Fixed support [a, b], no other constraints**: Uniform distribution on [a, b]</Body>
+  <Body>• **Fixed mean and variance (continuous)**: Gaussian (normal) distribution</Body>
+  <Body>• **Fixed mean (non-negative support)**: Exponential distribution</Body>
+  <Body>• **Fixed mean (discrete, non-negative)**: Geometric distribution</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy import optimize
+from scipy.special import entr
+
+def max_entropy_discrete(n, constraints=None):
+    """
+    Find maximum entropy distribution over n outcomes.
+
+    Without constraints, returns uniform distribution.
+    With constraints, uses Lagrange multipliers.
+
+    Parameters
+    ----------
+    n : int
+        Number of possible outcomes
+    constraints : list of tuples, optional
+        Each tuple (f, value) where f is a function f(p)
+        and the constraint is E[f] = value
+
+    Returns
+    -------
+    array
+        Maximum entropy probability distribution
+    """
+    if constraints is None:
+        # Uniform is maximum entropy with no constraints
+        return np.ones(n) / n
+
+    # With constraints, use numerical optimization
+    def neg_entropy(p):
+        return -np.sum(entr(p)) / np.log(2)  # Negative entropy in bits
+
+    # Constraints for scipy.optimize
+    cons = [{'type': 'eq', 'fun': lambda p: np.sum(p) - 1}]  # Sum to 1
+    for f, value in constraints:
+        cons.append({'type': 'eq', 'fun': lambda p, f=f, v=value: f(p) - v})
+
+    # Initial guess: uniform
+    p0 = np.ones(n) / n
+    bounds = [(1e-10, 1)] * n
+
+    result = optimize.minimize(neg_entropy, p0, method='SLSQP',
+                               bounds=bounds, constraints=cons)
+    return result.x
+
+# Example: Max entropy with fixed mean
+# For a die (n=6), what if we know the mean is 4.5?
+n = 6
+mean_constraint = (lambda p: np.sum(p * np.arange(1, n+1)), 4.5)
+p_max_ent = max_entropy_discrete(n, [mean_constraint])
+
+print("Maximum entropy distribution with E[X] = 4.5:")
+for i, pi in enumerate(p_max_ent, 1):
+    print(f"  P(X={i}) = {pi:.4f}")
+  </Code>
+
+  <Body>For neural coding, the maximum entropy principle suggests that if we only know the mean firing rate of a neuron, the least biased assumption is that interspike intervals follow an exponential distribution. Deviations from this reveal additional structure in the spike train.</Body>
+
+  <FlashCard id="fc6">
+    <Front>What distribution maximizes entropy given a fixed mean and variance for continuous variables?</Front>
+    <Back>The Gaussian (normal) distribution. This is why Gaussian noise is often assumed in neural models—it represents maximum uncertainty for a given variance, making it the least biased assumption.</Back>
+  </FlashCard>
+
+  <MatchPairs id="q4">
+    <Prompt>Match each constraint to its maximum entropy distribution:</Prompt>
+    <Pairs>
+      <Pair><Left>Fixed support [a,b], no other constraints</Left><Right>Uniform distribution</Right></Pair>
+      <Pair><Left>Fixed mean and variance (continuous)</Left><Right>Gaussian distribution</Right></Pair>
+      <Pair><Left>Fixed mean, non-negative support (continuous)</Left><Right>Exponential distribution</Right></Pair>
+      <Pair><Left>No constraints, n discrete outcomes</Left><Right>Discrete uniform</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Poisson distribution</Distractor>
+      <Distractor>Binomial distribution</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Joint and Conditional Entropy</H2>
+
+  <Body>When analyzing relationships between random variables—such as stimulus and neural response—we need joint and conditional entropy measures.</Body>
+
+  <H3>Joint Entropy</H3>
+
+  <Body>The joint entropy of two random variables X and Y measures the total uncertainty in the pair:</Body>
+
+  <Code lang="plaintext">
+H(X, Y) = -Σₓ Σᵧ P(x, y) log₂(P(x, y))
+  </Code>
+
+  <Body>Joint entropy satisfies: H(X, Y) ≤ H(X) + H(Y), with equality if and only if X and Y are independent.</Body>
+
+  <H3>Conditional Entropy</H3>
+
+  <Body>The conditional entropy H(Y|X) measures the remaining uncertainty in Y after observing X:</Body>
+
+  <Code lang="plaintext">
+H(Y|X) = -Σₓ Σᵧ P(x, y) log₂(P(y|x))
+       = Σₓ P(x) H(Y|X=x)
+  </Code>
+
+  <Body>Conditional entropy is the average entropy of Y over the distribution of X. It quantifies how much uncertainty about Y remains after X is known.</Body>
+
+  <H3>The Chain Rule of Entropy</H3>
+
+  <Body>A fundamental relationship connects joint and conditional entropy:</Body>
+
+  <Code lang="plaintext">
+H(X, Y) = H(X) + H(Y|X) = H(Y) + H(X|Y)
+  </Code>
+
+  <Body>This "chain rule" decomposes joint uncertainty into marginal uncertainty plus conditional uncertainty. It generalizes to multiple variables: H(X₁, X₂, ..., Xₙ) = Σᵢ H(Xᵢ | X₁, ..., Xᵢ₋₁).</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def joint_entropy(p_xy, base=2):
+    """
+    Compute joint entropy H(X, Y) from joint distribution.
+
+    Parameters
+    ----------
+    p_xy : 2D array
+        Joint probability distribution P(X=i, Y=j) = p_xy[i, j]
+    base : float
+        Logarithm base
+
+    Returns
+    -------
+    float
+        Joint entropy in bits (base=2) or nats (base=e)
+    """
+    p_flat = p_xy.flatten()
+    p_nonzero = p_flat[p_flat &gt; 0]
+    return -np.sum(p_nonzero * np.log(p_nonzero)) / np.log(base)
+
+def conditional_entropy(p_xy, base=2):
+    """
+    Compute conditional entropy H(Y|X) from joint distribution.
+
+    Uses: H(Y|X) = H(X,Y) - H(X)
+    """
+    H_joint = joint_entropy(p_xy, base)
+    p_x = p_xy.sum(axis=1)  # Marginal of X
+    p_x_nonzero = p_x[p_x &gt; 0]
+    H_x = -np.sum(p_x_nonzero * np.log(p_x_nonzero)) / np.log(base)
+    return H_joint - H_x
+
+# Example: Stimulus (X) and Neural Response (Y)
+# 2 stimuli, 3 response levels
+p_xy = np.array([
+    [0.25, 0.15, 0.10],  # P(Y|X=0) is more peaked
+    [0.10, 0.15, 0.25]   # P(Y|X=1) is different
+])
+
+H_joint = joint_entropy(p_xy)
+H_Y_given_X = conditional_entropy(p_xy)
+p_x = p_xy.sum(axis=1)
+p_y = p_xy.sum(axis=0)
+H_X = -np.sum(p_x[p_x &gt; 0] * np.log2(p_x[p_x &gt; 0]))
+H_Y = -np.sum(p_y[p_y &gt; 0] * np.log2(p_y[p_y &gt; 0]))
+
+print(f"H(X) = {H_X:.4f} bits")
+print(f"H(Y) = {H_Y:.4f} bits")
+print(f"H(X,Y) = {H_joint:.4f} bits")
+print(f"H(Y|X) = {H_Y_given_X:.4f} bits")
+print(f"Verify chain rule: H(X) + H(Y|X) = {H_X + H_Y_given_X:.4f} bits")
+  </Code>
+
+  <FlashCard id="fc7">
+    <Front>State the chain rule of entropy.</Front>
+    <Back>H(X, Y) = H(X) + H(Y|X) = H(Y) + H(X|Y). Joint entropy equals marginal entropy plus conditional entropy. This decomposes total uncertainty into the uncertainty of one variable plus the remaining uncertainty in the other given the first.</Back>
+  </FlashCard>
+
+  <SortQuiz id="q5">
+    <Prompt>Order these entropy quantities from smallest to largest for dependent random variables X and Y (where knowing one reduces uncertainty about the other):</Prompt>
+    <SortedItems>
+      <Item>H(Y|X) - Conditional entropy</Item>
+      <Item>H(Y) - Marginal entropy</Item>
+      <Item>H(X,Y) - Joint entropy</Item>
+      <Item>H(X) + H(Y) - Sum of marginals</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Entropy Rate of Spike Trains</H2>
+
+  <Body>Neural spike trains are stochastic processes unfolding over time. The entropy rate quantifies the asymptotic information content per time unit or per symbol in such processes.</Body>
+
+  <H3>Definition</H3>
+
+  <Body>For a stochastic process {X₁, X₂, ...}, the entropy rate is:</Body>
+
+  <Code lang="plaintext">
+H' = lim_{n→∞} (1/n) H(X₁, X₂, ..., Xₙ)
+
+Equivalently, for stationary processes:
+H' = lim_{n→∞} H(Xₙ | X₁, ..., Xₙ₋₁)
+  </Code>
+
+  <Body>The first form gives the average entropy per symbol over long sequences. The second gives the entropy of the next symbol given all previous ones—the "true" uncertainty rate once all correlations are accounted for.</Body>
+
+  <H3>Entropy Rate of Bernoulli Spike Trains</H3>
+
+  <Body>Consider discretizing time into bins of width Δt. A simple model treats each bin as an independent Bernoulli trial with firing probability p = rΔt (where r is the firing rate). For this independent process:</Body>
+
+  <Code lang="plaintext">
+H'_independent = H(p) / Δt bits/second
+
+where H(p) = -p log₂(p) - (1-p) log₂(1-p) is binary entropy
+  </Code>
+
+  <Body>Real neurons show temporal correlations (refractory periods, bursting), so their entropy rate is typically lower than this independent upper bound.</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def binary_entropy(p):
+    """Binary entropy function in bits."""
+    if p == 0 or p == 1:
+        return 0.0
+    return -p * np.log2(p) - (1-p) * np.log2(1-p)
+
+def entropy_rate_bernoulli(firing_rate, dt):
+    """
+    Entropy rate of independent Bernoulli spike train.
+
+    Parameters
+    ----------
+    firing_rate : float
+        Mean firing rate in Hz (spikes/second)
+    dt : float
+        Time bin width in seconds
+
+    Returns
+    -------
+    float
+        Entropy rate in bits/second
+    """
+    p = firing_rate * dt
+    if p &gt;= 1:
+        raise ValueError("p = rate * dt must be &lt; 1")
+    return binary_entropy(p) / dt
+
+# Example: Neuron firing at 50 Hz
+rate = 50  # Hz
+dt = 0.001  # 1 ms bins
+
+H_rate = entropy_rate_bernoulli(rate, dt)
+print(f"Firing rate: {rate} Hz")
+print(f"Time bin: {dt*1000} ms")
+print(f"Spike probability per bin: {rate * dt}")
+print(f"Entropy rate (independent): {H_rate:.2f} bits/second")
+
+# Compare different bin sizes
+print("\nEntropy rate vs bin size:")
+for dt in [0.0001, 0.001, 0.01]:
+    H_rate = entropy_rate_bernoulli(rate, dt)
+    print(f"  Δt = {dt*1000:.1f} ms: H' = {H_rate:.1f} bits/s")
+  </Code>
+
+  <H3>Estimating Entropy from Data</H3>
+
+  <Body>In practice, we estimate entropy from observed spike trains. The "direct method" bins spike patterns and computes plug-in entropy estimates, while more sophisticated approaches correct for limited sampling bias.</Body>
+
+  <Code lang="python">
+import numpy as np
+from collections import Counter
+
+def estimate_entropy_direct(spike_train, word_length, base=2):
+    """
+    Estimate entropy rate using direct method (Strong et al., 1998).
+
+    Parameters
+    ----------
+    spike_train : array
+        Binary spike train (0s and 1s)
+    word_length : int
+        Length of spike words to consider
+    base : float
+        Logarithm base
+
+    Returns
+    -------
+    float
+        Estimated entropy per symbol (per time bin)
+    """
+    n = len(spike_train) - word_length + 1
+    if n &lt;= 0:
+        raise ValueError("Spike train too short for given word length")
+
+    # Extract all words
+    words = [tuple(spike_train[i:i+word_length]) for i in range(n)]
+
+    # Count occurrences
+    counts = Counter(words)
+
+    # Estimate probabilities and entropy
+    total = sum(counts.values())
+    H = 0.0
+    for count in counts.values():
+        p = count / total
+        if p &gt; 0:
+            H -= p * np.log(p)
+
+    return H / (np.log(base) * word_length)  # Per-symbol entropy
+
+# Simulate spike train
+np.random.seed(42)
+rate = 30  # Hz
+dt = 0.001  # 1 ms bins
+T = 10  # seconds
+n_bins = int(T / dt)
+p_spike = rate * dt
+
+# Independent Bernoulli (maximum entropy for this rate)
+spike_train_ind = np.random.binomial(1, p_spike, n_bins)
+
+# Estimate entropy for different word lengths
+print("Entropy rate estimation (independent spikes):")
+print(f"True entropy per bin: {binary_entropy(p_spike):.4f} bits")
+for L in [1, 2, 4, 8, 16]:
+    H_est = estimate_entropy_direct(spike_train_ind, L)
+    print(f"  Word length {L:2d}: H = {H_est:.4f} bits/bin")
+  </Code>
+
+  <FillBlanks id="q6">
+    <Prompt>
+      The entropy rate of a spike train measures the <Blank>information</Blank> content per unit time. For an independent Bernoulli process with firing probability p per bin, the entropy per bin equals the <Blank>binary</Blank> entropy function H(p). Real neurons typically have <Blank>lower</Blank> entropy rates than independent models due to temporal correlations like <Blank>refractory</Blank> periods.
+    </Prompt>
+    <Distractors>
+      <Distractor>Fisher</Distractor>
+      <Distractor>uniform</Distractor>
+      <Distractor>higher</Distractor>
+      <Distractor>synaptic</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Coding Efficiency</H2>
+
+  <Body>Coding efficiency quantifies how well a neural system uses its available coding capacity. It compares the actual entropy of neural responses to the maximum possible entropy.</Body>
+
+  <Code lang="plaintext">
+Efficiency = H_actual / H_max
+
+where H_max is the entropy of the maximum entropy distribution
+subject to the same constraints (e.g., mean firing rate)
+  </Code>
+
+  <Body>An efficiency of 1 (or 100%) means the neural code is as variable as possible given its constraints—it carries maximum information. Lower efficiency indicates redundancy or structure that reduces information capacity.</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def coding_efficiency(observed_entropy, max_entropy):
+    """
+    Compute coding efficiency as ratio of observed to maximum entropy.
+
+    Parameters
+    ----------
+    observed_entropy : float
+        Actual entropy of neural responses
+    max_entropy : float
+        Maximum possible entropy under same constraints
+
+    Returns
+    -------
+    float
+        Efficiency in [0, 1]
+    """
+    if max_entropy == 0:
+        return 0.0  # Degenerate case
+    return observed_entropy / max_entropy
+
+# Example: Compare regular vs irregular firing
+# Regular firing: neuron fires exactly every 20ms (50 Hz)
+# Irregular firing: Poisson-like with same mean rate
+
+# For spike count in 100ms window:
+# Regular: always 5 spikes → H = 0 bits
+# Maximum entropy (uniform on 0-10): H = log2(11) ≈ 3.46 bits
+# Poisson (λ=5): H ≈ 2.5 bits (less than uniform due to mean constraint)
+
+from scipy.stats import poisson
+from scipy.special import entr
+
+# Poisson distribution with λ=5
+lambda_param = 5
+k_values = np.arange(0, 20)  # Spike counts
+p_poisson = poisson.pmf(k_values, lambda_param)
+H_poisson = np.sum(entr(p_poisson)) / np.log(2)  # bits
+
+# Maximum entropy with same mean (truncated)
+# For fair comparison, use same support
+H_max_fixed_mean = H_poisson  # Poisson is max entropy for fixed mean on non-negative integers
+
+# Regular firing
+H_regular = 0  # Deterministic
+
+# Irregular (exponential ISI, Poisson process)
+print("Spike count entropy in 100ms window (λ=5 spikes):")
+print(f"  Regular firing: H = {H_regular:.4f} bits (efficiency = 0%)")
+print(f"  Poisson process: H = {H_poisson:.4f} bits")
+print(f"  Uniform (0-10): H = {np.log2(11):.4f} bits (theoretical max)")
+
+eff_poisson = coding_efficiency(H_poisson, np.log2(11))
+print(f"\nPoisson efficiency vs uniform: {eff_poisson*100:.1f}%")
+  </Code>
+
+  <Body>Studies of sensory neurons often find that they operate near maximum entropy given their firing rate constraints, suggesting evolution has optimized neural codes for information transmission.</Body>
+
+  <SingleSelect id="q7">
+    <Prompt>A neuron's spike count distribution in 100ms windows has entropy H = 2.5 bits. The maximum possible entropy for the same mean firing rate is H_max = 3.0 bits. What is the coding efficiency?</Prompt>
+    <Options>
+      <Option correct="true">83.3%</Option>
+      <Option>75%</Option>
+      <Option>0.5 bits</Option>
+      <Option>120%</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Common Misconceptions</H2>
+
+  <Body>Before concluding, let's address frequent points of confusion in information theory:</Body>
+
+  <Body>**1. Shannon information vs. Fisher information**: Shannon information quantifies uncertainty reduction; Fisher information quantifies how much a parameter affects a distribution. They measure different things and have different units.</Body>
+
+  <Body>**2. Differential entropy can be negative**: Unlike discrete entropy, h(X) can be negative for "peaked" continuous distributions. This doesn't mean "negative information"—it's a consequence of measuring entropy relative to a uniform reference.</Body>
+
+  <Body>**3. Bits vs. nats**: Always check your units! Using ln() gives nats; using log₂() gives bits. To convert: bits = nats / ln(2) ≈ nats × 1.443.</Body>
+
+  <Body>**4. Discrete formulas for continuous variables**: Don't apply Σ p log p to continuous densities without proper discretization. As bin size → 0, discrete entropy → ∞, while differential entropy remains finite.</Body>
+
+  <Subjective id="q8">
+    <Prompt>Explain why the Gaussian distribution is often assumed for noise in neural models, relating your answer to the maximum entropy principle. What does this assumption imply about what we know (and don't know) about the noise?</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains that the Gaussian maximizes entropy for fixed mean and variance</Requirement>
+        <Indicators>maximum entropy, fixed variance, fixed mean, least biased, most uncertain</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Explains the epistemological interpretation: Gaussian is the least assuming distribution given only knowledge of mean and variance</Requirement>
+        <Indicators>least assuming, minimal assumptions, only know, limited knowledge, agnostic</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Connects to neural modeling: using Gaussian implies we don't know higher-order statistics of the noise</Requirement>
+        <Indicators>higher-order, skewness, kurtosis, neural noise, modeling assumption</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Mentions practical or analytical convenience of Gaussian distributions</Requirement>
+        <Indicators>convenient, tractable, analytical, closed-form</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="200" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>This lesson introduced the foundational concepts of Shannon information theory:</Body>
+
+  <Body>• **Shannon information** S(A) = -log₂(P(A)) quantifies the surprise of observing event A</Body>
+  <Body>• **Entropy** H(X) = -Σ P(x) log₂ P(x) measures average uncertainty, maximized by uniform distributions</Body>
+  <Body>• **Differential entropy** extends these ideas to continuous variables, but can be negative</Body>
+  <Body>• **Maximum entropy principle** prescribes the least biased distribution given constraints</Body>
+  <Body>• **Conditional entropy** and the **chain rule** decompose joint uncertainty</Body>
+  <Body>• **Entropy rate** quantifies information per time in spike trains</Body>
+  <Body>• **Coding efficiency** compares actual to maximum possible entropy</Body>
+
+  <Body>These concepts provide the foundation for mutual information and neural coding analysis in the next lesson, where we'll quantify how much information neural responses carry about stimuli.</Body>
+
+  <FlashCard id="fc8">
+    <Front>What does coding efficiency measure in neural systems?</Front>
+    <Back>Coding efficiency = H_actual / H_max, the ratio of observed entropy to maximum possible entropy under the same constraints. High efficiency (near 100%) means the neural code is maximally variable and carries maximum information given its constraints.</Back>
+  </FlashCard>
+
+</Lesson>

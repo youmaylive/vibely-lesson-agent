@@ -1,0 +1,895 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-07-01</Id>
+    <Title>Optimal Control Framework</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>optimal-control</Tag>
+      <Tag>hamilton-jacobi-bellman</Tag>
+      <Tag>dynamic-programming</Tag>
+      <Tag>calculus-of-variations</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>motor-control</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Optimal Control Framework</H1>
+
+  <Body>Optimal control theory provides a principled mathematical framework for finding inputs that drive dynamical systems—including neuronal systems—to desired states while minimizing costs. This framework reveals computational principles underlying motor control and suggests potential therapeutic interventions for neurological disorders. In this lesson, we develop the mathematical foundations of optimal control, from problem formulation through numerical solution methods.</Body>
+
+  <H2>Connection to Dynamical Systems</H2>
+
+  <Body>Recall from Module 1 that dynamical systems describe how states evolve over time according to differential equations. While that module focused on analyzing uncontrolled dynamics, optimal control extends this framework by asking: given the ability to apply inputs (controls), what is the best way to steer the system to achieve a desired goal? This question is central to understanding how the nervous system generates movements and how we might design neural prosthetics or stimulation protocols.</Body>
+
+  <H2>The Optimal Control Problem Formulation</H2>
+
+  <Body>An optimal control problem consists of three essential components: state dynamics describing how the system evolves, a cost functional quantifying what we wish to minimize (or maximize), and constraints on the controls and states.</Body>
+
+  <H3>State Dynamics</H3>
+
+  <Body>The controlled dynamical system is described by a differential equation where the state evolution depends on both the current state and a control input:</Body>
+
+  <Code lang="plaintext">
+dx/dt = f(x, u, t)
+
+where:
+  x ∈ ℝⁿ is the state vector
+  u ∈ ℝᵐ is the control input
+  f : ℝⁿ × ℝᵐ × ℝ → ℝⁿ is the dynamics function
+  </Code>
+
+  <Body>For neuronal systems, x might represent membrane potential, gating variables, or firing rates, while u could be an applied current, synaptic input, or stimulation protocol.</Body>
+
+  <H3>Cost Functional</H3>
+
+  <Body>The cost functional J quantifies the objective we wish to minimize. The general form combines a terminal cost (penalizing deviation from desired final state) and a running cost (penalizing state deviations and control effort along the trajectory):</Body>
+
+  <Code lang="plaintext">
+J[u] = φ(x(T), T) + ∫₀ᵀ L(x(t), u(t), t) dt
+
+where:
+  φ(x(T), T) = terminal cost (Mayer term)
+  L(x, u, t) = running cost (Lagrangian)
+  T = final time (fixed or free)
+  </Code>
+
+  <Body>Common choices for the running cost include quadratic forms that penalize both state deviations from a target and control effort:</Body>
+
+  <Code lang="plaintext">
+L(x, u, t) = (x - xₜₐᵣgₑₜ)ᵀ Q (x - xₜₐᵣgₑₜ) + uᵀ R u
+
+where Q ≥ 0 and R > 0 are weighting matrices
+  </Code>
+
+  <FlashCard id="fc1">
+    <Front>What is a cost functional in optimal control?</Front>
+    <Back>A cost functional J[u] maps a control trajectory u(t) to a scalar cost value. It typically combines a terminal cost φ(x(T)) penalizing the final state and a running cost ∫L(x,u,t)dt penalizing behavior along the trajectory. The optimal control minimizes this functional.</Back>
+  </FlashCard>
+
+  <H3>Control Constraints</H3>
+
+  <Body>Real systems have physical limitations on what controls can be applied. Common constraints include:</Body>
+
+  <Code lang="plaintext">
+Bounded inputs:     u_min ≤ u(t) ≤ u_max
+Energy constraints: ∫₀ᵀ ||u(t)||² dt ≤ E_max
+Rate constraints:   |du/dt| ≤ r_max
+State constraints:  x(t) ∈ X (admissible region)
+  </Code>
+
+  <Body>For neural stimulation, these might reflect maximum safe current levels, total energy budgets, or constraints on stimulation rates to avoid tissue damage.</Body>
+
+  <H2>Calculus of Variations Approach</H2>
+
+  <Body>The calculus of variations provides a classical approach to finding optimal controls by deriving necessary conditions that any optimal solution must satisfy.</Body>
+
+  <H3>The Euler-Lagrange Equations</H3>
+
+  <Body>For unconstrained problems, we seek controls and states that make the first variation of the cost functional vanish. This leads to the Euler-Lagrange equations. Consider the augmented cost with the dynamics constraint incorporated via a costate (adjoint) variable p:</Body>
+
+  <Code lang="plaintext">
+J̄ = φ(x(T)) + ∫₀ᵀ [L(x, u, t) + pᵀ(f(x, u, t) - ẋ)] dt
+  </Code>
+
+  <Body>Taking variations with respect to x, u, and p and requiring δJ̄ = 0 yields the necessary conditions:</Body>
+
+  <Code lang="plaintext">
+State equation:    dx/dt = ∂H/∂p = f(x, u, t)
+Costate equation:  dp/dt = -∂H/∂x = -∂L/∂x - (∂f/∂x)ᵀ p
+Stationarity:      ∂H/∂u = 0  →  ∂L/∂u + (∂f/∂u)ᵀ p = 0
+  </Code>
+
+  <FlashCard id="fc2">
+    <Front>What is the costate (adjoint) variable in optimal control?</Front>
+    <Back>The costate variable p(t) is a Lagrange multiplier function that enforces the dynamics constraint dx/dt = f(x,u,t). It satisfies the adjoint equation dp/dt = -∂H/∂x and can be interpreted as the sensitivity of the optimal cost to perturbations in the state. It represents the "shadow price" of the state.</Back>
+  </FlashCard>
+
+  <H3>The Control Hamiltonian</H3>
+
+  <Body>The control Hamiltonian H plays a central role in optimal control theory, analogous to its role in classical mechanics:</Body>
+
+  <Code lang="plaintext">
+H(x, p, u, t) = L(x, u, t) + pᵀ f(x, u, t)
+
+The Hamiltonian combines:
+  - L(x, u, t): the running cost (what we want to minimize)
+  - pᵀ f(x, u, t): the costate times dynamics (constraint enforcement)
+  </Code>
+
+  <Body>The optimal control minimizes the Hamiltonian with respect to u at each instant:</Body>
+
+  <Code lang="plaintext">
+u*(t) = arg min_u H(x(t), p(t), u, t)
+  </Code>
+
+  <Body>This is Pontryagin's Minimum Principle, a powerful necessary condition for optimality that applies even when controls are constrained.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is Pontryagin's Minimum Principle?</Front>
+    <Back>Pontryagin's Minimum Principle states that the optimal control u*(t) minimizes the Hamiltonian H(x, p, u, t) = L(x,u,t) + pᵀf(x,u,t) at each time t, subject to the state and costate equations. It provides necessary conditions for optimality and extends to problems with control constraints where calculus-based methods fail.</Back>
+  </FlashCard>
+
+  <H2>Hamilton-Jacobi-Bellman Equation</H2>
+
+  <Body>While the calculus of variations approach requires solving a two-point boundary value problem (states start at x₀, costates have terminal conditions), the Hamilton-Jacobi-Bellman (HJB) equation provides an alternative formulation based on dynamic programming.</Body>
+
+  <H3>The Value Function</H3>
+
+  <Body>Define the value function V(x, t) as the optimal cost-to-go from state x at time t:</Body>
+
+  <Code lang="plaintext">
+V(x, t) = min_{u(·)} {φ(x(T)) + ∫ₜᵀ L(x(s), u(s), s) ds}
+
+subject to: dx/ds = f(x, u, s), x(t) = x
+  </Code>
+
+  <Body>The value function satisfies the terminal condition V(x, T) = φ(x, T) and encapsulates the solution to all optimal control problems starting from any state at any time.</Body>
+
+  <H3>Derivation of the HJB Equation</H3>
+
+  <Body>Applying the principle of optimality—that any portion of an optimal trajectory is itself optimal—leads to the Hamilton-Jacobi-Bellman partial differential equation:</Body>
+
+  <Code lang="plaintext">
+-∂V/∂t = min_u [L(x, u, t) + (∂V/∂x)ᵀ f(x, u, t)]
+
+Or equivalently, using the Hamiltonian:
+-∂V/∂t = min_u H(x, ∂V/∂x, u, t)
+
+where ∂V/∂x plays the role of the costate p
+  </Code>
+
+  <Body>The HJB equation is a first-order nonlinear PDE that, when solved, directly provides both the optimal value function and (through the minimizing argument) the optimal feedback control policy u*(x, t).</Body>
+
+  <FlashCard id="fc4">
+    <Front>What is the Hamilton-Jacobi-Bellman (HJB) equation?</Front>
+    <Back>The HJB equation is -∂V/∂t = min_u[L(x,u,t) + (∂V/∂x)·f(x,u,t)], where V(x,t) is the optimal cost-to-go (value function). It provides a sufficient condition for optimality and yields an optimal feedback control law. The gradient ∂V/∂x corresponds to the costate variable from the Pontryagin approach.</Back>
+  </FlashCard>
+
+  <H3>Relationship to Pontryagin Conditions</H3>
+
+  <Body>The HJB and Pontryagin approaches are deeply connected:</Body>
+
+  <Code lang="plaintext">
+Connection: p(t) = ∂V/∂x |_{x=x*(t)}
+
+Along optimal trajectories:
+  - The costate equals the gradient of the value function
+  - The HJB minimum condition implies the stationarity condition
+  - Solutions to both approaches coincide
+  </Code>
+
+  <SingleSelect id="q1">
+    <Prompt>In the Hamilton-Jacobi-Bellman equation -∂V/∂t = min_u[L(x,u,t) + (∂V/∂x)·f(x,u,t)], what does the term (∂V/∂x)·f(x,u,t) represent?</Prompt>
+    <Options>
+      <Option>The running cost along the trajectory</Option>
+      <Option correct="true">The rate of change of optimal cost-to-go due to state dynamics</Option>
+      <Option>The terminal cost at the final time</Option>
+      <Option>The control effort penalty</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Dynamic Programming Principle</H2>
+
+  <Body>Dynamic programming is both a conceptual framework and a computational approach for solving optimal control problems. The key insight is Bellman's principle of optimality.</Body>
+
+  <H3>Principle of Optimality</H3>
+
+  <Body>Bellman's principle states: An optimal policy has the property that whatever the initial state and initial decision, the remaining decisions must constitute an optimal policy with regard to the state resulting from the first decision.</Body>
+
+  <Code lang="plaintext">
+Mathematically, for any intermediate time s ∈ (t, T):
+
+V(x, t) = min_{u(·)|[t,s]} {∫ₜˢ L(x, u, τ) dτ + V(x(s), s)}
+
+This recursive relationship underlies both:
+  1. The HJB equation (continuous time)
+  2. Discrete-time dynamic programming algorithms
+  </Code>
+
+  <Body>This principle allows us to break a complex optimization over an entire trajectory into a sequence of simpler optimizations, working backward from the terminal time.</Body>
+
+  <H3>Discrete-Time Dynamic Programming</H3>
+
+  <Body>For computational implementation, we often discretize time and solve the discrete Bellman equation backward:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def value_iteration(states, controls, transition, running_cost,
+                    terminal_cost, T, dt):
+    """
+    Discrete-time dynamic programming via backward induction.
+
+    Parameters:
+    -----------
+    states : array of discrete state values
+    controls : array of discrete control values
+    transition : function(x, u, t) -> next state
+    running_cost : function(x, u, t) -> instantaneous cost
+    terminal_cost : function(x) -> terminal cost
+    T : final time
+    dt : time step
+
+    Returns:
+    --------
+    V : value function V[state_idx, time_idx]
+    policy : optimal control policy[state_idx, time_idx]
+    """
+    n_states = len(states)
+    n_times = int(T / dt) + 1
+
+    # Initialize value function and policy
+    V = np.zeros((n_states, n_times))
+    policy = np.zeros((n_states, n_times - 1), dtype=int)
+
+    # Terminal condition
+    for i, x in enumerate(states):
+        V[i, -1] = terminal_cost(x)
+
+    # Backward induction
+    for k in range(n_times - 2, -1, -1):
+        t = k * dt
+        for i, x in enumerate(states):
+            min_cost = np.inf
+            best_u = 0
+
+            for j, u in enumerate(controls):
+                # Compute next state
+                x_next = transition(x, u, t)
+
+                # Find nearest state index (for discrete approximation)
+                next_idx = np.argmin(np.abs(states - x_next))
+
+                # Bellman equation
+                cost = running_cost(x, u, t) * dt + V[next_idx, k + 1]
+
+                if cost &lt; min_cost:
+                    min_cost = cost
+                    best_u = j
+
+            V[i, k] = min_cost
+            policy[i, k] = best_u
+
+    return V, policy
+  </Code>
+
+  <MultiSelect id="q2">
+    <Prompt>Which of the following are advantages of the dynamic programming approach over the Pontryagin approach for solving optimal control problems?</Prompt>
+    <Options>
+      <Option correct="true">Provides a global feedback control law rather than a single optimal trajectory</Option>
+      <Option correct="true">Naturally handles state constraints and obstacles</Option>
+      <Option>Always computationally faster regardless of state dimension</Option>
+      <Option correct="true">Does not require solving a two-point boundary value problem</Option>
+      <Option>Avoids the curse of dimensionality for high-dimensional systems</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>The Linear-Quadratic Regulator (LQR)</H2>
+
+  <Body>The linear-quadratic regulator is a fundamental special case where both the dynamics are linear and the cost is quadratic. Remarkably, this problem admits an analytical solution.</Body>
+
+  <H3>Problem Formulation</H3>
+
+  <Code lang="plaintext">
+Dynamics: dx/dt = Ax + Bu
+Cost: J = xᵀ(T)Qf x(T) + ∫₀ᵀ [xᵀQx + uᵀRu] dt
+
+where:
+  A ∈ ℝⁿˣⁿ : state matrix
+  B ∈ ℝⁿˣᵐ : input matrix
+  Q ≥ 0    : state cost weight (positive semidefinite)
+  R > 0    : control cost weight (positive definite)
+  Qf ≥ 0   : terminal state cost weight
+  </Code>
+
+  <H3>Solution via Riccati Equation</H3>
+
+  <Body>The optimal control is a linear state feedback law:</Body>
+
+  <Code lang="plaintext">
+u*(t) = -K(t) x(t)
+
+where K(t) = R⁻¹ Bᵀ P(t)
+
+and P(t) satisfies the matrix Riccati differential equation:
+-dP/dt = AᵀP + PA - PBR⁻¹BᵀP + Q
+
+with terminal condition P(T) = Qf
+  </Code>
+
+  <Body>For infinite-horizon problems (T → ∞), P converges to a constant matrix satisfying the algebraic Riccati equation (ARE):</Body>
+
+  <Code lang="plaintext">
+0 = AᵀP + PA - PBR⁻¹BᵀP + Q
+  </Code>
+
+  <Code lang="python">
+import numpy as np
+from scipy.linalg import solve_continuous_are
+from scipy.integrate import solve_ivp
+
+def lqr_infinite_horizon(A, B, Q, R):
+    """
+    Solve the infinite-horizon LQR problem.
+
+    Returns:
+    --------
+    K : optimal gain matrix
+    P : solution to algebraic Riccati equation
+    """
+    # Solve algebraic Riccati equation
+    P = solve_continuous_are(A, B, Q, R)
+
+    # Compute optimal gain
+    K = np.linalg.solve(R, B.T @ P)
+
+    return K, P
+
+
+def lqr_finite_horizon(A, B, Q, R, Qf, T, dt=0.01):
+    """
+    Solve the finite-horizon LQR problem via Riccati ODE.
+
+    Returns:
+    --------
+    K : time-varying gain matrices K[k] for each time step
+    P : solution trajectory P[k] for each time step
+    """
+    n = A.shape[0]
+
+    # Riccati ODE (integrated backward)
+    def riccati_ode(t, P_flat):
+        P = P_flat.reshape((n, n))
+        dP = -(A.T @ P + P @ A - P @ B @ np.linalg.solve(R, B.T @ P) + Q)
+        return dP.flatten()
+
+    # Integrate backward from T to 0
+    t_span = (T, 0)
+    t_eval = np.linspace(T, 0, int(T/dt) + 1)
+
+    sol = solve_ivp(riccati_ode, t_span, Qf.flatten(),
+                    t_eval=t_eval, method='RK45')
+
+    # Extract P(t) and compute K(t) = R⁻¹ Bᵀ P(t)
+    P_traj = [sol.y[:, k].reshape((n, n)) for k in range(len(sol.t))]
+    K_traj = [np.linalg.solve(R, B.T @ P) for P in P_traj]
+
+    # Reverse to get forward time ordering
+    return K_traj[::-1], P_traj[::-1]
+
+
+# Example: Simple 1D system
+A = np.array([[0, 1], [0, 0]])  # Double integrator
+B = np.array([[0], [1]])
+Q = np.eye(2)
+R = np.array([[1.0]])
+
+K, P = lqr_infinite_horizon(A, B, Q, R)
+print(f"Optimal gain K = {K}")
+print(f"Closed-loop eigenvalues: {np.linalg.eigvals(A - B @ K)}")
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What is the Riccati equation in LQR control?</Front>
+    <Back>The Riccati equation determines the optimal cost-to-go matrix P(t) for LQR problems. The differential form is -dP/dt = AᵀP + PA - PBR⁻¹BᵀP + Q. For infinite horizon, P satisfies the algebraic Riccati equation (ARE): 0 = AᵀP + PA - PBR⁻¹BᵀP + Q. The optimal control gain is K = R⁻¹BᵀP.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q3">
+    <Prompt>In the LQR problem, what happens to the optimal gain matrix K as the control weight R increases (making control more expensive)?</Prompt>
+    <Options>
+      <Option>K increases, applying more aggressive control</Option>
+      <Option correct="true">K decreases, applying less control effort</Option>
+      <Option>K remains unchanged since it only depends on A and B</Option>
+      <Option>K oscillates depending on the state weight Q</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Minimum Time and Bang-Bang Control</H2>
+
+  <Body>When the goal is to reach a target state in minimum time with bounded controls, the optimal solution often has a distinctive "bang-bang" character where the control switches between its extreme values.</Body>
+
+  <H3>Problem Setup</H3>
+
+  <Code lang="plaintext">
+Minimize: J = ∫₀ᵀ 1 dt = T (minimize final time)
+
+Subject to: dx/dt = f(x, u)
+           |u| ≤ u_max
+           x(0) = x₀, x(T) = x_target
+  </Code>
+
+  <H3>Bang-Bang Principle</H3>
+
+  <Body>For linear systems with scalar bounded control, Pontryagin's principle implies that the optimal control takes only extreme values:</Body>
+
+  <Code lang="plaintext">
+u*(t) = u_max · sign(σ(t))
+
+where σ(t) = pᵀ(t) B is the switching function
+
+The control switches when σ(t) = 0 (switching times)
+  </Code>
+
+  <Body>This results in control trajectories that "bang" between maximum and minimum values, with the number of switches depending on the system order.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+import matplotlib.pyplot as plt
+
+def bang_bang_double_integrator(x0, xf, u_max, T_guess=2.0):
+    """
+    Minimum time control for double integrator: ẍ = u, |u| ≤ u_max
+
+    For this system, the optimal control has at most one switch.
+    """
+    # State: [position, velocity]
+    # Analytical solution for double integrator:
+    # The switching time and final time can be computed analytically
+
+    pos0, vel0 = x0
+    pos_f, vel_f = xf
+
+    def simulate(params):
+        t_switch, T = params
+        if t_switch &lt; 0 or T &lt; 0 or t_switch > T:
+            return np.inf, None, None
+
+        # Phase 1: u = u_max (or -u_max)
+        # Phase 2: u = -u_max (or u_max)
+        # Determine sign based on whether we need to accelerate or decelerate
+
+        dt = 0.001
+        t = np.arange(0, T + dt, dt)
+        pos = np.zeros_like(t)
+        vel = np.zeros_like(t)
+        u = np.zeros_like(t)
+
+        pos[0], vel[0] = pos0, vel0
+
+        # Determine initial control direction
+        u_sign = 1 if pos_f > pos0 else -1
+
+        for i in range(1, len(t)):
+            if t[i] &lt; t_switch:
+                u[i-1] = u_sign * u_max
+            else:
+                u[i-1] = -u_sign * u_max
+
+            vel[i] = vel[i-1] + u[i-1] * dt
+            pos[i] = pos[i-1] + vel[i-1] * dt
+
+        return T, (t, pos, vel, u), (pos[-1] - pos_f)**2 + (vel[-1] - vel_f)**2
+
+    # Optimize switching time and final time
+    def objective(params):
+        T, _, error = simulate(params)
+        return T + 1000 * error  # Penalize constraint violation
+
+    result = minimize(objective, [T_guess/2, T_guess],
+                     bounds=[(0, 10), (0, 10)],
+                     method='L-BFGS-B')
+
+    T_opt, trajectory, _ = simulate(result.x)
+    return T_opt, trajectory
+
+
+# Example
+x0 = [0, 0]      # Start at origin, at rest
+xf = [1, 0]      # Move to position 1, come to rest
+u_max = 1.0
+
+T_opt, (t, pos, vel, u) = bang_bang_double_integrator(x0, xf, u_max)
+print(f"Minimum time: {T_opt:.3f}")
+  </Code>
+
+  <FlashCard id="fc6">
+    <Front>What is bang-bang control?</Front>
+    <Back>Bang-bang control is a control strategy where the control input takes only extreme values (maximum or minimum), switching between them at discrete times. It arises as the optimal solution for minimum-time problems with bounded controls. The name comes from the control "banging" between its limits. For linear systems, Pontryagin's principle proves this is optimal.</Back>
+  </FlashCard>
+
+  <H2>Energy-Optimal Control</H2>
+
+  <Body>When the cost penalizes control effort (e.g., J = ∫u²dt), the optimal solution is typically smooth, contrasting with the discontinuous bang-bang solutions of minimum-time problems.</Body>
+
+  <Code lang="plaintext">
+Energy-optimal problem:
+Minimize: J = ∫₀ᵀ ||u(t)||² dt
+
+For linear systems dx/dt = Ax + Bu:
+u*(t) = Bᵀ e^(Aᵀ(T-t)) λ
+
+where λ is determined by boundary conditions
+  </Code>
+
+  <Body>The energy-optimal control for linear systems is a weighted sum of exponential functions, producing smooth trajectories that are easier to implement in practice.</Body>
+
+  <MatchPairs id="q4">
+    <Prompt>Match each optimal control problem type with its characteristic solution:</Prompt>
+    <Pairs>
+      <Pair><Left>Minimum time with bounded control</Left><Right>Bang-bang switching</Right></Pair>
+      <Pair><Left>Energy minimization (∫u²dt)</Left><Right>Smooth exponential control</Right></Pair>
+      <Pair><Left>LQR (quadratic cost, linear dynamics)</Left><Right>Linear state feedback</Right></Pair>
+      <Pair><Left>Tracking a reference trajectory</Left><Right>Time-varying gain</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Random stochastic control</Distractor>
+      <Distractor>Constant control input</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Numerical Methods for Optimal Control</H2>
+
+  <Body>Most practical optimal control problems cannot be solved analytically. Several numerical approaches exist, each with trade-offs between accuracy, computational cost, and applicability.</Body>
+
+  <H3>Shooting Methods</H3>
+
+  <Body>Shooting methods parameterize the initial costate and solve the two-point boundary value problem by adjusting initial conditions until terminal constraints are satisfied.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import solve_ivp
+from scipy.optimize import root
+
+def single_shooting(dynamics, cost_grad_x, cost_grad_u,
+                    x0, xf, T, p0_guess):
+    """
+    Single shooting method for optimal control.
+
+    Solves the two-point BVP by adjusting initial costate p(0).
+    """
+    n = len(x0)
+
+    def augmented_dynamics(t, y):
+        """State and costate dynamics."""
+        x = y[:n]
+        p = y[n:]
+
+        # Optimal control from stationarity: ∂H/∂u = 0
+        # For simplicity, assume u = -R⁻¹ Bᵀ p (linear case)
+        # Generalize based on your specific problem
+
+        dx = dynamics(x, p, t)
+        dp = -cost_grad_x(x, p, t)
+
+        return np.concatenate([dx, dp])
+
+    def shooting_residual(p0):
+        """Residual: difference between achieved and desired final state."""
+        y0 = np.concatenate([x0, p0])
+        sol = solve_ivp(augmented_dynamics, [0, T], y0,
+                       method='RK45', dense_output=True)
+        x_final = sol.y[:n, -1]
+        return x_final - xf
+
+    # Solve for initial costate
+    result = root(shooting_residual, p0_guess)
+
+    if result.success:
+        p0_opt = result.x
+        y0 = np.concatenate([x0, p0_opt])
+        sol = solve_ivp(augmented_dynamics, [0, T], y0,
+                       t_eval=np.linspace(0, T, 100))
+        return sol.t, sol.y[:n], sol.y[n:]
+    else:
+        raise ValueError("Shooting method failed to converge")
+  </Code>
+
+  <H3>Direct Collocation</H3>
+
+  <Body>Direct methods discretize both states and controls, converting the infinite-dimensional optimal control problem into a finite-dimensional nonlinear program (NLP).</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+
+def direct_collocation(f, L, x0, xf, T, N=50):
+    """
+    Direct collocation for optimal control using trapezoidal rule.
+
+    Parameters:
+    -----------
+    f : dynamics function f(x, u, t)
+    L : running cost function L(x, u, t)
+    x0, xf : initial and final states
+    T : final time
+    N : number of collocation points
+    """
+    n_x = len(x0)  # State dimension
+    n_u = 1        # Control dimension (assumed scalar)
+    dt = T / N
+    t_grid = np.linspace(0, T, N + 1)
+
+    # Decision variables: [x_0, x_1, ..., x_N, u_0, u_1, ..., u_N]
+    n_vars = (N + 1) * (n_x + n_u)
+
+    def unpack(z):
+        """Unpack decision variables."""
+        X = z[:(N+1)*n_x].reshape((N+1, n_x))
+        U = z[(N+1)*n_x:].reshape((N+1, n_u))
+        return X, U
+
+    def objective(z):
+        """Cost function using trapezoidal integration."""
+        X, U = unpack(z)
+        cost = 0
+        for k in range(N):
+            L_k = L(X[k], U[k], t_grid[k])
+            L_k1 = L(X[k+1], U[k+1], t_grid[k+1])
+            cost += 0.5 * dt * (L_k + L_k1)
+        return cost
+
+    def dynamics_constraints(z):
+        """Collocation constraints (trapezoidal rule)."""
+        X, U = unpack(z)
+        constraints = []
+
+        for k in range(N):
+            f_k = f(X[k], U[k], t_grid[k])
+            f_k1 = f(X[k+1], U[k+1], t_grid[k+1])
+
+            # Trapezoidal defect: x_{k+1} - x_k - dt/2 * (f_k + f_{k+1}) = 0
+            defect = X[k+1] - X[k] - 0.5 * dt * (f_k + f_k1)
+            constraints.extend(defect.tolist())
+
+        return np.array(constraints)
+
+    def boundary_constraints(z):
+        """Initial and final state constraints."""
+        X, U = unpack(z)
+        return np.concatenate([X[0] - x0, X[-1] - xf])
+
+    # Initial guess: linear interpolation for states, zero control
+    X_init = np.linspace(x0, xf, N + 1)
+    U_init = np.zeros((N + 1, n_u))
+    z0 = np.concatenate([X_init.flatten(), U_init.flatten()])
+
+    # Solve NLP
+    constraints = [
+        {'type': 'eq', 'fun': dynamics_constraints},
+        {'type': 'eq', 'fun': boundary_constraints}
+    ]
+
+    result = minimize(objective, z0, constraints=constraints,
+                     method='SLSQP', options={'maxiter': 1000})
+
+    X_opt, U_opt = unpack(result.x)
+    return t_grid, X_opt, U_opt, result
+  </Code>
+
+  <SortQuiz id="q5">
+    <Prompt>Order the following numerical optimal control methods from most likely to find a global optimum to most likely to converge to a local optimum:</Prompt>
+    <SortedItems>
+      <Item>Dynamic programming with fine discretization</Item>
+      <Item>Multiple shooting with many random initial guesses</Item>
+      <Item>Single shooting with one initial guess</Item>
+      <Item>Gradient descent on direct transcription</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Application: Optimal Control of Neuronal Firing</H2>
+
+  <Body>We now apply optimal control theory to a neuroscience problem: driving an integrate-and-fire (IF) neuron to achieve a target firing rate while minimizing control effort.</Body>
+
+  <H3>Problem Setup</H3>
+
+  <Code lang="plaintext">
+Integrate-and-Fire Dynamics:
+  τ dV/dt = -(V - V_rest) + R·I(t) + R·u(t)
+
+  When V ≥ V_threshold: V → V_reset, emit spike
+
+Objective: Achieve target firing rate r_target over interval [0, T]
+           while minimizing ∫₀ᵀ u(t)² dt
+  </Code>
+
+  <Body>This is a challenging problem because the spiking mechanism introduces discontinuities. We can address this by either working with a firing rate approximation or using hybrid optimal control methods.</Body>
+
+  <H3>Rate-Based Approximation</H3>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+from scipy.integrate import solve_ivp
+
+def optimal_stimulation_if_neuron():
+    """
+    Find optimal stimulation to achieve target firing rate in IF neuron.
+    Uses a smooth firing rate approximation for tractability.
+    """
+    # Neuron parameters
+    tau = 10.0        # Membrane time constant (ms)
+    V_rest = -65.0    # Resting potential (mV)
+    V_th = -50.0      # Threshold (mV)
+    V_reset = -65.0   # Reset potential (mV)
+    R = 10.0          # Membrane resistance (MΩ)
+
+    # Control parameters
+    T = 1000.0        # Simulation time (ms)
+    N = 100           # Number of control segments
+    dt_control = T / N
+    r_target = 0.02   # Target firing rate (spikes/ms = 20 Hz)
+
+    # Smooth firing rate approximation: f-I curve
+    def firing_rate(V):
+        """Sigmoid approximation to IF f-I curve."""
+        k = 0.5  # Steepness
+        return 1.0 / (1.0 + np.exp(-k * (V - V_th)))
+
+    def simulate_rate(u_sequence):
+        """Simulate mean-field rate dynamics with control."""
+        r = np.zeros(N + 1)
+        V_mean = np.zeros(N + 1)
+        V_mean[0] = V_rest
+
+        for k in range(N):
+            # Approximate mean voltage dynamics
+            dV = (-( V_mean[k] - V_rest) + R * u_sequence[k]) / tau
+            V_mean[k+1] = V_mean[k] + dV * dt_control
+            r[k+1] = firing_rate(V_mean[k+1])
+
+        return r, V_mean
+
+    def objective(u):
+        """Cost: tracking error + control effort."""
+        r, _ = simulate_rate(u)
+
+        # Tracking cost: deviation from target rate
+        tracking_cost = np.sum((r - r_target)**2) * dt_control
+
+        # Control cost: energy
+        control_cost = np.sum(u**2) * dt_control
+
+        # Weighting
+        alpha = 100.0  # Weight on tracking vs control
+
+        return alpha * tracking_cost + control_cost
+
+    # Optimize
+    u0 = np.ones(N) * 0.5  # Initial guess
+    bounds = [(0, 5.0)] * N  # Non-negative bounded current
+
+    result = minimize(objective, u0, method='L-BFGS-B', bounds=bounds)
+
+    u_opt = result.x
+    r_opt, V_opt = simulate_rate(u_opt)
+
+    return u_opt, r_opt, V_opt, result
+
+
+# Run optimization
+u_opt, r_opt, V_opt, result = optimal_stimulation_if_neuron()
+print(f"Optimization converged: {result.success}")
+print(f"Mean achieved rate: {np.mean(r_opt[10:]):.4f} (target: 0.02)")
+print(f"Control energy: {np.sum(u_opt**2) * 10:.2f}")
+  </Code>
+
+  <FillBlanks id="q6">
+    <Prompt>In optimal control of neuronal systems, the <Blank>Hamiltonian</Blank> combines the running cost and dynamics constraint. The <Blank>costate</Blank> variable represents the sensitivity of optimal cost to state perturbations. For LQR problems, the optimal feedback gain is computed from the <Blank>Riccati</Blank> equation.</Prompt>
+    <Distractors>
+      <Distractor>Lagrangian</Distractor>
+      <Distractor>eigenvalue</Distractor>
+      <Distractor>Lyapunov</Distractor>
+      <Distractor>gradient</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Necessary vs. Sufficient Conditions</H2>
+
+  <Body>A critical distinction in optimal control is between necessary and sufficient conditions for optimality.</Body>
+
+  <Code lang="plaintext">
+Necessary Conditions (Pontryagin):
+- Every optimal solution MUST satisfy these conditions
+- But satisfying them does NOT guarantee optimality
+- May find local optima, saddle points, or maxima
+- Examples: Euler-Lagrange equations, Pontryagin minimum principle
+
+Sufficient Conditions:
+- If satisfied, the solution IS optimal
+- Stronger requirements (e.g., convexity, HJB verification)
+- HJB equation provides sufficient conditions when V is smooth
+- LQR: convexity guarantees global optimum
+  </Code>
+
+  <Body>In practice, we often verify optimality by checking second-order conditions, testing multiple initial guesses, or using convexity arguments when applicable.</Body>
+
+  <SingleSelect id="q7">
+    <Prompt>A control trajectory satisfies all of Pontryagin's necessary conditions. What can we conclude?</Prompt>
+    <Options>
+      <Option>The trajectory is globally optimal</Option>
+      <Option>The trajectory is locally optimal</Option>
+      <Option correct="true">The trajectory is a candidate for optimality that requires further verification</Option>
+      <Option>The trajectory satisfies the Hamilton-Jacobi-Bellman equation</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Common Misconceptions</H2>
+
+  <Body>Several misconceptions frequently arise when learning optimal control:</Body>
+
+  <FlashCard id="fc7">
+    <Front>Misconception: The HJB equation can always be solved analytically.</Front>
+    <Back>Reality: The HJB equation is a nonlinear PDE that can only be solved analytically for special cases (e.g., LQR). For most problems, numerical methods (grid-based, approximate dynamic programming, reinforcement learning) are required. The curse of dimensionality makes direct solution intractable for systems with more than a few state variables.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc8">
+    <Front>Misconception: Linear control methods (LQR) work well for nonlinear systems.</Front>
+    <Back>Reality: LQR is derived for linear dynamics and quadratic costs. Applying it directly to nonlinear systems (by linearizing around a trajectory) provides local approximations that may fail far from the linearization point. For strongly nonlinear systems, methods like iterative LQR (iLQR), model predictive control (MPC), or direct optimal control are needed.</Back>
+  </FlashCard>
+
+  <H2>Summary</H2>
+
+  <Body>Optimal control theory provides powerful tools for understanding how biological systems generate movements and for designing interventions in neural systems. Key takeaways include:</Body>
+
+  <Code lang="plaintext">
+1. Problem Formulation
+   - State dynamics: dx/dt = f(x, u, t)
+   - Cost functional: J = φ(x(T)) + ∫L(x,u,t)dt
+   - Constraints on controls and states
+
+2. Solution Approaches
+   - Calculus of variations → Euler-Lagrange, Pontryagin conditions
+   - Dynamic programming → HJB equation, value function
+   - Numerical methods → shooting, collocation, direct transcription
+
+3. Special Cases
+   - LQR: analytical solution via Riccati equation
+   - Minimum time: bang-bang control
+   - Energy optimal: smooth controls
+
+4. Key Insights
+   - Necessary ≠ sufficient for optimality
+   - Curse of dimensionality limits exact solutions
+   - Feedback vs. open-loop control trade-offs
+  </Code>
+
+  <Subjective id="q8">
+    <Prompt>Explain why the principle of optimality (Bellman's principle) is fundamental to dynamic programming, and discuss one advantage and one limitation of using dynamic programming to solve optimal control problems in computational neuroscience applications.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly explains the principle of optimality: any portion of an optimal trajectory is itself optimal, enabling recursive decomposition</Requirement>
+        <Indicators>recursive, sub-problem, optimal sub-trajectory, whatever the initial state, remaining decisions optimal</Indicators>
+      </Criterion>
+      <Criterion points="2" required="true">
+        <Requirement>Identifies a valid advantage of dynamic programming (e.g., global feedback law, handles constraints, no boundary value problem)</Requirement>
+        <Indicators>feedback, global, policy, constraints, boundaries, robust</Indicators>
+      </Criterion>
+      <Criterion points="2" required="true">
+        <Requirement>Identifies a valid limitation (e.g., curse of dimensionality, computational cost, discretization errors)</Requirement>
+        <Indicators>curse of dimensionality, exponential, computational, high-dimensional, intractable, discretization</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Connects to neuroscience context (e.g., motor control, neural prosthetics, brain stimulation)</Requirement>
+        <Indicators>neuron, brain, motor, neural, stimulation, firing, biological</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Uses clear technical writing with appropriate mathematical terminology</Requirement>
+        <Indicators>clear, precise, terminology, well-organized</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+</Lesson>

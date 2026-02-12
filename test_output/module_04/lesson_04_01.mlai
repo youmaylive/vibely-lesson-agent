@@ -1,0 +1,692 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-04-01</Id>
+    <Title>Cable Theory: Passive Signal Propagation</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>cable-theory</Tag>
+      <Tag>dendrites</Tag>
+      <Tag>space-constant</Tag>
+      <Tag>time-constant</Tag>
+      <Tag>synaptic-integration</Tag>
+      <Tag>electrotonic-conduction</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Cable Theory: Passive Signal Propagation</H1>
+
+  <Body>
+    In previous lessons, we treated neurons as point models where voltage is uniform throughout the cell. Real neurons, however, have elaborate dendritic trees where synaptic inputs occur at varying distances from the soma. Cable theory provides the mathematical framework for understanding how electrical signals propagate passively through these extended neuronal structures.
+  </Body>
+
+  <Body>
+    The cable equation reveals how dendritic geometry—diameter, length, and branching patterns—fundamentally shapes synaptic integration by determining how signals attenuate and summate across space and time. This lesson develops cable theory from first principles and explores its profound implications for neural computation.
+  </Body>
+
+  <H2>The Cylindrical Dendrite Model</H2>
+
+  <Body>
+    We model a dendrite as a cylindrical cable with uniform properties. The key parameters are the membrane resistance per unit length r_m (Ω·cm), axial (cytoplasmic) resistance per unit length r_a (Ω/cm), and membrane capacitance per unit length c_m (F/cm). Current can flow in two ways: axially along the cytoplasm, and radially across the membrane.
+  </Body>
+
+  <Body>
+    Consider a small segment of cable at position x with length Δx. The axial current I_a flows along the dendrite, while the membrane current I_m crosses the membrane. By Ohm's law, the axial current is driven by the voltage gradient:
+  </Body>
+
+  <Code lang="plaintext">
+I_a = -(1/r_a) · ∂V/∂x
+  </Code>
+
+  <Body>
+    The negative sign indicates that current flows from high to low voltage. The membrane current per unit length has two components: capacitive current and ionic (resistive) current:
+  </Body>
+
+  <Code lang="plaintext">
+i_m = c_m · ∂V/∂t + V/r_m
+  </Code>
+
+  <FlashCard id="fc1">
+    <Front>What is axial resistance (r_a) in cable theory?</Front>
+    <Back>Axial resistance is the resistance to current flow along the cytoplasm inside a dendrite, measured in Ω/cm. It depends on cytoplasmic resistivity and the cross-sectional area of the dendrite.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What is membrane resistance (r_m) in cable theory?</Front>
+    <Back>Membrane resistance is the resistance to current flow across the membrane per unit length, measured in Ω·cm. Higher r_m means less current leaks out of the cable, allowing signals to travel farther.</Back>
+  </FlashCard>
+
+  <H2>Derivation of the Cable Equation</H2>
+
+  <Body>
+    Current conservation requires that any change in axial current along x must equal the membrane current leaving at that location:
+  </Body>
+
+  <Code lang="plaintext">
+-∂I_a/∂x = i_m
+  </Code>
+
+  <Body>
+    Substituting our expressions for I_a and i_m:
+  </Body>
+
+  <Code lang="plaintext">
+(1/r_a) · ∂²V/∂x² = c_m · ∂V/∂t + V/r_m
+  </Code>
+
+  <Body>
+    Multiplying both sides by r_m and defining the space constant λ = √(r_m/r_a) and time constant τ = r_m · c_m, we obtain the canonical cable equation:
+  </Body>
+
+  <Code lang="plaintext">
+λ² · ∂²V/∂x² = τ · ∂V/∂t + V
+  </Code>
+
+  <Body>
+    This is a linear partial differential equation (PDE) that describes how voltage evolves in both space and time. The two fundamental constants λ and τ completely characterize the cable's electrical properties.
+  </Body>
+
+  <FlashCard id="fc3">
+    <Front>What is the space constant λ and what does it represent physically?</Front>
+    <Back>The space constant λ = √(r_m/r_a) has units of length (cm). It represents the distance over which a steady-state voltage decays to 1/e (≈37%) of its original value. Larger λ means signals travel farther before attenuating.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc4">
+    <Front>What is the time constant τ in cable theory?</Front>
+    <Back>The time constant τ = r_m · c_m has units of time (seconds). It characterizes how quickly the membrane voltage responds to changes—the time for voltage to reach (1 - 1/e) ≈ 63% of its final value during charging, or decay to 1/e during discharging.</Back>
+  </FlashCard>
+
+  <H2>Steady-State Solution: Exponential Decay</H2>
+
+  <Body>
+    In steady state (∂V/∂t = 0), the cable equation simplifies to an ordinary differential equation:
+  </Body>
+
+  <Code lang="plaintext">
+λ² · d²V/dx² = V
+  </Code>
+
+  <Body>
+    This has the general solution V(x) = A·exp(x/λ) + B·exp(-x/λ). For a semi-infinite cable extending from x = 0 to infinity with voltage V₀ applied at x = 0, we require the solution to remain bounded as x → ∞, giving:
+  </Body>
+
+  <Code lang="plaintext">
+V(x) = V₀ · exp(-x/λ)
+  </Code>
+
+  <Body>
+    This exponential decay is the hallmark of passive signal propagation. At x = λ, the voltage has decayed to V₀/e ≈ 0.37V₀. At x = 3λ, it has decayed to about 5% of the original value.
+  </Body>
+
+  <H3>Python Implementation: Steady-State Voltage Profile</H3>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def steady_state_voltage(x, V0, lambda_):
+    """
+    Compute steady-state voltage along a semi-infinite cable.
+
+    Parameters:
+    -----------
+    x : array-like
+        Position along cable (cm)
+    V0 : float
+        Voltage at x=0 (mV)
+    lambda_ : float
+        Space constant (cm)
+
+    Returns:
+    --------
+    V : array-like
+        Voltage at each position (mV)
+    """
+    return V0 * np.exp(-x / lambda_)
+
+# Example: dendrite with λ = 0.1 cm (1 mm)
+x = np.linspace(0, 0.5, 100)  # 0 to 5 mm
+lambda_ = 0.1  # cm
+V0 = 10  # mV (e.g., EPSP amplitude at input site)
+
+V = steady_state_voltage(x, V0, lambda_)
+
+plt.figure(figsize=(8, 5))
+plt.plot(x * 10, V, 'b-', linewidth=2)  # convert to mm
+plt.axhline(V0/np.e, color='r', linestyle='--', label=f'V₀/e at x=λ')
+plt.axvline(lambda_ * 10, color='r', linestyle='--')
+plt.xlabel('Distance from input (mm)')
+plt.ylabel('Voltage (mV)')
+plt.title('Steady-State Voltage Attenuation in Passive Cable')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+  </Code>
+
+  <H2>Space Constant: Dependence on Morphology</H2>
+
+  <Body>
+    The space constant λ = √(r_m/r_a) depends critically on dendritic diameter. For a cylindrical cable with diameter d, membrane resistance per unit length r_m and axial resistance per unit length r_a relate to the specific resistivities as:
+  </Body>
+
+  <Code lang="plaintext">
+r_m = R_m / (π·d)      [Ω·cm]
+r_a = 4·R_a / (π·d²)   [Ω/cm]
+
+where:
+R_m = specific membrane resistance (Ω·cm²)
+R_a = axial (cytoplasmic) resistivity (Ω·cm)
+  </Code>
+
+  <Body>
+    Substituting into the expression for λ:
+  </Body>
+
+  <Code lang="plaintext">
+λ = √(r_m/r_a) = √[(R_m·π·d²) / (4·R_a·π·d)] = √(R_m·d / 4R_a) = (1/2)·√(R_m·d/R_a)
+  </Code>
+
+  <Body>
+    This reveals that λ ∝ √d: thicker dendrites have larger space constants. This has profound implications—large-diameter dendrites (like the apical dendrite of pyramidal neurons) conduct signals more effectively than thin distal branches.
+  </Body>
+
+  <FlashCard id="fc5">
+    <Front>How does dendritic diameter affect the space constant λ?</Front>
+    <Back>The space constant scales as λ ∝ √d, where d is the diameter. Thicker dendrites have larger space constants, meaning signals attenuate less and travel farther before decaying. This is why proximal dendrites are typically thicker than distal branches.</Back>
+  </FlashCard>
+
+  <H3>Computing λ from Morphological Parameters</H3>
+
+  <Code lang="python">
+def compute_space_constant(R_m, R_a, diameter):
+    """
+    Compute space constant from specific resistances and diameter.
+
+    Parameters:
+    -----------
+    R_m : float
+        Specific membrane resistance (Ω·cm²)
+    R_a : float
+        Axial resistivity (Ω·cm)
+    diameter : float
+        Dendrite diameter (cm)
+
+    Returns:
+    --------
+    lambda_ : float
+        Space constant (cm)
+    """
+    return 0.5 * np.sqrt(R_m * diameter / R_a)
+
+# Typical cortical neuron parameters
+R_m = 20000  # Ω·cm² (specific membrane resistance)
+R_a = 150    # Ω·cm (axial resistivity)
+
+# Compare thick vs thin dendrites
+d_thick = 5e-4   # 5 μm = 5×10⁻⁴ cm
+d_thin = 0.5e-4  # 0.5 μm
+
+lambda_thick = compute_space_constant(R_m, R_a, d_thick)
+lambda_thin = compute_space_constant(R_m, R_a, d_thin)
+
+print(f"Thick dendrite (5 μm): λ = {lambda_thick*1e4:.1f} μm")
+print(f"Thin dendrite (0.5 μm): λ = {lambda_thin*1e4:.1f} μm")
+print(f"Ratio: {lambda_thick/lambda_thin:.2f}")
+  </Code>
+
+  <Body>
+    For typical cortical neurons with R_m ≈ 20,000 Ω·cm² and R_a ≈ 150 Ω·cm, a 5 μm diameter dendrite has λ ≈ 400 μm, while a 0.5 μm diameter dendrite has λ ≈ 130 μm. The 10× difference in diameter produces only a √10 ≈ 3.2× difference in λ.
+  </Body>
+
+  <H2>Electrotonic Distance</H2>
+
+  <Body>
+    Electrotonic distance X = x/λ is a dimensionless measure that normalizes physical distance by the space constant. This allows comparison across dendrites with different morphologies. At X = 1 (one electrotonic length unit), voltage has decayed to 37% of its original value; at X = 3, it's down to 5%.
+  </Body>
+
+  <Body>
+    Electrotonic distance is crucial for understanding synaptic efficacy. Two synapses at the same physical distance from the soma may have very different effects if they're located on dendrites with different space constants.
+  </Body>
+
+  <FlashCard id="fc6">
+    <Front>What is electrotonic distance and why is it useful?</Front>
+    <Back>Electrotonic distance X = x/λ is a dimensionless measure that normalizes physical distance by the space constant. It allows meaningful comparison of signal attenuation across different dendritic branches with varying morphologies. At X = 1, voltage is at 37% of its initial value.</Back>
+  </FlashCard>
+
+  <H2>Transient Solutions and the Time Constant</H2>
+
+  <Body>
+    For time-varying inputs, we must solve the full cable equation. The solution can be constructed using Green's functions. For a point current injection I₀·δ(x)·δ(t) at the origin at time zero, the Green's function (response kernel) is:
+  </Body>
+
+  <Code lang="plaintext">
+G(x,t) = (r_m / 2λ) · (1/√(πt/τ)) · exp(-t/τ) · exp(-x²·τ/(4λ²t))
+  </Code>
+
+  <Body>
+    This shows that the voltage spreads out in space as a Gaussian that broadens with time, while simultaneously decaying exponentially with time constant τ. The interplay between spatial spread (governed by λ) and temporal decay (governed by τ) determines the effective integration window for synaptic inputs.
+  </Body>
+
+  <H3>Finite Difference Solution</H3>
+
+  <Body>
+    For numerical solutions, we discretize the cable equation using finite differences. Let V_i^n denote the voltage at spatial node i and time step n:
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def solve_cable_equation_fd(L, T, N_x, N_t, lambda_, tau, I_inj, x_inj, t_inj, duration):
+    """
+    Solve cable equation using finite difference method (explicit Euler).
+
+    Parameters:
+    -----------
+    L : float
+        Cable length (cm)
+    T : float
+        Simulation duration (ms)
+    N_x : int
+        Number of spatial points
+    N_t : int
+        Number of time points
+    lambda_ : float
+        Space constant (cm)
+    tau : float
+        Time constant (ms)
+    I_inj : float
+        Injected current amplitude (normalized)
+    x_inj : float
+        Position of current injection (cm)
+    t_inj : float
+        Time of current onset (ms)
+    duration : float
+        Duration of current injection (ms)
+
+    Returns:
+    --------
+    x : array
+        Spatial grid
+    t : array
+        Time grid
+    V : 2D array
+        Voltage at each (x, t)
+    """
+    dx = L / (N_x - 1)
+    dt = T / (N_t - 1)
+
+    x = np.linspace(0, L, N_x)
+    t = np.linspace(0, T, N_t)
+
+    V = np.zeros((N_x, N_t))
+
+    # Stability condition for explicit scheme: dt &lt; dx²·τ/(2λ²)
+    stability = dt * (lambda_**2) / (dx**2 * tau)
+    if stability &gt; 0.5:
+        print(f"Warning: stability parameter = {stability:.3f} &gt; 0.5")
+
+    # Find injection site
+    i_inj = np.argmin(np.abs(x - x_inj))
+
+    # Time stepping (explicit Euler)
+    for n in range(N_t - 1):
+        for i in range(1, N_x - 1):
+            # Spatial second derivative
+            d2V_dx2 = (V[i+1, n] - 2*V[i, n] + V[i-1, n]) / dx**2
+
+            # Cable equation: λ²·∂²V/∂x² = τ·∂V/∂t + V
+            dV_dt = (lambda_**2 * d2V_dx2 - V[i, n]) / tau
+
+            V[i, n+1] = V[i, n] + dt * dV_dt
+
+        # Inject current
+        if t_inj &lt;= t[n] &lt; t_inj + duration:
+            V[i_inj, n+1] += I_inj * dt / tau
+
+        # Sealed-end boundary conditions (no current flow)
+        V[0, n+1] = V[1, n+1]
+        V[-1, n+1] = V[-2, n+1]
+
+    return x, t, V
+
+# Simulation parameters
+L = 0.1       # 1 mm cable
+T = 50        # 50 ms
+N_x = 101
+N_t = 5001
+lambda_ = 0.03  # 300 μm
+tau = 20        # 20 ms
+
+# Current injection at center
+x_inj = 0.05  # Center of cable
+t_inj = 5     # Start at 5 ms
+duration = 2  # 2 ms pulse
+I_inj = 100   # Current amplitude
+
+x, t, V = solve_cable_equation_fd(L, T, N_x, N_t, lambda_, tau,
+                                   I_inj, x_inj, t_inj, duration)
+
+# Plot results
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+# Voltage at different times
+times_to_plot = [6, 10, 20, 40]
+for t_plot in times_to_plot:
+    idx = np.argmin(np.abs(t - t_plot))
+    axes[0].plot(x * 1000, V[:, idx], label=f't = {t_plot} ms')
+axes[0].set_xlabel('Position (μm)')
+axes[0].set_ylabel('Voltage (a.u.)')
+axes[0].set_title('Spatial Voltage Profile at Different Times')
+axes[0].legend()
+axes[0].grid(True, alpha=0.3)
+
+# Voltage at different positions over time
+positions_to_plot = [0.05, 0.04, 0.02, 0.0]  # cm
+for x_plot in positions_to_plot:
+    idx = np.argmin(np.abs(x - x_plot))
+    dist_from_inj = abs(x_plot - x_inj) * 1000  # μm
+    axes[1].plot(t, V[idx, :], label=f'{dist_from_inj:.0f} μm from input')
+axes[1].set_xlabel('Time (ms)')
+axes[1].set_ylabel('Voltage (a.u.)')
+axes[1].set_title('Voltage Time Course at Different Positions')
+axes[1].legend()
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+  </Code>
+
+  <H2>Boundary Conditions</H2>
+
+  <Body>
+    The solution to the cable equation depends critically on boundary conditions. Three common types are:
+  </Body>
+
+  <Body>
+    1. **Sealed-end (Neumann)**: No current flows through the end: ∂V/∂x = 0. This models a dendrite terminal or sealed electrode.
+  </Body>
+
+  <Body>
+    2. **Killed-end (Dirichlet)**: The end is held at resting potential: V = 0. This models a very low-resistance connection (voltage clamp) or a massive soma.
+  </Body>
+
+  <Body>
+    3. **Semi-infinite**: The cable extends to infinity: V → 0 as x → ∞. This is an idealization useful for analytical solutions.
+  </Body>
+
+  <Body>
+    Sealed ends cause voltage reflection—the signal effectively doubles at the boundary. Killed ends cause signal absorption. Real dendritic trees have complex boundary conditions due to branching and soma impedance.
+  </Body>
+
+  <FlashCard id="fc7">
+    <Front>What is a sealed-end boundary condition and how does it affect signal propagation?</Front>
+    <Back>A sealed-end boundary condition (∂V/∂x = 0) means no axial current flows through the end. This causes voltage reflection—the signal amplitude effectively doubles at the boundary. It models dendritic terminals or the sealed end of a recording electrode.</Back>
+  </FlashCard>
+
+  <H2>Synaptic Integration: Location Matters</H2>
+
+  <Body>
+    Cable theory explains why synaptic location profoundly affects integration. Distal synapses are electrotonically distant from the soma, so their signals attenuate more before reaching the spike initiation zone. However, this doesn't mean distal synapses are ineffective—the local voltage change at a distal synapse can be much larger than at a proximal synapse for the same conductance change, because the local input resistance is higher.
+  </Body>
+
+  <Code lang="python">
+def synaptic_efficacy_analysis(lambda_, L_prox, L_dist, g_syn, E_syn):
+    """
+    Compare synaptic effects at proximal vs distal locations.
+
+    Parameters:
+    -----------
+    lambda_ : float
+        Space constant (cm)
+    L_prox : float
+        Distance of proximal synapse from soma (cm)
+    L_dist : float
+        Distance of distal synapse from soma (cm)
+    g_syn : float
+        Synaptic conductance (nS)
+    E_syn : float
+        Synaptic reversal potential (mV)
+    """
+    # Attenuation factors (steady-state approximation)
+    atten_prox = np.exp(-L_prox / lambda_)
+    atten_dist = np.exp(-L_dist / lambda_)
+
+    print(f"Space constant λ = {lambda_*1000:.0f} μm")
+    print(f"\nProximal synapse at {L_prox*1000:.0f} μm:")
+    print(f"  Electrotonic distance: {L_prox/lambda_:.2f}")
+    print(f"  Attenuation factor: {atten_prox:.3f} ({atten_prox*100:.1f}%)")
+
+    print(f"\nDistal synapse at {L_dist*1000:.0f} μm:")
+    print(f"  Electrotonic distance: {L_dist/lambda_:.2f}")
+    print(f"  Attenuation factor: {atten_dist:.3f} ({atten_dist*100:.1f}%)")
+
+    print(f"\nRelative somatic effect (distal/proximal): {atten_dist/atten_prox:.3f}")
+
+# Example analysis
+synaptic_efficacy_analysis(
+    lambda_=0.04,   # 400 μm
+    L_prox=0.01,    # 100 μm from soma
+    L_dist=0.1,     # 1000 μm from soma
+    g_syn=1.0,      # 1 nS
+    E_syn=0         # Excitatory (mV relative to rest)
+)
+  </Code>
+
+  <Body>
+    The analysis shows that a synapse at 1000 μm (electrotonic distance X = 2.5 for λ = 400 μm) delivers only about 8% of its local effect to the soma, compared to 78% for a synapse at 100 μm. This "dendritic democracy" problem is compensated in real neurons through synaptic scaling—distal synapses often have larger conductances.
+  </Body>
+
+  <H2>Branching and the Equivalent Cylinder</H2>
+
+  <Body>
+    Real dendrites branch extensively. At a branch point, current divides between the daughter branches. The impedance matching at branch points affects signal propagation. The Rall equivalent cylinder model simplifies analysis by showing that branching trees satisfying the "3/2 power rule" (parent diameter³/² = sum of daughter diameters³/²) are electrically equivalent to unbranched cylinders.
+  </Body>
+
+  <Code lang="plaintext">
+Rall's 3/2 power rule: d_parent^(3/2) = Σ d_daughter^(3/2)
+
+If satisfied: No impedance mismatch at branch points
+If violated: Signal reflection/attenuation at branches
+  </Code>
+
+  <FlashCard id="fc8">
+    <Front>What is Rall's 3/2 power rule for dendritic branching?</Front>
+    <Back>Rall's rule states that d_parent^(3/2) = Σ d_daughter^(3/2), where d is the diameter. When this rule is satisfied, there's no impedance mismatch at branch points, and the branched dendrite is electrically equivalent to an unbranched cylinder. Many real dendrites approximately follow this rule.</Back>
+  </FlashCard>
+
+  <H2>Summary: Key Relationships</H2>
+
+  <Body>
+    Cable theory provides essential insights into dendritic computation:
+  </Body>
+
+  <Body>
+    • The cable equation λ²∂²V/∂x² = τ∂V/∂t + V governs passive signal propagation
+  </Body>
+
+  <Body>
+    • Space constant λ = √(r_m/r_a) ∝ √d determines how far signals travel
+  </Body>
+
+  <Body>
+    • Time constant τ = r_m·c_m determines how fast the membrane responds
+  </Body>
+
+  <Body>
+    • Electrotonic distance X = x/λ allows comparison across morphologies
+  </Body>
+
+  <Body>
+    • Boundary conditions (sealed, killed, infinite) critically affect solutions
+  </Body>
+
+  <Body>
+    • Synaptic location determines efficacy through electrotonic attenuation
+  </Body>
+
+  <H2>Knowledge Check</H2>
+
+  <SingleSelect id="q1">
+    <Prompt>A dendrite has a space constant λ = 200 μm. At what physical distance from the input site will the steady-state voltage decay to approximately 5% of its original value?</Prompt>
+    <Options>
+      <Option>200 μm</Option>
+      <Option>400 μm</Option>
+      <Option correct="true">600 μm</Option>
+      <Option>1000 μm</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>Which of the following changes would INCREASE the space constant λ of a dendrite?</Prompt>
+    <Options>
+      <Option>Decreasing the membrane resistance R_m</Option>
+      <Option correct="true">Increasing the dendritic diameter</Option>
+      <Option>Increasing the axial resistivity R_a</Option>
+      <Option>Decreasing the membrane capacitance c_m</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>In the derivation of the cable equation, which physical principle is used to relate the change in axial current to membrane current?</Prompt>
+    <Options>
+      <Option>Ohm's law</Option>
+      <Option correct="true">Current conservation (Kirchhoff's current law)</Option>
+      <Option>The Nernst equation</Option>
+      <Option>Newton's second law</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following statements about the time constant τ are TRUE? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">τ = r_m · c_m</Option>
+      <Option correct="true">τ determines how quickly the membrane voltage responds to current injection</Option>
+      <Option>τ has units of length (cm)</Option>
+      <Option correct="true">Larger τ means slower membrane charging</Option>
+      <Option>τ depends on dendritic diameter</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5">
+    <Prompt>Which boundary conditions cause voltage reflection at the end of a cable? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Sealed-end (∂V/∂x = 0)</Option>
+      <Option>Killed-end (V = 0)</Option>
+      <Option>Semi-infinite (V → 0 as x → ∞)</Option>
+      <Option>Open circuit at the boundary</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these dendritic structures from LARGEST to SMALLEST space constant λ, assuming the same membrane properties:</Prompt>
+    <SortedItems>
+      <Item>Thick proximal dendrite (5 μm diameter)</Item>
+      <Item>Medium dendrite (2 μm diameter)</Item>
+      <Item>Thin distal branch (1 μm diameter)</Item>
+      <Item>Dendritic spine neck (0.1 μm diameter)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7">
+    <Prompt>Match each cable theory parameter with its correct formula or definition:</Prompt>
+    <Pairs>
+      <Pair><Left>Space constant λ</Left><Right>√(r_m/r_a)</Right></Pair>
+      <Pair><Left>Time constant τ</Left><Right>r_m · c_m</Right></Pair>
+      <Pair><Left>Electrotonic distance X</Left><Right>x/λ</Right></Pair>
+      <Pair><Left>Steady-state voltage decay</Left><Right>V₀ · exp(-x/λ)</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>r_a · c_m</Distractor>
+      <Distractor>λ/x</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q8">
+    <Prompt>Match each boundary condition with its physical interpretation:</Prompt>
+    <Pairs>
+      <Pair><Left>∂V/∂x = 0 (Neumann)</Left><Right>Sealed end, no current flow</Right></Pair>
+      <Pair><Left>V = 0 (Dirichlet)</Left><Right>Killed end, voltage clamp</Right></Pair>
+      <Pair><Left>V → 0 as x → ∞</Left><Right>Semi-infinite cable</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Constant current injection</Distractor>
+      <Distractor>Periodic boundary</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q9">
+    <Prompt>
+      The cable equation λ²∂²V/∂x² = τ∂V/∂t + V is derived by combining <Blank>Ohm's law</Blank> (which relates axial current to voltage gradient) with <Blank>current conservation</Blank> (which requires that changes in axial current equal membrane current). The space constant λ increases with the <Blank>square root</Blank> of dendritic diameter.
+    </Prompt>
+    <Distractors>
+      <Distractor>Nernst equation</Distractor>
+      <Distractor>energy conservation</Distractor>
+      <Distractor>logarithm</Distractor>
+      <Distractor>cube</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q10">
+    <Prompt>
+      In steady state, voltage decays exponentially along a passive cable: V(x) = V₀ · exp(-x/λ). At x = λ, the voltage has decayed to approximately <Blank>37%</Blank> of V₀. At x = 3λ, the voltage has decayed to approximately <Blank>5%</Blank> of V₀.
+    </Prompt>
+    <Distractors>
+      <Distractor>50%</Distractor>
+      <Distractor>63%</Distractor>
+      <Distractor>10%</Distractor>
+      <Distractor>25%</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q11">
+    <Prompt>Explain how dendritic morphology affects synaptic integration, using the concepts of space constant and electrotonic distance. Include a discussion of why distal synapses, despite being highly attenuated at the soma, can still significantly influence neuronal output.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains that space constant λ determines signal attenuation distance and depends on dendritic diameter (λ ∝ √d)</Requirement>
+        <Indicators>space constant, lambda, attenuation, diameter, square root, morphology</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Explains electrotonic distance as x/λ and how it normalizes physical distance for comparing different dendritic branches</Requirement>
+        <Indicators>electrotonic distance, x/λ, dimensionless, normalize, compare</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Discusses why distal synapses can still be effective despite attenuation (e.g., higher local input resistance, synaptic scaling, local dendritic computation)</Requirement>
+        <Indicators>distal, local, input resistance, synaptic scaling, compensation, effective</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Uses specific values or examples (e.g., at X=1 voltage is 37%, at X=3 voltage is 5%)</Requirement>
+        <Indicators>37%, 5%, e⁻¹, example, typical values</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses implications for dendritic computation or synaptic democracy</Requirement>
+        <Indicators>computation, democracy, integration, nonlinear, active</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="400" />
+  </Subjective>
+
+  <Subjective id="q12">
+    <Prompt>A neuroscientist measures the voltage response to current injection at the soma and at a distal dendritic location 500 μm away. The soma response has τ = 20 ms, and the steady-state voltage at 500 μm is 25% of the somatic voltage. Calculate the space constant λ and explain what this tells you about the electrotonic structure of this neuron.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly calculates λ from V(x)/V₀ = exp(-x/λ), giving λ ≈ 361 μm (since ln(0.25) ≈ -1.39, so λ = 500/1.39 ≈ 360 μm)</Requirement>
+        <Indicators>361, 360, calculation, exp, ln, logarithm</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Correctly computes electrotonic distance X = 500/360 ≈ 1.4 space constants</Requirement>
+        <Indicators>electrotonic distance, 1.4, 1.39, X = x/λ</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Interprets results in terms of how electrotonically compact or extended the dendrite is</Requirement>
+        <Indicators>compact, extended, attenuation, integration, efficacy</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Shows clear mathematical work and reasoning</Requirement>
+        <Indicators>equation, step, solve, substitute</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="75" maxWords="300" />
+  </Subjective>
+
+</Lesson>

@@ -29,6 +29,5 @@ ENV/
 .env
 .env.*
 
-# Test/generated output
-test_output/
+# Generated output
 lesson_agent/output/

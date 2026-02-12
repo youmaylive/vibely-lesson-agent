@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-03-02</Id>
+    <Title>Jump Processes: Poisson Synaptic Input</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>stochastic-processes</Tag>
+      <Tag>poisson-process</Tag>
+      <Tag>synaptic-input</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>event-driven-simulation</Tag>
+      <Tag>spike-trains</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Jump Processes: Poisson Synaptic Input</H1>
+
+  <Body>In the previous lesson, we explored the Ornstein-Uhlenbeck process as a model for continuous membrane potential fluctuations. However, synaptic transmission in biological neurons occurs through discrete events: the arrival of action potentials at presynaptic terminals triggers the release of neurotransmitters, producing postsynaptic potentials that appear as sudden "jumps" in the membrane voltage. This lesson develops the mathematical framework for modeling these discrete stochastic events using Poisson processes and their generalizations.</Body>
+
+  <Body>The Poisson process is the canonical model for random point events occurring independently in time. When combined with random jump amplitudes—representing the variable sizes of postsynaptic potentials—we obtain the compound Poisson process, a powerful tool for modeling synaptic bombardment. Understanding these processes is essential for analyzing how neurons integrate thousands of synaptic inputs to produce irregular firing patterns observed experimentally.</Body>
+
+  <H2>The Poisson Process: Fundamentals</H2>
+
+  <Body>A Poisson process N(t) is a counting process that tracks the number of events occurring up to time t. It is characterized by a single parameter λ, the rate (or intensity) of the process, which represents the average number of events per unit time. The Poisson process satisfies three fundamental properties:</Body>
+
+  <Body>1. N(0) = 0 (the process starts at zero)</Body>
+  <Body>2. Independent increments: the numbers of events in non-overlapping intervals are statistically independent</Body>
+  <Body>3. Stationary increments: the distribution of events in any interval depends only on the interval length</Body>
+
+  <Body>From these properties, one can derive that the number of events in an interval of length t follows a Poisson distribution:</Body>
+
+  <Code lang="plaintext">P(N(t) = k) = (λt)^k × exp(-λt) / k!
+
+where:
+  λ = event rate (events per unit time)
+  t = interval length
+  k = number of events (k = 0, 1, 2, ...)</Code>
+
+  <Body>The mean and variance of this distribution are both equal to λt, a characteristic property of Poisson statistics. This equality of mean and variance—known as the Fano factor being unity—provides a useful diagnostic for identifying Poisson-like behavior in experimental spike trains.</Body>
+
+  <H3>Inter-Event Interval Distribution</H3>
+
+  <Body>A crucial result for simulation and analysis is the distribution of waiting times between consecutive events. Let τ denote the inter-event interval (IEI). The probability that no event occurs in an interval of length τ is:</Body>
+
+  <Code lang="plaintext">P(τ &gt; t) = P(N(t) = 0) = exp(-λt)
+
+Taking the derivative, we obtain the probability density function:
+
+f(τ) = λ × exp(-λτ)    for τ ≥ 0
+
+This is the exponential distribution with rate parameter λ.
+
+Key statistics:
+  Mean:     E[τ] = 1/λ
+  Variance: Var(τ) = 1/λ²
+  CV:       σ/μ = 1</Code>
+
+  <Body>The exponential distribution is memoryless: the probability of an event occurring in the next dt seconds is independent of how long we have already waited. This property makes Poisson processes mathematically tractable and computationally efficient to simulate.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the probability distribution of inter-event intervals in a Poisson process with rate λ?</Front>
+    <Back>The exponential distribution: f(τ) = λ exp(-λτ) for τ ≥ 0. The mean interval is 1/λ and the coefficient of variation equals 1.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What is the Fano factor, and what value does it take for a Poisson process?</Front>
+    <Back>The Fano factor is the ratio of variance to mean for event counts: F = Var(N)/E[N]. For a Poisson process, F = 1 exactly, since both mean and variance equal λt.</Back>
+  </FlashCard>
+
+  <H2>Compound Poisson Process: Random Jump Amplitudes</H2>
+
+  <Body>In biological neurons, synaptic events produce postsynaptic potentials of varying amplitude. To model this, we extend the basic Poisson process to the compound Poisson process, where each event carries a random "mark" representing the jump size.</Body>
+
+  <Body>Let {aᵢ} be a sequence of independent, identically distributed random variables representing jump amplitudes, with probability density g(a). The compound Poisson process X(t) is defined as:</Body>
+
+  <Code lang="plaintext">X(t) = Σᵢ₌₁^N(t) aᵢ
+
+where N(t) is a Poisson process with rate λ and {aᵢ} are iid jump amplitudes.
+
+For the sum X(t), we have:
+  E[X(t)] = λt × E[a]
+  Var(X(t)) = λt × E[a²]
+
+The characteristic function:
+  φ_X(u) = exp(λt × (φ_a(u) - 1))</Code>
+
+  <Body>Common choices for the jump amplitude distribution include:</Body>
+  <Body>• Fixed amplitude: a = a₀ (deterministic)</Body>
+  <Body>• Exponential: g(a) = (1/ā)exp(-a/ā) for a ≥ 0</Body>
+  <Body>• Gaussian: g(a) = N(μₐ, σₐ²)</Body>
+  <Body>• Gamma: modeling amplitude variability with controlled mean and variance</Body>
+
+  <FlashCard id="fc3">
+    <Front>What is a compound Poisson process?</Front>
+    <Back>A counting process where each event carries a random amplitude (mark). The cumulative process X(t) = Σᵢ aᵢ sums random jump sizes over Poisson-distributed event times. It models synaptic input with variable PSP amplitudes.</Back>
+  </FlashCard>
+
+  <H2>Stochastic Differential Equations with Jumps</H2>
+
+  <Body>To model a neuron receiving Poisson synaptic input, we couple the jump process to membrane dynamics. Consider the leaky integrate-and-fire (LIF) neuron with jump input:</Body>
+
+  <Code lang="plaintext">dV = -(V - V_rest)/τ_m dt + a_ε dN
+
+where:
+  V       = membrane potential
+  V_rest  = resting potential
+  τ_m     = membrane time constant
+  a_ε     = jump amplitude (random or fixed)
+  dN      = Poisson increment (0 or 1)
+
+When N jumps: V → V + a_ε
+Between jumps: V decays exponentially toward V_rest</Code>
+
+  <Body>This is a piecewise-deterministic process: between events, the dynamics are purely deterministic (exponential decay), but at random Poisson times, the state jumps discontinuously. The interplay between decay and jump accumulation determines the neuron's firing behavior.</Body>
+
+  <H3>Firing Statistics with Poisson Input</H3>
+
+  <Body>When the membrane potential reaches threshold V_th, the neuron fires and resets to V_reset. The statistics of interspike intervals (ISIs) depend critically on the ratio of synaptic input strength to threshold distance. Using renewal theory, one can derive the firing rate and ISI distribution.</Body>
+
+  <Code lang="plaintext">For a LIF neuron with Poisson input:
+
+Mean firing rate: r = 1/E[T_ISI]
+
+where T_ISI is the first passage time to threshold V_th.
+
+In the diffusion limit (many small inputs):
+  E[T_ISI] ≈ τ_m × ln[(V_th - V_∞)/(V_reset - V_∞)]
+
+where V_∞ = V_rest + λ × a_ε × τ_m is the asymptotic mean.
+
+The coefficient of variation:
+  CV = σ_ISI / μ_ISI
+
+For Poisson input: CV ≈ 1 (irregular firing)
+For regular periodic input: CV → 0</Code>
+
+  <FlashCard id="fc4">
+    <Front>What does a coefficient of variation (CV) near 1 indicate about a neuron's firing pattern?</Front>
+    <Back>CV ≈ 1 indicates highly irregular firing, where the standard deviation of ISIs approximately equals the mean ISI. This is characteristic of neurons driven by balanced excitation/inhibition and matches experimental observations in cortical neurons.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc5">
+    <Front>What is the difference between time-driven and event-driven simulation?</Front>
+    <Back>Time-driven simulation advances in fixed time steps Δt, updating all variables each step. Event-driven simulation advances directly from event to event (e.g., spike times), computing exact solutions between events. Event-driven is more efficient for sparse Poisson input.</Back>
+  </FlashCard>
+
+  <H2>Event-Driven Simulation of Jump Processes</H2>
+
+  <Body>Two fundamentally different strategies exist for simulating neurons with Poisson input: time-driven and event-driven approaches. The choice significantly impacts computational efficiency and numerical accuracy.</Body>
+
+  <H3>Time-Driven Simulation</H3>
+
+  <Body>In time-driven simulation, we discretize time into steps of size Δt and check for events probabilistically at each step:</Body>
+
+  <Code lang="python">import numpy as np
+
+def time_driven_poisson_lif(T, dt, V_rest, V_th, V_reset, tau_m, lam, a_eps):
+    """
+    Time-driven simulation of LIF with Poisson input.
+
+    Parameters:
+    -----------
+    T : float - simulation duration
+    dt : float - time step
+    V_rest : float - resting potential
+    V_th : float - threshold
+    V_reset : float - reset potential
+    tau_m : float - membrane time constant
+    lam : float - Poisson rate (events/time)
+    a_eps : float - jump amplitude
+
+    Returns:
+    --------
+    t : array - time points
+    V : array - membrane potential
+    spikes : list - spike times
+    """
+    n_steps = int(T / dt)
+    t = np.linspace(0, T, n_steps)
+    V = np.zeros(n_steps)
+    V[0] = V_rest
+    spikes = []
+
+    for i in range(1, n_steps):
+        # Deterministic decay
+        V[i] = V_rest + (V[i-1] - V_rest) * np.exp(-dt / tau_m)
+
+        # Poisson events (approximate for small dt)
+        n_events = np.random.poisson(lam * dt)
+        V[i] += n_events * a_eps
+
+        # Threshold crossing
+        if V[i] &gt;= V_th:
+            spikes.append(t[i])
+            V[i] = V_reset
+
+    return t, V, spikes</Code>
+
+  <Body>Time-driven simulation is simple to implement but has drawbacks: (1) accuracy depends on dt being small relative to 1/λ, and (2) computational cost is independent of the event rate, wasting resources when events are rare.</Body>
+
+  <H3>Event-Driven Simulation</H3>
+
+  <Body>Event-driven simulation exploits the exact solution between events, advancing directly from one event to the next:</Body>
+
+  <Code lang="python">import numpy as np
+
+def event_driven_poisson_lif(T, V_rest, V_th, V_reset, tau_m, lam, a_eps):
+    """
+    Event-driven simulation of LIF with Poisson input.
+
+    More efficient than time-driven for sparse input.
+    Uses exact exponential decay between events.
+    """
+    t_current = 0.0
+    V_current = V_rest
+    spikes = []
+    events = []  # (time, voltage) pairs for visualization
+
+    while t_current &lt; T:
+        # Sample next input event time (exponential interval)
+        tau = np.random.exponential(1.0 / lam)
+
+        # Check if spike occurs before next input
+        if V_current &gt; V_rest:
+            # Time to decay to threshold (if ever)
+            # V(t) = V_rest + (V_0 - V_rest) * exp(-t/tau_m)
+            # Solve for when V(t) = V_th (only if V_0 &gt; V_th)
+            pass  # Simplified: assume subthreshold
+
+        t_next = t_current + tau
+
+        if t_next &gt; T:
+            break
+
+        # Exact decay to next event time
+        V_decayed = V_rest + (V_current - V_rest) * np.exp(-tau / tau_m)
+
+        # Apply jump
+        V_new = V_decayed + a_eps
+        events.append((t_next, V_new))
+
+        # Check threshold
+        if V_new &gt;= V_th:
+            spikes.append(t_next)
+            V_new = V_reset
+
+        t_current = t_next
+        V_current = V_new
+
+    return spikes, events</Code>
+
+  <Body>Event-driven simulation offers several advantages: (1) exact integration between events eliminates discretization error, (2) computational cost scales with event rate rather than simulation duration, and (3) spike times are determined exactly rather than binned to the nearest Δt.</Body>
+
+  <FlashCard id="fc6">
+    <Front>How do you generate exponentially-distributed inter-event intervals for Poisson simulation?</Front>
+    <Back>Sample τ = -ln(U)/λ where U ~ Uniform(0,1), or equivalently use numpy.random.exponential(1/λ). This leverages the inverse transform method applied to the exponential CDF.</Back>
+  </FlashCard>
+
+  <H2>Analyzing Firing Statistics</H2>
+
+  <Body>Characterizing the output spike train is essential for understanding how neurons encode information. Key metrics include the firing rate, ISI distribution, and coefficient of variation.</Body>
+
+  <Code lang="python">import numpy as np
+from scipy import stats
+
+def analyze_spike_train(spike_times):
+    """
+    Compute firing statistics from a spike train.
+
+    Parameters:
+    -----------
+    spike_times : array-like - times of spikes
+
+    Returns:
+    --------
+    dict with firing rate, ISI statistics, and CV
+    """
+    spike_times = np.array(spike_times)
+
+    if len(spike_times) &lt; 2:
+        return None
+
+    # Interspike intervals
+    ISIs = np.diff(spike_times)
+
+    # Basic statistics
+    mean_ISI = np.mean(ISIs)
+    std_ISI = np.std(ISIs)
+    CV = std_ISI / mean_ISI
+
+    # Firing rate
+    total_time = spike_times[-1] - spike_times[0]
+    firing_rate = (len(spike_times) - 1) / total_time
+
+    # Test for exponential distribution (Poisson output)
+    # Kolmogorov-Smirnov test
+    ks_stat, p_value = stats.kstest(ISIs, 'expon', args=(0, mean_ISI))
+
+    return {
+        'firing_rate': firing_rate,
+        'mean_ISI': mean_ISI,
+        'std_ISI': std_ISI,
+        'CV': CV,
+        'n_spikes': len(spike_times),
+        'ks_statistic': ks_stat,
+        'ks_pvalue': p_value
+    }</Code>
+
+  <H3>Interpreting the Coefficient of Variation</H3>
+
+  <Body>The coefficient of variation CV = σ_ISI / μ_ISI is a dimensionless measure of firing regularity:</Body>
+  <Body>• CV = 0: Perfectly regular firing (periodic)</Body>
+  <Body>• CV = 1: Poisson-like irregular firing</Body>
+  <Body>• CV &gt; 1: More irregular than Poisson (bursty)</Body>
+  <Body>• CV &lt; 1: More regular than Poisson</Body>
+
+  <Body>Cortical neurons typically exhibit CV values between 0.5 and 1.5, with many neurons showing CV ≈ 1. This high variability emerges naturally from balanced excitatory-inhibitory input and has important implications for neural coding efficiency.</Body>
+
+  <H2>Knowledge Assessment</H2>
+
+  <SingleSelect id="q1">
+    <Prompt>A Poisson process has rate λ = 100 Hz. What is the mean inter-event interval?</Prompt>
+    <Options>
+      <Option correct="true">10 ms</Option>
+      <Option>100 ms</Option>
+      <Option>1 ms</Option>
+      <Option>0.01 ms</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>In event-driven simulation of a LIF neuron with Poisson input, what probability distribution is used to generate the time until the next synaptic event?</Prompt>
+    <Options>
+      <Option correct="true">Exponential distribution</Option>
+      <Option>Poisson distribution</Option>
+      <Option>Gaussian distribution</Option>
+      <Option>Uniform distribution</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>What coefficient of variation (CV) characterizes a Poisson spike train?</Prompt>
+    <Options>
+      <Option correct="true">CV = 1</Option>
+      <Option>CV = 0</Option>
+      <Option>CV = 0.5</Option>
+      <Option>CV = 2</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following are properties of a homogeneous Poisson process? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Independent increments</Option>
+      <Option correct="true">Stationary increments</Option>
+      <Option correct="true">Fano factor equals 1</Option>
+      <Option>Gaussian inter-event intervals</Option>
+      <Option correct="true">Memoryless waiting times</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5">
+    <Prompt>Which advantages does event-driven simulation have over time-driven simulation for Poisson input? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Exact integration between events</Option>
+      <Option correct="true">Computational cost scales with event rate</Option>
+      <Option correct="true">Precise spike time determination</Option>
+      <Option>Simpler to implement</Option>
+      <Option>Works for any input type without modification</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these neuron models from MOST regular firing (lowest CV) to LEAST regular firing (highest CV) when driven by typical inputs:</Prompt>
+    <SortedItems>
+      <Item>Pacemaker neuron with intrinsic oscillation (CV ≈ 0.1)</Item>
+      <Item>Neuron with strong adaptation (CV ≈ 0.3)</Item>
+      <Item>Standard LIF with balanced input (CV ≈ 0.8)</Item>
+      <Item>Neuron with Poisson output (CV = 1.0)</Item>
+      <Item>Bursting neuron (CV &gt; 1.5)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7">
+    <Prompt>Match each statistical property to its value or formula for a Poisson process with rate λ:</Prompt>
+    <Pairs>
+      <Pair><Left>Mean number of events in time T</Left><Right>λT</Right></Pair>
+      <Pair><Left>Variance of event count in time T</Left><Right>λT</Right></Pair>
+      <Pair><Left>Mean inter-event interval</Left><Right>1/λ</Right></Pair>
+      <Pair><Left>CV of inter-event intervals</Left><Right>1</Right></Pair>
+      <Pair><Left>Fano factor</Left><Right>1</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>λ²T</Distractor>
+      <Distractor>√λT</Distractor>
+      <Distractor>λ</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q8">
+    <Prompt>In a compound Poisson process, both the <Blank>timing</Blank> of events and the <Blank>amplitude</Blank> of jumps are random. The mean cumulative sum over time T equals λT × E[a], where λ is the <Blank>rate</Blank> and E[a] is the expected jump <Blank>size</Blank>.</Prompt>
+    <Distractors>
+      <Distractor>variance</Distractor>
+      <Distractor>threshold</Distractor>
+      <Distractor>membrane</Distractor>
+      <Distractor>decay</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q9">
+    <Prompt>To generate Poisson events for simulation, sample inter-event intervals from the <Blank>exponential</Blank> distribution using τ = -ln(U)/λ, where U is drawn from a <Blank>uniform</Blank> distribution on (0,1). This method is called the <Blank>inverse transform</Blank> technique.</Prompt>
+    <Distractors>
+      <Distractor>Gaussian</Distractor>
+      <Distractor>Poisson</Distractor>
+      <Distractor>rejection sampling</Distractor>
+      <Distractor>normal</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q10">
+    <Prompt>Explain why cortical neurons exhibit highly irregular firing patterns (CV ≈ 1) despite receiving thousands of synaptic inputs. Discuss the role of balanced excitation and inhibition, and contrast this with what would happen if the neuron received only excitatory input.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that balanced E/I input keeps neurons in a fluctuation-driven regime near threshold</Requirement>
+        <Indicators>balanced, excitation, inhibition, fluctuation, threshold, near threshold, subthreshold</Indicators>
+      </Criterion>
+      <Criterion points="2" required="true">
+        <Requirement>Describes that with balanced input, mean drive is low but variance is high, leading to irregular spike timing</Requirement>
+        <Indicators>mean, variance, irregular, timing, stochastic, random, noise-driven</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Contrasts with purely excitatory input: would produce regular, rate-coded firing</Requirement>
+        <Indicators>excitatory only, regular, periodic, rate code, mean-driven, deterministic</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions that high CV has implications for neural coding (e.g., temporal coding, reliability)</Requirement>
+        <Indicators>coding, information, temporal, reliability, efficiency, representation</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Uses appropriate quantitative terminology (CV, ISI, Poisson-like)</Requirement>
+        <Indicators>CV, coefficient of variation, ISI, interspike interval, Poisson</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q11">
+    <Prompt>Describe the key differences between time-driven and event-driven simulation approaches for modeling a neuron with Poisson synaptic input. When would you choose one approach over the other?</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly describes time-driven: fixed time steps, approximate updates, simple implementation</Requirement>
+        <Indicators>time step, dt, fixed, discretize, approximate, simple, straightforward</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly describes event-driven: advances between events, exact solutions, variable time steps</Requirement>
+        <Indicators>event, exact, exponential, analytic, variable, between events, jump</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Identifies when to use each: event-driven for sparse input, time-driven for dense input or complex dynamics</Requirement>
+        <Indicators>sparse, rare, efficient, dense, complex, conductance, nonlinear</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions computational efficiency trade-offs</Requirement>
+        <Indicators>efficient, cost, scaling, performance, faster, computational</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="60" maxWords="250" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>This lesson introduced jump processes as models for discrete synaptic events. The Poisson process, characterized by exponentially-distributed inter-event intervals, provides the foundation for modeling the random timing of synaptic inputs. The compound Poisson process extends this by including random jump amplitudes, capturing the variability in postsynaptic potential sizes.</Body>
+
+  <Body>We derived the key statistical properties—including the Fano factor and coefficient of variation—and implemented both time-driven and event-driven simulation strategies. Event-driven simulation, which exploits exact analytical solutions between events, offers superior efficiency for sparse Poisson input.</Body>
+
+  <Body>The analysis of firing statistics revealed how Poisson-like input produces irregular output firing (CV ≈ 1), matching experimental observations in cortical neurons. This irregularity emerges from the balance of excitation and inhibition and has profound implications for neural coding and information transmission.</Body>
+
+  <Body>In the next lesson, we will extend these concepts to analyze neuronal populations and explore how correlations in synaptic input affect network dynamics.</Body>
+
+</Lesson>

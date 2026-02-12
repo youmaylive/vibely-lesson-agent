@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-02-02</Id>
+    <Title>Bifurcation Theory in Neuronal Excitability</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>bifurcation</Tag>
+      <Tag>dynamical-systems</Tag>
+      <Tag>neuronal-excitability</Tag>
+      <Tag>saddle-node</Tag>
+      <Tag>hopf-bifurcation</Tag>
+      <Tag>SNIC</Tag>
+      <Tag>type-I-type-II</Tag>
+      <Tag>continuation-methods</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Bifurcation Theory in Neuronal Excitability</H1>
+
+  <Body>
+    Bifurcations mark qualitative transitions in neuronal behavior—from silence to firing, from tonic to bursting—and understanding bifurcation structure reveals how neurons switch between computational modes as parameters vary. In this lesson, we develop a systematic framework for classifying bifurcations in neuronal models and connect them to observable properties like firing rate curves and excitability classes.
+  </Body>
+
+  <Body>
+    Recall from our analysis of the FitzHugh-Nagumo model that Hopf bifurcations introduce transitions to oscillatory behavior. Now we extend this to a comprehensive taxonomy of bifurcations relevant to neuroscience, enabling us to predict how neurons respond to changing inputs, neuromodulation, or pathological conditions.
+  </Body>
+
+  <H2>What is a Bifurcation?</H2>
+
+  <Body>
+    A bifurcation occurs when a small, smooth change in a system parameter causes a qualitative change in its dynamical behavior. The parameter value at which this transition occurs is called the bifurcation point. Unlike simple parameter sensitivity where behavior changes gradually, bifurcations represent genuine phase transitions in the system's dynamics.
+  </Body>
+
+  <Body>
+    Mathematically, consider a dynamical system dx/dt = f(x, μ) where x is the state variable and μ is a parameter. A bifurcation occurs at μ = μ* if the topological structure of the phase portrait changes—fixed points may appear, disappear, or change stability; limit cycles may be born or destroyed.
+  </Body>
+
+  <FlashCard id="fc1">
+    <Front>What is a bifurcation point?</Front>
+    <Back>A critical parameter value at which the qualitative behavior of a dynamical system changes, such as fixed points appearing/disappearing or stability changing.</Back>
+  </FlashCard>
+
+  <H2>Saddle-Node Bifurcation</H2>
+
+  <Body>
+    The saddle-node bifurcation (also called fold or tangent bifurcation) involves the creation or annihilation of a pair of fixed points—one stable (node) and one unstable (saddle). This is the generic mechanism by which fixed points appear in systems with one parameter.
+  </Body>
+
+  <Body>
+    The normal form for a saddle-node bifurcation is:
+  </Body>
+
+  <Code lang="python">
+# Saddle-node normal form: dx/dt = μ + x²
+# For μ &lt; 0: two fixed points at x = ±√(-μ)
+# For μ = 0: one fixed point at x = 0 (saddle-node)
+# For μ &gt; 0: no fixed points
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def saddle_node_fixed_points(mu):
+    """Return fixed points for saddle-node normal form."""
+    if mu &lt; 0:
+        return np.array([np.sqrt(-mu), -np.sqrt(-mu)])
+    elif mu == 0:
+        return np.array([0])
+    else:
+        return np.array([])  # No real fixed points
+
+# Bifurcation diagram
+mu_values = np.linspace(-1, 0.5, 200)
+stable_branch = []
+unstable_branch = []
+
+for mu in mu_values:
+    if mu &lt;= 0:
+        stable_branch.append(-np.sqrt(-mu))    # Stable node
+        unstable_branch.append(np.sqrt(-mu))   # Saddle
+    else:
+        stable_branch.append(np.nan)
+        unstable_branch.append(np.nan)
+  </Code>
+
+  <Body>
+    In neuronal models, saddle-node bifurcations often correspond to the appearance of a firing threshold. Below the bifurcation, the neuron has a stable resting state; at the bifurcation point, this rest state collides with an unstable threshold and both disappear, forcing the neuron to fire.
+  </Body>
+
+  <FlashCard id="fc2">
+    <Front>What happens at a saddle-node bifurcation?</Front>
+    <Back>A stable fixed point (node) and an unstable fixed point (saddle) collide and annihilate each other, or conversely, a pair of fixed points is created from nothing.</Back>
+  </FlashCard>
+
+  <H2>Hopf Bifurcation</H2>
+
+  <Body>
+    The Hopf bifurcation marks the birth (or death) of a limit cycle from a fixed point. As a parameter varies, a pair of complex conjugate eigenvalues crosses the imaginary axis, and the fixed point changes stability while spawning oscillations.
+  </Body>
+
+  <Body>
+    The key signature is in the eigenvalues λ = α(μ) ± iω(μ). At the Hopf bifurcation:
+  </Body>
+
+  <Code lang="python">
+# Hopf bifurcation conditions:
+# 1. α(μ*) = 0 (real part crosses zero)
+# 2. ω(μ*) ≠ 0 (nonzero imaginary part - oscillations)
+# 3. dα/dμ ≠ 0 (transversality condition)
+
+import numpy as np
+from scipy.integrate import odeint
+
+def hopf_normal_form(y, t, mu, omega=1.0):
+    """
+    Hopf bifurcation normal form in Cartesian coordinates.
+    Supercritical: coefficient of cubic term is negative.
+    """
+    x, y_coord = y
+    r_sq = x**2 + y_coord**2
+
+    dxdt = mu * x - omega * y_coord - x * r_sq
+    dydt = omega * x + mu * y_coord - y_coord * r_sq
+
+    return [dxdt, dydt]
+
+# For mu &lt; 0: stable fixed point at origin
+# For mu &gt; 0: unstable origin surrounded by stable limit cycle
+#            with radius r = √μ
+  </Code>
+
+  <Body>
+    There are two types of Hopf bifurcations:
+  </Body>
+
+  <Body>
+    Supercritical Hopf: A stable limit cycle is born from a stable fixed point, which becomes unstable. The amplitude grows continuously from zero as √(μ - μ*). This produces a "soft" onset of oscillations.
+  </Body>
+
+  <Body>
+    Subcritical Hopf: An unstable limit cycle shrinks and disappears into a stable fixed point, which becomes unstable. Beyond the bifurcation, the system jumps to a distant attractor. This can produce hysteresis and "hard" onset of oscillations.
+  </Body>
+
+  <FlashCard id="fc3">
+    <Front>What distinguishes supercritical from subcritical Hopf bifurcation?</Front>
+    <Back>Supercritical: stable limit cycle born, amplitude grows smoothly from zero. Subcritical: unstable limit cycle disappears, system jumps to distant attractor, exhibiting hysteresis.</Back>
+  </FlashCard>
+
+  <H2>Saddle-Node on Invariant Circle (SNIC)</H2>
+
+  <Body>
+    The SNIC bifurcation (also called SNIPER - Saddle-Node Infinite PERiod) combines features of saddle-node and oscillatory dynamics. Here, a saddle-node bifurcation occurs on an invariant circle (limit cycle), creating a global bifurcation.
+  </Body>
+
+  <Body>
+    The key property of SNIC is that the period of oscillations diverges as the bifurcation is approached: T → ∞ as μ → μ*, which means the frequency f → 0 continuously. This produces a continuous frequency-current (f-I) curve starting from arbitrarily low frequencies.
+  </Body>
+
+  <Code lang="python">
+# Theta neuron model - canonical Type I neuron with SNIC bifurcation
+# dθ/dt = (1 - cos θ) + (1 + cos θ) * I
+
+import numpy as np
+from scipy.integrate import odeint
+
+def theta_neuron(theta, t, I):
+    """Theta neuron dynamics on the unit circle."""
+    return (1 - np.cos(theta)) + (1 + np.cos(theta)) * I
+
+# For I &lt; 0: two fixed points on the circle (rest and threshold)
+# For I = 0: saddle-node bifurcation (SNIC)
+# For I &gt; 0: no fixed points, continuous rotation (spiking)
+
+# Near the bifurcation, frequency scales as:
+# f ∝ √(I - I_c)  for I &gt; I_c (Type I f-I curve)
+
+def type_I_firing_rate(I, I_threshold=0):
+    """Type I f-I curve near SNIC bifurcation."""
+    if I &lt;= I_threshold:
+        return 0
+    return np.sqrt(I - I_threshold) / np.pi  # Analytical result
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>What is the characteristic f-I curve shape for SNIC (Type I) bifurcation?</Front>
+    <Back>A continuous curve starting from zero frequency at threshold, with f ∝ √(I - I_threshold). The neuron can fire at arbitrarily low rates near threshold.</Back>
+  </FlashCard>
+
+  <H2>Neuronal Excitability Classes</H2>
+
+  <Body>
+    The bifurcation type at firing onset determines the neuron's excitability class, first characterized by Hodgkin in 1948:
+  </Body>
+
+  <Body>
+    Type I Excitability (Integrators): Firing onset via SNIC bifurcation. These neurons can fire at arbitrarily low frequencies near threshold, producing a continuous f-I curve. They act as integrators, responding to the mean level of input. The theta neuron and quadratic integrate-and-fire models exhibit Type I excitability.
+  </Body>
+
+  <Body>
+    Type II Excitability (Resonators): Firing onset via Hopf bifurcation. These neurons have a minimum firing frequency—they jump from silence to finite-frequency oscillations. They act as resonators, responding preferentially to inputs near their natural frequency. The Hodgkin-Huxley squid axon model (at standard temperature) exhibits Type II excitability.
+  </Body>
+
+  <Code lang="python">
+# Comparison of Type I and Type II f-I curves
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def type_I_fI(I, I_th=1.0, gain=10):
+    """Type I (SNIC): continuous from zero."""
+    return np.where(I &gt; I_th, gain * np.sqrt(I - I_th), 0)
+
+def type_II_fI(I, I_th=1.0, f_min=5, gain=2):
+    """Type II (Hopf): jump to minimum frequency."""
+    return np.where(I &gt; I_th, f_min + gain * (I - I_th), 0)
+
+I = np.linspace(0, 3, 200)
+
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+plt.plot(I, type_I_fI(I), 'b-', linewidth=2)
+plt.xlabel('Input Current I')
+plt.ylabel('Firing Rate f')
+plt.title('Type I (SNIC): Continuous f-I')
+plt.axvline(1.0, color='r', linestyle='--', label='Threshold')
+
+plt.subplot(1, 2, 2)
+plt.plot(I, type_II_fI(I), 'r-', linewidth=2)
+plt.xlabel('Input Current I')
+plt.ylabel('Firing Rate f')
+plt.title('Type II (Hopf): Discontinuous f-I')
+plt.axvline(1.0, color='r', linestyle='--', label='Threshold')
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>How do Type I and Type II neurons differ in their response to slowly varying input?</Front>
+    <Back>Type I neurons (integrators) track input level and fire at rates proportional to input strength. Type II neurons (resonators) respond preferentially to inputs matching their resonant frequency and show bistability near threshold.</Back>
+  </FlashCard>
+
+  <H2>Continuation Methods and Bifurcation Diagrams</H2>
+
+  <Body>
+    Numerical continuation is a technique for systematically tracking how fixed points, limit cycles, and their stability change as parameters vary. Rather than running many simulations, continuation methods follow solution branches through parameter space, detecting bifurcations where branches appear, disappear, or change stability.
+  </Body>
+
+  <Code lang="python">
+# Simple continuation example: tracking fixed points of
+# f(x, μ) = μ + x² - x³
+
+import numpy as np
+from scipy.optimize import fsolve
+
+def f(x, mu):
+    return mu + x**2 - x**3
+
+def df_dx(x, mu):
+    """Jacobian for stability analysis."""
+    return 2*x - 3*x**2
+
+def continuation_fixed_points(mu_range, x_initial, step=0.01):
+    """
+    Simple predictor-corrector continuation.
+    Track fixed point as μ varies.
+    """
+    mu_values = []
+    x_values = []
+    stability = []
+
+    x = x_initial
+    for mu in mu_range:
+        # Newton correction
+        x_new = fsolve(lambda x: f(x, mu), x)[0]
+
+        # Check stability via eigenvalue (1D: just derivative)
+        jac = df_dx(x_new, mu)
+        stable = jac &lt; 0
+
+        mu_values.append(mu)
+        x_values.append(x_new)
+        stability.append(stable)
+
+        x = x_new  # Use as initial guess for next step
+
+    return np.array(mu_values), np.array(x_values), np.array(stability)
+  </Code>
+
+  <Body>
+    Professional continuation software like AUTO, PyDSTool, or MATCONT can track bifurcations in high-dimensional systems, follow limit cycles, detect period-doubling cascades, and compute two-parameter bifurcation diagrams. These tools are essential for analyzing conductance-based models like Hodgkin-Huxley.
+  </Body>
+
+  <Code lang="python">
+# Example: Using PyDSTool for bifurcation analysis of HH model
+# (Conceptual - requires PyDSTool installation)
+
+"""
+from PyDSTool import *
+
+# Define Hodgkin-Huxley equations
+HH_args = {
+    'pars': {'I': 0, 'C': 1, 'gNa': 120, 'gK': 36, 'gL': 0.3,
+             'ENa': 50, 'EK': -77, 'EL': -54.4},
+    'varspecs': {
+        'V': '(I - gNa*m**3*h*(V-ENa) - gK*n**4*(V-EK) - gL*(V-EL))/C',
+        'm': 'alpha_m*(1-m) - beta_m*m',
+        'h': 'alpha_h*(1-h) - beta_h*h',
+        'n': 'alpha_n*(1-n) - beta_n*n'
+    },
+    # ... rate function definitions
+}
+
+# Create ODE system and equilibrium point finder
+HH = Generator.Vode_ODEsystem(HH_args)
+
+# Continuation in parameter I
+PC = ContClass(HH)
+PCargs = {
+    'name': 'EQ1',
+    'type': 'EP-C',           # Equilibrium point continuation
+    'freepars': ['I'],        # Vary applied current
+    'MaxStepSize': 0.5,
+    'MinStepSize': 1e-5,
+    'MaxNumPoints': 500,
+    'LocBifPoints': 'all'     # Detect all bifurcations
+}
+PC.newCurve(PCargs)
+PC['EQ1'].forward()           # Continue in forward direction
+"""
+  </Code>
+
+  <FlashCard id="fc6">
+    <Front>What is numerical continuation and why is it useful for neuronal models?</Front>
+    <Back>Numerical continuation tracks how equilibria and limit cycles change with parameters, systematically detecting bifurcations. It's more efficient than many simulations and reveals the complete bifurcation structure governing neuronal dynamics.</Back>
+  </FlashCard>
+
+  <H2>Bifurcation Diagram for the Hodgkin-Huxley Model</H2>
+
+  <Body>
+    The Hodgkin-Huxley model exhibits rich bifurcation structure as applied current I varies. At low current, a stable resting potential exists. As I increases, this rest state loses stability via a subcritical Hopf bifurcation, and the system jumps to repetitive firing. This explains the Type II excitability of the squid giant axon.
+  </Body>
+
+  <Body>
+    The full bifurcation diagram reveals:
+  </Body>
+
+  <Body>
+    1. A stable equilibrium branch at low I (resting state)
+  </Body>
+
+  <Body>
+    2. An unstable limit cycle branch emerging from a subcritical Hopf bifurcation
+  </Body>
+
+  <Body>
+    3. A stable limit cycle branch (repetitive firing) that coexists with the rest state in a bistable region
+  </Body>
+
+  <Body>
+    4. A saddle-node of limit cycles where unstable and stable oscillations collide
+  </Body>
+
+  <Body>
+    The subcritical nature produces hysteresis: the current needed to initiate firing differs from the current at which firing stops.
+  </Body>
+
+  <H2>Summary: Relating Bifurcations to Neural Computation</H2>
+
+  <Body>
+    Understanding bifurcation structure is essential for predicting how neurons process information:
+  </Body>
+
+  <Body>
+    SNIC bifurcations create integrator neurons ideal for rate coding and detecting input magnitude.
+  </Body>
+
+  <Body>
+    Hopf bifurcations create resonator neurons suited for detecting oscillatory input and supporting synchronization.
+  </Body>
+
+  <Body>
+    Subcritical bifurcations introduce bistability and hysteresis, enabling memory and switching behaviors.
+  </Body>
+
+  <Body>
+    Bifurcation diagrams map the complete repertoire of behaviors available to a neuron as conditions change.
+  </Body>
+
+  <Body>
+    Neuromodulators can shift neurons between excitability classes by changing the underlying bifurcation structure, fundamentally altering their computational properties.
+  </Body>
+
+  <H1>Knowledge Check</H1>
+
+  <SingleSelect id="q1">
+    <Prompt>A neuron's f-I curve shows firing rates that start from zero and increase continuously with input current. What type of bifurcation most likely governs firing onset?</Prompt>
+    <Options>
+      <Option correct="true">Saddle-node on invariant circle (SNIC)</Option>
+      <Option>Supercritical Hopf bifurcation</Option>
+      <Option>Subcritical Hopf bifurcation</Option>
+      <Option>Saddle-node bifurcation of fixed points</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>In the Hodgkin-Huxley model at standard temperature, what accounts for the neuron's inability to fire at frequencies below approximately 50 Hz?</Prompt>
+    <Options>
+      <Option correct="true">Firing onset occurs via Hopf bifurcation with finite frequency</Option>
+      <Option>The refractory period prevents faster firing</Option>
+      <Option>Sodium channel inactivation limits minimum frequency</Option>
+      <Option>The capacitance creates a low-frequency cutoff</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>At a supercritical Hopf bifurcation, how does the amplitude of the emerging limit cycle scale with distance from the bifurcation point?</Prompt>
+    <Options>
+      <Option correct="true">Amplitude ∝ √(μ - μ*)</Option>
+      <Option>Amplitude ∝ (μ - μ*)</Option>
+      <Option>Amplitude ∝ (μ - μ*)²</Option>
+      <Option>Amplitude jumps discontinuously to a finite value</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following are characteristic features of Type II (resonator) neurons? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Minimum nonzero firing frequency</Option>
+      <Option correct="true">Firing onset via Hopf bifurcation</Option>
+      <Option>Continuous f-I curve from zero frequency</Option>
+      <Option correct="true">Preferential response to oscillatory inputs near resonant frequency</Option>
+      <Option>Ability to encode input magnitude at arbitrarily low rates</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5">
+    <Prompt>Which conditions indicate that a subcritical Hopf bifurcation is occurring rather than a supercritical one?</Prompt>
+    <Options>
+      <Option correct="true">Hysteresis in transitions between rest and firing</Option>
+      <Option correct="true">The limit cycle has finite amplitude immediately at onset</Option>
+      <Option>The limit cycle amplitude grows smoothly from zero</Option>
+      <Option correct="true">Bistability between rest and oscillatory states</Option>
+      <Option>Continuous, reversible transition between states</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these bifurcation analysis steps from first to last when constructing a bifurcation diagram:</Prompt>
+    <SortedItems>
+      <Item>Define the dynamical system and identify control parameters</Item>
+      <Item>Find fixed points as functions of the parameter</Item>
+      <Item>Compute eigenvalues to determine stability</Item>
+      <Item>Identify parameter values where eigenvalues cross stability boundaries</Item>
+      <Item>Classify bifurcation types from eigenvalue behavior</Item>
+      <Item>Track limit cycles if Hopf bifurcations are present</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7">
+    <Prompt>Match each bifurcation type to its characteristic eigenvalue behavior at the bifurcation point:</Prompt>
+    <Pairs>
+      <Pair><Left>Saddle-node bifurcation</Left><Right>Real eigenvalue crosses zero</Right></Pair>
+      <Pair><Left>Hopf bifurcation</Left><Right>Complex conjugate pair crosses imaginary axis</Right></Pair>
+      <Pair><Left>SNIC bifurcation</Left><Right>Fixed points annihilate on a limit cycle</Right></Pair>
+      <Pair><Left>Pitchfork bifurcation</Left><Right>Symmetry-breaking with eigenvalue at zero</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>All eigenvalues become positive simultaneously</Distractor>
+      <Distractor>Eigenvalues form a repeated root</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q8">
+    <Prompt>Match each neuron model to its primary excitability type:</Prompt>
+    <Pairs>
+      <Pair><Left>Theta neuron model</Left><Right>Type I (integrator)</Right></Pair>
+      <Pair><Left>Standard Hodgkin-Huxley squid axon</Left><Right>Type II (resonator)</Right></Pair>
+      <Pair><Left>Quadratic integrate-and-fire</Left><Right>Type I (integrator)</Right></Pair>
+      <Pair><Left>Connor-Stevens A-current model</Left><Right>Type I (can be modified to Type II)</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Type III (coincidence detector)</Distractor>
+      <Distractor>Non-excitable (no firing)</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q9">
+    <Prompt>
+      In a <Blank>saddle-node</Blank> bifurcation, a stable node and an unstable <Blank>saddle</Blank> point collide and annihilate. When this occurs on an invariant circle, it is called a <Blank>SNIC</Blank> bifurcation, which produces <Blank>Type I</Blank> excitability with a continuous f-I curve.
+    </Prompt>
+    <Distractors>
+      <Distractor>Hopf</Distractor>
+      <Distractor>focus</Distractor>
+      <Distractor>transcritical</Distractor>
+      <Distractor>Type II</Distractor>
+      <Distractor>pitchfork</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q10">
+    <Prompt>
+      At a Hopf bifurcation, a pair of <Blank>complex conjugate</Blank> eigenvalues crosses the <Blank>imaginary axis</Blank>. In the supercritical case, the limit cycle amplitude grows as the <Blank>square root</Blank> of the distance from the bifurcation point.
+    </Prompt>
+    <Distractors>
+      <Distractor>real positive</Distractor>
+      <Distractor>origin</Distractor>
+      <Distractor>linear function</Distractor>
+      <Distractor>negative real axis</Distractor>
+      <Distractor>exponential</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q11">
+    <Prompt>Explain how the bifurcation type at firing onset determines whether a neuron functions as an integrator or a resonator. Include in your answer: (1) the specific bifurcations involved, (2) the resulting f-I curve shapes, and (3) the computational implications for neural coding.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly identifies SNIC bifurcation for Type I/integrators and Hopf bifurcation for Type II/resonators</Requirement>
+        <Indicators>SNIC, saddle-node on invariant circle, Type I, integrator, Hopf, Type II, resonator</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes f-I curve differences: continuous from zero for Type I vs. discontinuous jump to minimum frequency for Type II</Requirement>
+        <Indicators>continuous, zero frequency, f-I curve, discontinuous, minimum frequency, jump, threshold</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains computational implications: rate coding for integrators, frequency selectivity for resonators</Requirement>
+        <Indicators>rate coding, input magnitude, frequency selectivity, resonant, oscillatory input, synchronization</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Provides concrete examples or describes the underlying mathematical mechanism</Requirement>
+        <Indicators>theta neuron, Hodgkin-Huxley, eigenvalue, period, arbitrarily low, sqrt</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q12">
+    <Prompt>A researcher observes that a neuron exhibits hysteresis: the current required to initiate spiking is higher than the current at which spiking stops. What does this tell you about the underlying bifurcation structure? Describe the likely bifurcation scenario and explain the mechanism producing this bistability.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Identifies subcritical Hopf bifurcation as the likely mechanism for hysteresis</Requirement>
+        <Indicators>subcritical, Hopf, bistability, hysteresis, coexistence</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Explains the mechanism: stable rest state coexists with stable limit cycle in a parameter range</Requirement>
+        <Indicators>stable, unstable, limit cycle, rest state, coexist, parameter range, saddle-node of cycles</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Describes the role of the unstable limit cycle in separating basins of attraction</Requirement>
+        <Indicators>unstable limit cycle, basin, attraction, separatrix, threshold</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Mentions practical implications or examples (HH model, neuromodulation)</Requirement>
+        <Indicators>Hodgkin-Huxley, squid, neuromodulation, pathological, clinical</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="60" maxWords="250" />
+  </Subjective>
+
+</Lesson>

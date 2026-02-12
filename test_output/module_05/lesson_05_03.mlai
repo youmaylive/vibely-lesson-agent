@@ -1,0 +1,1052 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-05-03</Id>
+    <Title>Beyond Kuramoto: Realistic Network Synchronization</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>synchronization</Tag>
+      <Tag>kuramoto-model</Tag>
+      <Tag>chimera-states</Tag>
+      <Tag>network-dynamics</Tag>
+      <Tag>neural-oscillators</Tag>
+      <Tag>time-delays</Tag>
+      <Tag>stochastic-synchronization</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Beyond Kuramoto: Realistic Network Synchronization</H1>
+
+  <Body>
+    Real neuronal networks exhibit synchronization phenomena far richer than predicted by the classical Kuramoto model. While the basic Kuramoto framework assumes uniform all-to-all coupling, actual brain networks feature heterogeneous connection strengths, finite propagation delays, and stochastic fluctuations. These biologically realistic extensions produce striking emergent phenomena—chimera states, metastable dynamics, and noise-induced synchronization—that are increasingly observed in experimental neuroscience.
+  </Body>
+
+  <Body>
+    This lesson extends the Kuramoto framework to capture these complexities, connecting mathematical models to experimental observations from EEG, MEG, and in vitro neuronal recordings. We will develop computational tools for simulating extended models and analyzing synchronization in real neural data.
+  </Body>
+
+  <H2>Heterogeneous Coupling in Neuronal Networks</H2>
+
+  <Body>
+    The classical Kuramoto model assumes uniform coupling strength K for all oscillator pairs. However, neuronal connectivity is highly structured: nearby neurons connect more strongly than distant ones, hub neurons have many more connections than peripheral ones, and synaptic weights vary across orders of magnitude.
+  </Body>
+
+  <H3>The Generalized Kuramoto Model</H3>
+
+  <Body>
+    We extend the Kuramoto model by replacing the uniform coupling constant with a coupling matrix K_ij that captures pairwise connection strengths:
+  </Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+def kuramoto_heterogeneous(t, theta, omega, K_matrix):
+    """
+    Extended Kuramoto model with heterogeneous coupling.
+
+    dθ_i/dt = ω_i + Σ_j K_ij sin(θ_j - θ_i)
+
+    Parameters:
+    -----------
+    theta : array, shape (N,)
+        Phase of each oscillator
+    omega : array, shape (N,)
+        Natural frequency of each oscillator
+    K_matrix : array, shape (N, N)
+        Coupling matrix where K_ij is strength from j to i
+    """
+    N = len(theta)
+    dtheta = omega.copy()
+
+    for i in range(N):
+        coupling_sum = 0.0
+        for j in range(N):
+            coupling_sum += K_matrix[i, j] * np.sin(theta[j] - theta[i])
+        dtheta[i] += coupling_sum
+
+    return dtheta
+
+# Vectorized implementation (more efficient)
+def kuramoto_heterogeneous_vectorized(t, theta, omega, K_matrix):
+    """Vectorized version for efficiency."""
+    N = len(theta)
+    # Compute phase differences: theta_j - theta_i for all pairs
+    phase_diff = theta[np.newaxis, :] - theta[:, np.newaxis]
+    # Coupling contribution: sum over j of K_ij * sin(theta_j - theta_i)
+    coupling = np.sum(K_matrix * np.sin(phase_diff), axis=1)
+    return omega + coupling
+  </Code>
+
+  <FlashCard id="fc-heterogeneous-coupling">
+    <Front>What distinguishes heterogeneous coupling from uniform coupling in the Kuramoto model?</Front>
+    <Back>Heterogeneous coupling replaces the single coupling constant K with a coupling matrix K_ij, allowing different connection strengths between each pair of oscillators. This captures realistic features like distance-dependent connectivity, hub structures, and variable synaptic weights.</Back>
+  </FlashCard>
+
+  <H3>Network Topologies and Coupling Structures</H3>
+
+  <Body>
+    The coupling matrix K_ij encodes the network topology. Common structures in neural networks include:
+  </Body>
+
+  <Body>
+    1. Distance-dependent coupling: K_ij decays with spatial distance, often exponentially or as a power law. This captures the local nature of cortical connectivity.
+  </Body>
+
+  <Body>
+    2. Small-world networks: High local clustering combined with sparse long-range connections, balancing local processing with global integration.
+  </Body>
+
+  <Body>
+    3. Scale-free networks: Power-law degree distribution with highly connected hub nodes, observed in some brain networks.
+  </Body>
+
+  <Code lang="python">
+def create_distance_dependent_coupling(positions, K0, sigma):
+    """
+    Create coupling matrix with exponential distance decay.
+
+    K_ij = K0 * exp(-|r_i - r_j|^2 / (2*sigma^2))
+
+    Parameters:
+    -----------
+    positions : array, shape (N, d)
+        Spatial positions of N oscillators in d dimensions
+    K0 : float
+        Maximum coupling strength (at zero distance)
+    sigma : float
+        Spatial decay constant
+    """
+    N = positions.shape[0]
+    K_matrix = np.zeros((N, N))
+
+    for i in range(N):
+        for j in range(N):
+            if i != j:
+                distance = np.linalg.norm(positions[i] - positions[j])
+                K_matrix[i, j] = K0 * np.exp(-distance**2 / (2 * sigma**2))
+
+    return K_matrix
+
+def create_small_world_coupling(N, k, p, K_strength):
+    """
+    Create Watts-Strogatz small-world coupling matrix.
+
+    Parameters:
+    -----------
+    N : int
+        Number of oscillators
+    k : int
+        Number of nearest neighbors in ring lattice
+    p : float
+        Rewiring probability
+    K_strength : float
+        Coupling strength for connected pairs
+    """
+    import networkx as nx
+
+    # Generate small-world graph
+    G = nx.watts_strogatz_graph(N, k, p)
+
+    # Convert to coupling matrix
+    K_matrix = K_strength * nx.to_numpy_array(G)
+
+    return K_matrix
+  </Code>
+
+  <FlashCard id="fc-small-world">
+    <Front>What are the defining characteristics of small-world network topology?</Front>
+    <Back>Small-world networks combine high local clustering (neighbors of a node are likely connected to each other) with short average path length (any two nodes can be connected through few intermediate links). This is achieved by adding sparse long-range connections to a locally connected network.</Back>
+  </FlashCard>
+
+  <H2>Time Delays in Coupled Oscillators</H2>
+
+  <Body>
+    Axonal conduction and synaptic transmission introduce finite propagation delays in neural signals. For cortical networks, delays range from a few milliseconds (local connections) to tens of milliseconds (long-range connections). These delays fundamentally alter synchronization dynamics.
+  </Body>
+
+  <H3>Delayed Kuramoto Model</H3>
+
+  <Body>
+    Incorporating time delays transforms the Kuramoto model into a delay differential equation (DDE):
+  </Body>
+
+  <Code lang="python">
+def kuramoto_with_delays(t, theta, theta_history, omega, K_matrix, tau_matrix):
+    """
+    Kuramoto model with heterogeneous time delays.
+
+    dθ_i/dt = ω_i + Σ_j K_ij sin(θ_j(t - τ_ij) - θ_i(t))
+
+    Parameters:
+    -----------
+    theta : array, shape (N,)
+        Current phases
+    theta_history : callable
+        Function that returns theta at past times
+    tau_matrix : array, shape (N, N)
+        Delay matrix where tau_ij is delay from j to i
+    """
+    N = len(theta)
+    dtheta = omega.copy()
+
+    for i in range(N):
+        for j in range(N):
+            if K_matrix[i, j] != 0:
+                # Get delayed phase
+                delay = tau_matrix[i, j]
+                theta_j_delayed = theta_history(t - delay, j)
+                dtheta[i] += K_matrix[i, j] * np.sin(theta_j_delayed - theta[i])
+
+    return dtheta
+
+class DelayedKuramotoSimulator:
+    """
+    Simulator for Kuramoto model with delays using Euler-Maruyama method.
+    """
+    def __init__(self, N, omega, K_matrix, tau_matrix, dt=0.01):
+        self.N = N
+        self.omega = omega
+        self.K_matrix = K_matrix
+        self.tau_matrix = tau_matrix
+        self.dt = dt
+
+        # Maximum delay determines history buffer size
+        self.max_delay = np.max(tau_matrix)
+        self.history_length = int(np.ceil(self.max_delay / dt)) + 1
+
+    def simulate(self, T, theta0=None):
+        """Run simulation for time T."""
+        n_steps = int(T / self.dt)
+
+        # Initialize phases
+        if theta0 is None:
+            theta0 = np.random.uniform(0, 2*np.pi, self.N)
+
+        # History buffer (circular)
+        history = np.zeros((self.history_length, self.N))
+        history[:] = theta0  # Initialize with constant
+
+        # Storage for results
+        theta_series = np.zeros((n_steps, self.N))
+        theta_series[0] = theta0
+
+        current_theta = theta0.copy()
+        hist_idx = 0
+
+        for step in range(1, n_steps):
+            # Compute coupling with delays
+            coupling = np.zeros(self.N)
+            for i in range(self.N):
+                for j in range(self.N):
+                    if self.K_matrix[i, j] != 0:
+                        # Find delayed index
+                        delay_steps = int(self.tau_matrix[i, j] / self.dt)
+                        delayed_idx = (hist_idx - delay_steps) % self.history_length
+                        theta_j_delayed = history[delayed_idx, j]
+                        coupling[i] += self.K_matrix[i, j] * np.sin(
+                            theta_j_delayed - current_theta[i]
+                        )
+
+            # Euler step
+            current_theta = current_theta + self.dt * (self.omega + coupling)
+
+            # Update history
+            hist_idx = (hist_idx + 1) % self.history_length
+            history[hist_idx] = current_theta
+
+            theta_series[step] = current_theta
+
+        return np.arange(n_steps) * self.dt, theta_series
+  </Code>
+
+  <Body>
+    Time delays can produce counterintuitive effects. While one might expect delays to destabilize synchronization, this is not always true. Delays can actually induce or stabilize synchronization in certain parameter regimes, and can create multistability between different synchronization patterns.
+  </Body>
+
+  <FlashCard id="fc-time-delays">
+    <Front>How do time delays affect synchronization stability in the Kuramoto model?</Front>
+    <Back>Time delays can either stabilize or destabilize synchronization depending on the delay magnitude and coupling strength. Delays can create multistability between different synchronization patterns, induce oscillation death (amplitude collapse), or generate new synchronized states not possible without delays.</Back>
+  </FlashCard>
+
+  <H3>Oscillation Death and Amplitude Effects</H3>
+
+  <Body>
+    In systems where amplitude dynamics matter (beyond pure phase models), delays can induce "oscillation death"—a phenomenon where coupled oscillators stop oscillating entirely and settle to a fixed point. This has implications for understanding pathological brain states.
+  </Body>
+
+  <SingleSelect id="q1-delay-effects">
+    <Prompt>What is "oscillation death" in the context of delayed coupled oscillators?</Prompt>
+    <Options>
+      <Option correct="true">A state where oscillators stop oscillating and settle to fixed points due to coupling</Option>
+      <Option>The gradual decrease in oscillation frequency over time</Option>
+      <Option>The loss of synchronization between coupled oscillators</Option>
+      <Option>The divergence of oscillation amplitudes to infinity</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Chimera States: The Coexistence of Order and Disorder</H2>
+
+  <Body>
+    One of the most striking discoveries in coupled oscillator theory is the chimera state—a spontaneous splitting of identical oscillators into coexisting synchronized and desynchronized subpopulations. Named after the mythological creature combining different animals, chimera states demonstrate that symmetry in the equations does not guarantee symmetry in the solutions.
+  </Body>
+
+  <H3>Conditions for Chimera States</H3>
+
+  <Body>
+    Chimera states typically require non-local coupling: oscillators interact strongly with nearby neighbors but also have weaker connections to more distant oscillators. A phase lag parameter in the coupling function is often necessary.
+  </Body>
+
+  <Code lang="python">
+def kuramoto_nonlocal_phaselag(t, theta, omega, r, alpha, N):
+    """
+    Kuramoto model with non-local coupling and phase lag.
+    Supports chimera states.
+
+    dθ_i/dt = ω - (K/N) Σ_j G(x_i - x_j) sin(θ_i - θ_j + α)
+
+    where G is the coupling kernel and α is the phase lag.
+
+    Parameters:
+    -----------
+    r : float
+        Coupling range (fraction of system size)
+    alpha : float
+        Phase lag parameter (radians)
+    """
+    dtheta = np.ones(N) * omega
+
+    for i in range(N):
+        coupling_sum = 0.0
+        n_coupled = 0
+
+        for j in range(N):
+            # Non-local coupling: exponential decay with periodic boundary
+            distance = min(abs(i - j), N - abs(i - j)) / N
+
+            if distance &lt; r:  # Coupling kernel cutoff
+                weight = np.exp(-distance / (r/3))
+                coupling_sum += weight * np.sin(theta[i] - theta[j] + alpha)
+                n_coupled += 1
+
+        if n_coupled &gt; 0:
+            dtheta[i] -= coupling_sum / n_coupled
+
+    return dtheta
+
+def simulate_chimera_state(N=256, T=500, dt=0.01, r=0.35, alpha=1.46):
+    """
+    Simulate and visualize a chimera state.
+
+    Parameters chosen to produce chimera in 1D ring.
+    """
+    # Initialize with small perturbation to synchronized state
+    theta0 = np.linspace(0, 2*np.pi, N) + 0.01 * np.random.randn(N)
+
+    n_steps = int(T / dt)
+    theta = theta0.copy()
+
+    # Store space-time plot data (sample every 100 steps)
+    sample_interval = 100
+    theta_history = []
+
+    omega = 0  # Identical frequencies
+
+    for step in range(n_steps):
+        # RK4 integration
+        k1 = kuramoto_nonlocal_phaselag(0, theta, omega, r, alpha, N)
+        k2 = kuramoto_nonlocal_phaselag(0, theta + 0.5*dt*k1, omega, r, alpha, N)
+        k3 = kuramoto_nonlocal_phaselag(0, theta + 0.5*dt*k2, omega, r, alpha, N)
+        k4 = kuramoto_nonlocal_phaselag(0, theta + dt*k3, omega, r, alpha, N)
+        theta = theta + (dt/6) * (k1 + 2*k2 + 2*k3 + k4)
+
+        if step % sample_interval == 0:
+            theta_history.append(theta.copy())
+
+    return np.array(theta_history)
+  </Code>
+
+  <Body>
+    Chimera states have been observed experimentally in chemical oscillators, mechanical metronomes, and electronic circuits. More importantly for neuroscience, chimera-like patterns are hypothesized to underlie certain brain states, including the coexistence of sleep-like and wake-like activity observed in sleep deprivation.
+  </Body>
+
+  <FlashCard id="fc-chimera-states">
+    <Front>What is a chimera state in coupled oscillator systems?</Front>
+    <Back>A chimera state is a symmetry-breaking phenomenon where identical oscillators spontaneously split into coexisting synchronized and desynchronized subpopulations. Despite uniform coupling rules and identical oscillator properties, spatial coherence and incoherence emerge simultaneously.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q2-chimera-requirements">
+    <Prompt>Which of the following is typically required for chimera states to emerge in coupled oscillator systems?</Prompt>
+    <Options>
+      <Option>All-to-all uniform coupling with identical oscillators</Option>
+      <Option>Heterogeneous natural frequencies with local coupling</Option>
+      <Option correct="true">Non-local coupling with a phase lag parameter</Option>
+      <Option>Time delays with distance-independent coupling</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Noise Effects on Synchronization</H2>
+
+  <Body>
+    Neural systems operate in inherently noisy environments. Synaptic transmission is stochastic, ion channels open and close randomly, and neurons receive background inputs from countless unmodeled sources. Rather than simply degrading synchronization, noise can play constructive roles.
+  </Body>
+
+  <H3>The Stochastic Kuramoto Model</H3>
+
+  <Body>
+    Adding noise to the Kuramoto model yields a stochastic differential equation (SDE):
+  </Body>
+
+  <Code lang="python">
+def kuramoto_stochastic(N, omega, K_matrix, sigma, T, dt):
+    """
+    Stochastic Kuramoto model with independent and common noise.
+
+    dθ_i = [ω_i + Σ_j K_ij sin(θ_j - θ_i)] dt + σ_ind dW_i + σ_com dW_com
+
+    Parameters:
+    -----------
+    sigma : tuple (sigma_ind, sigma_com)
+        Independent and common noise strengths
+    """
+    sigma_ind, sigma_com = sigma
+    n_steps = int(T / dt)
+    sqrt_dt = np.sqrt(dt)
+
+    theta = np.random.uniform(0, 2*np.pi, N)
+    theta_series = np.zeros((n_steps, N))
+    theta_series[0] = theta
+
+    for step in range(1, n_steps):
+        # Deterministic drift
+        phase_diff = theta[np.newaxis, :] - theta[:, np.newaxis]
+        coupling = np.sum(K_matrix * np.sin(phase_diff), axis=1)
+        drift = omega + coupling
+
+        # Noise terms
+        dW_ind = sqrt_dt * np.random.randn(N)  # Independent noise
+        dW_com = sqrt_dt * np.random.randn()    # Common noise
+
+        # Euler-Maruyama update
+        theta = theta + dt * drift + sigma_ind * dW_ind + sigma_com * dW_com
+        theta_series[step] = theta
+
+    return np.arange(n_steps) * dt, theta_series
+
+def compute_stochastic_order_parameter(theta_series):
+    """
+    Compute time-varying Kuramoto order parameter.
+    """
+    N = theta_series.shape[1]
+    z = np.mean(np.exp(1j * theta_series), axis=1)
+    R = np.abs(z)
+    Psi = np.angle(z)
+    return R, Psi
+  </Code>
+
+  <H3>Common Noise Synchronization</H3>
+
+  <Body>
+    A remarkable phenomenon occurs when oscillators receive a common noise input: even without coupling, shared noise can induce synchronization. This "noise-induced synchronization" has profound implications for neural circuits where neurons receive correlated background inputs.
+  </Body>
+
+  <Code lang="python">
+def common_noise_synchronization_demo(N=100, T=200, dt=0.01):
+    """
+    Demonstrate synchronization induced by common noise alone.
+
+    Uncoupled oscillators with different frequencies synchronize
+    when driven by common noise.
+    """
+    # Heterogeneous frequencies
+    omega = np.random.normal(1.0, 0.1, N)
+
+    # Zero coupling - no interaction between oscillators
+    K_matrix = np.zeros((N, N))
+
+    # Only common noise, no independent noise
+    sigma = (0.0, 0.5)  # (sigma_ind, sigma_com)
+
+    t, theta = kuramoto_stochastic(N, omega, K_matrix, sigma, T, dt)
+
+    # Compute synchronization
+    R, _ = compute_stochastic_order_parameter(theta)
+
+    return t, theta, R
+  </Code>
+
+  <Body>
+    The mechanism underlying common noise synchronization is intuitive: shared fluctuations push all oscillators in the same direction simultaneously, gradually aligning their phases despite different natural frequencies. This effect is enhanced when oscillators have similar frequencies and can overcome moderate frequency heterogeneity.
+  </Body>
+
+  <FlashCard id="fc-common-noise">
+    <Front>What is common noise synchronization?</Front>
+    <Back>Common noise synchronization is the phenomenon where uncoupled oscillators with heterogeneous frequencies become synchronized when they receive the same noisy input. Shared fluctuations drive oscillators toward phase alignment even without direct coupling between them.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q3-noise-effects">
+    <Prompt>Which of the following are valid effects of noise on coupled oscillator systems? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">Common noise can synchronize uncoupled oscillators</Option>
+      <Option correct="true">Independent noise can desynchronize coupled oscillators</Option>
+      <Option correct="true">Noise can induce transitions between different synchronization states</Option>
+      <Option>Noise always decreases the order parameter</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Metastability in Neural Networks</H2>
+
+  <Body>
+    Rather than settling into fixed synchronization patterns, brain networks exhibit metastability—the tendency to visit multiple partially synchronized states in sequence without remaining indefinitely in any one. Metastable dynamics may support flexible cognition by allowing rapid transitions between functional configurations.
+  </Body>
+
+  <H3>Characterizing Metastability</H3>
+
+  <Body>
+    Metastability can be quantified by examining fluctuations in the order parameter and the duration of visits to different synchronization states.
+  </Body>
+
+  <Code lang="python">
+def compute_metastability_index(R_timeseries, dt):
+    """
+    Compute metastability index from order parameter time series.
+
+    High metastability = large variance in R over time.
+
+    Parameters:
+    -----------
+    R_timeseries : array
+        Time series of order parameter magnitude
+    dt : float
+        Time step
+
+    Returns:
+    --------
+    metastability : float
+        Standard deviation of R (metastability index)
+    mean_R : float
+        Mean synchronization level
+    """
+    metastability = np.std(R_timeseries)
+    mean_R = np.mean(R_timeseries)
+    return metastability, mean_R
+
+def identify_metastable_states(R_timeseries, threshold=0.1, min_duration=10):
+    """
+    Identify transitions between metastable states.
+
+    Parameters:
+    -----------
+    threshold : float
+        Minimum change in R to count as transition
+    min_duration : int
+        Minimum samples in state before transition counts
+    """
+    states = []
+    current_state_start = 0
+    current_R = R_timeseries[0]
+
+    for i in range(1, len(R_timeseries)):
+        if abs(R_timeseries[i] - current_R) &gt; threshold:
+            duration = i - current_state_start
+            if duration &gt;= min_duration:
+                states.append({
+                    'start': current_state_start,
+                    'end': i,
+                    'duration': duration,
+                    'mean_R': np.mean(R_timeseries[current_state_start:i])
+                })
+            current_state_start = i
+            current_R = R_timeseries[i]
+
+    return states
+  </Code>
+
+  <Body>
+    Metastability emerges naturally in networks operating near a critical point—close to but not at the synchronization transition. This criticality hypothesis suggests that the brain self-organizes to the edge of synchronization, maximizing both integration (through transient synchronization) and segregation (through dynamic desynchronization).
+  </Body>
+
+  <FlashCard id="fc-metastability">
+    <Front>What is metastability in neural network dynamics?</Front>
+    <Back>Metastability is a dynamical regime where the network transiently visits multiple partially synchronized states without settling permanently into any single pattern. It is characterized by fluctuating synchronization levels and is thought to support flexible cognitive processing.</Back>
+  </FlashCard>
+
+  <H2>Experimental Validation: EEG and MEG Analysis</H2>
+
+  <Body>
+    The theoretical frameworks developed above connect directly to experimental neuroscience through analysis of EEG (electroencephalography) and MEG (magnetoencephalography) recordings. Phase synchronization measures allow us to quantify coordination across brain regions.
+  </Body>
+
+  <H3>Phase Extraction and Synchronization Measures</H3>
+
+  <Code lang="python">
+from scipy.signal import hilbert, butter, filtfilt
+
+def extract_phase(signal, fs, freq_band):
+    """
+    Extract instantaneous phase using Hilbert transform.
+
+    Parameters:
+    -----------
+    signal : array
+        Time series data
+    fs : float
+        Sampling frequency (Hz)
+    freq_band : tuple
+        (low, high) frequency band for filtering (Hz)
+
+    Returns:
+    --------
+    phase : array
+        Instantaneous phase (radians)
+    amplitude : array
+        Instantaneous amplitude (envelope)
+    """
+    # Bandpass filter
+    low, high = freq_band
+    nyq = fs / 2
+    b, a = butter(4, [low/nyq, high/nyq], btype='band')
+    filtered = filtfilt(b, a, signal)
+
+    # Hilbert transform
+    analytic = hilbert(filtered)
+    phase = np.angle(analytic)
+    amplitude = np.abs(analytic)
+
+    return phase, amplitude
+
+def phase_locking_value(phase1, phase2):
+    """
+    Compute Phase Locking Value (PLV) between two signals.
+
+    PLV = |&lt;exp(i(φ_1 - φ_2))&gt;|
+
+    Ranges from 0 (no synchronization) to 1 (perfect synchronization).
+    """
+    phase_diff = phase1 - phase2
+    plv = np.abs(np.mean(np.exp(1j * phase_diff)))
+    return plv
+
+def phase_lag_index(phase1, phase2):
+    """
+    Compute Phase Lag Index (PLI).
+
+    PLI is less sensitive to volume conduction than PLV.
+    PLI = |&lt;sign(sin(φ_1 - φ_2))&gt;|
+    """
+    phase_diff = phase1 - phase2
+    pli = np.abs(np.mean(np.sign(np.sin(phase_diff))))
+    return pli
+
+def compute_synchronization_matrix(phases):
+    """
+    Compute pairwise synchronization matrix for multichannel data.
+
+    Parameters:
+    -----------
+    phases : array, shape (n_channels, n_timepoints)
+        Phase time series for each channel
+
+    Returns:
+    --------
+    plv_matrix : array, shape (n_channels, n_channels)
+        Pairwise Phase Locking Values
+    """
+    n_channels = phases.shape[0]
+    plv_matrix = np.zeros((n_channels, n_channels))
+
+    for i in range(n_channels):
+        for j in range(i+1, n_channels):
+            plv = phase_locking_value(phases[i], phases[j])
+            plv_matrix[i, j] = plv
+            plv_matrix[j, i] = plv
+        plv_matrix[i, i] = 1.0
+
+    return plv_matrix
+  </Code>
+
+  <Body>
+    The Phase Locking Value (PLV) measures how consistently two signals maintain a fixed phase relationship over time. Values near 1 indicate strong synchronization, while values near 0 suggest independent dynamics. The Phase Lag Index (PLI) provides a similar measure that is more robust to volume conduction artifacts common in EEG/MEG.
+  </Body>
+
+  <H3>Global and Local Synchronization Measures</H3>
+
+  <Code lang="python">
+def kuramoto_order_from_eeg(phases):
+    """
+    Compute time-varying global synchronization using Kuramoto order parameter.
+
+    Parameters:
+    -----------
+    phases : array, shape (n_channels, n_timepoints)
+        Phase time series for each channel
+
+    Returns:
+    --------
+    R : array, shape (n_timepoints,)
+        Global synchronization level over time
+    """
+    n_channels, n_timepoints = phases.shape
+
+    # Compute order parameter at each time point
+    z = np.mean(np.exp(1j * phases), axis=0)
+    R = np.abs(z)
+
+    return R
+
+def analyze_eeg_synchronization(eeg_data, fs, freq_bands):
+    """
+    Complete analysis pipeline for EEG synchronization.
+
+    Parameters:
+    -----------
+    eeg_data : array, shape (n_channels, n_timepoints)
+        Raw EEG data
+    fs : float
+        Sampling frequency
+    freq_bands : dict
+        Dictionary of frequency bands, e.g., {'alpha': (8, 13), 'beta': (13, 30)}
+
+    Returns:
+    --------
+    results : dict
+        Synchronization measures for each frequency band
+    """
+    results = {}
+    n_channels = eeg_data.shape[0]
+
+    for band_name, (low, high) in freq_bands.items():
+        # Extract phases for this band
+        phases = np.zeros_like(eeg_data)
+        for ch in range(n_channels):
+            phases[ch], _ = extract_phase(eeg_data[ch], fs, (low, high))
+
+        # Compute synchronization measures
+        R = kuramoto_order_from_eeg(phases)
+        plv_matrix = compute_synchronization_matrix(phases)
+
+        # Metastability
+        meta_idx, mean_sync = compute_metastability_index(R, 1/fs)
+
+        results[band_name] = {
+            'global_sync': R,
+            'plv_matrix': plv_matrix,
+            'metastability': meta_idx,
+            'mean_synchronization': mean_sync
+        }
+
+    return results
+  </Code>
+
+  <FlashCard id="fc-plv">
+    <Front>What does the Phase Locking Value (PLV) measure?</Front>
+    <Back>The Phase Locking Value quantifies the consistency of phase relationships between two signals over time. PLV = |&lt;exp(i(φ_1 - φ_2))&gt;| ranges from 0 (random phase relationship) to 1 (perfectly locked phases). It is widely used to measure functional connectivity in EEG/MEG data.</Back>
+  </FlashCard>
+
+  <MatchPairs id="q4-sync-measures">
+    <Prompt>Match each synchronization measure with its primary characteristic:</Prompt>
+    <Pairs>
+      <Pair><Left>Phase Locking Value (PLV)</Left><Right>Sensitive to consistent phase relationships</Right></Pair>
+      <Pair><Left>Phase Lag Index (PLI)</Left><Right>Robust to volume conduction artifacts</Right></Pair>
+      <Pair><Left>Kuramoto order parameter</Left><Right>Measures global population synchrony</Right></Pair>
+      <Pair><Left>Metastability index</Left><Right>Quantifies fluctuations in synchronization</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Measures spectral power density</Distractor>
+      <Distractor>Computes signal amplitude envelope</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Computational Tools and Best Practices</H2>
+
+  <Body>
+    Analyzing synchronization in realistic networks requires careful attention to computational efficiency, numerical stability, and statistical validity.
+  </Body>
+
+  <H3>Efficient Network Analysis</H3>
+
+  <Code lang="python">
+import networkx as nx
+from scipy import sparse
+
+def analyze_coupling_network(K_matrix, threshold=0.01):
+    """
+    Analyze structural properties of the coupling network.
+
+    Parameters:
+    -----------
+    K_matrix : array
+        Coupling matrix
+    threshold : float
+        Minimum coupling strength to count as edge
+
+    Returns:
+    --------
+    metrics : dict
+        Network metrics
+    """
+    # Threshold to binary adjacency
+    A = (np.abs(K_matrix) &gt; threshold).astype(float)
+
+    # Create NetworkX graph
+    G = nx.from_numpy_array(A)
+
+    metrics = {
+        'n_nodes': G.number_of_nodes(),
+        'n_edges': G.number_of_edges(),
+        'density': nx.density(G),
+        'clustering': nx.average_clustering(G),
+        'is_connected': nx.is_connected(G)
+    }
+
+    if metrics['is_connected']:
+        metrics['avg_path_length'] = nx.average_shortest_path_length(G)
+        metrics['diameter'] = nx.diameter(G)
+
+    # Degree distribution
+    degrees = [d for n, d in G.degree()]
+    metrics['mean_degree'] = np.mean(degrees)
+    metrics['degree_std'] = np.std(degrees)
+
+    return metrics
+
+def sparse_kuramoto_step(theta, omega, K_sparse, dt):
+    """
+    Efficient Kuramoto step using sparse coupling matrix.
+
+    For large networks with sparse connectivity.
+    """
+    N = len(theta)
+
+    # Convert to sparse if needed
+    if not sparse.issparse(K_sparse):
+        K_sparse = sparse.csr_matrix(K_sparse)
+
+    # Compute coupling using sparse operations
+    sin_theta = np.sin(theta)
+    cos_theta = np.cos(theta)
+
+    # Expand sin(theta_j - theta_i) = sin(theta_j)cos(theta_i) - cos(theta_j)sin(theta_i)
+    coupling = (K_sparse @ sin_theta) * cos_theta - (K_sparse @ cos_theta) * sin_theta
+
+    return theta + dt * (omega + coupling)
+  </Code>
+
+  <H3>Statistical Testing for Synchronization</H3>
+
+  <Body>
+    Observed synchronization must be tested against appropriate null models to establish statistical significance. Surrogate data methods preserve certain signal properties while destroying phase relationships.
+  </Body>
+
+  <Code lang="python">
+def create_phase_shuffled_surrogate(signal):
+    """
+    Create surrogate by randomizing phases while preserving spectrum.
+
+    Fourier Transform Surrogate (FT surrogate).
+    """
+    # FFT
+    fft_signal = np.fft.fft(signal)
+
+    # Random phases (preserving conjugate symmetry)
+    n = len(signal)
+    random_phases = np.random.uniform(0, 2*np.pi, n//2 - 1)
+
+    # Construct phase array
+    phases = np.zeros(n)
+    phases[1:n//2] = random_phases
+    phases[n//2+1:] = -random_phases[::-1]
+
+    # Apply random phases
+    surrogate_fft = np.abs(fft_signal) * np.exp(1j * (np.angle(fft_signal) + phases))
+
+    # Inverse FFT
+    surrogate = np.real(np.fft.ifft(surrogate_fft))
+
+    return surrogate
+
+def test_synchronization_significance(signal1, signal2, fs, freq_band,
+                                       n_surrogates=1000, alpha=0.05):
+    """
+    Test if observed PLV is significant using surrogate testing.
+    """
+    # Observed PLV
+    phase1, _ = extract_phase(signal1, fs, freq_band)
+    phase2, _ = extract_phase(signal2, fs, freq_band)
+    observed_plv = phase_locking_value(phase1, phase2)
+
+    # Surrogate distribution
+    surrogate_plvs = []
+    for _ in range(n_surrogates):
+        surr1 = create_phase_shuffled_surrogate(signal1)
+        surr2 = create_phase_shuffled_surrogate(signal2)
+
+        phase_surr1, _ = extract_phase(surr1, fs, freq_band)
+        phase_surr2, _ = extract_phase(surr2, fs, freq_band)
+
+        surrogate_plvs.append(phase_locking_value(phase_surr1, phase_surr2))
+
+    surrogate_plvs = np.array(surrogate_plvs)
+
+    # P-value (one-tailed: is observed PLV higher than chance?)
+    p_value = np.mean(surrogate_plvs &gt;= observed_plv)
+
+    # Threshold
+    threshold = np.percentile(surrogate_plvs, 100 * (1 - alpha))
+
+    return {
+        'observed_plv': observed_plv,
+        'p_value': p_value,
+        'threshold': threshold,
+        'significant': p_value &lt; alpha,
+        'surrogate_mean': np.mean(surrogate_plvs),
+        'surrogate_std': np.std(surrogate_plvs)
+    }
+  </Code>
+
+  <SortQuiz id="q5-analysis-pipeline">
+    <Prompt>Order the steps in a typical EEG synchronization analysis pipeline from first to last:</Prompt>
+    <SortedItems>
+      <Item>Bandpass filter signals to frequency band of interest</Item>
+      <Item>Extract instantaneous phase using Hilbert transform</Item>
+      <Item>Compute pairwise phase synchronization measures</Item>
+      <Item>Test significance against surrogate null distribution</Item>
+      <Item>Interpret results in context of network topology</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Common Misconceptions and Pitfalls</H2>
+
+  <Body>
+    Several misconceptions can lead to errors in analyzing and interpreting neural synchronization:
+  </Body>
+
+  <Body>
+    1. Delays always destabilize: While intuitive, time delays can actually stabilize or induce synchronization in certain parameter regimes. The effect depends on the relationship between delay magnitude, coupling strength, and natural frequencies.
+  </Body>
+
+  <Body>
+    2. Chimera = partial synchronization: Chimera states are a specific phenomenon requiring spatial structure—the coexistence of coherent and incoherent domains. Generic partial synchronization (intermediate order parameter) does not necessarily constitute a chimera state.
+  </Body>
+
+  <Body>
+    3. Ignoring topology: The structure of connections fundamentally shapes synchronization dynamics. Results from all-to-all models may not apply to sparse or structured networks typical of real neural systems.
+  </Body>
+
+  <Body>
+    4. Oscillator assumption: The Kuramoto framework assumes limit-cycle oscillators. Applying phase synchronization measures to neurons that do not exhibit autonomous oscillations can yield misleading results.
+  </Body>
+
+  <FillBlanks id="q6-misconceptions">
+    <Prompt>
+      Chimera states require <Blank>non-local</Blank> coupling to emerge, and represent coexisting <Blank>synchronized</Blank> and <Blank>desynchronized</Blank> subpopulations. Unlike generic partial synchronization, chimeras have a <Blank>spatial</Blank> structure.
+    </Prompt>
+    <Distractors>
+      <Distractor>uniform</Distractor>
+      <Distractor>temporal</Distractor>
+      <Distractor>inhibitory</Distractor>
+      <Distractor>random</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Summary and Key Takeaways</H2>
+
+  <Body>
+    Extending the Kuramoto model to include heterogeneous coupling, time delays, and noise reveals a rich landscape of synchronization phenomena observed in real neural networks:
+  </Body>
+
+  <Body>
+    - Heterogeneous coupling matrices capture realistic connectivity including distance-dependence, small-world topology, and hub structures.
+  </Body>
+
+  <Body>
+    - Time delays, arising from axonal conduction, can stabilize, destabilize, or induce multistability in synchronization patterns.
+  </Body>
+
+  <Body>
+    - Chimera states demonstrate that identical oscillators with symmetric coupling can spontaneously break into coexisting synchronized and desynchronized groups.
+  </Body>
+
+  <Body>
+    - Common noise can synchronize even uncoupled oscillators, while independent noise generally opposes synchronization.
+  </Body>
+
+  <Body>
+    - Metastability—transient visits to multiple synchronization states—may be a fundamental operating regime of the brain supporting flexible cognition.
+  </Body>
+
+  <Body>
+    - Phase synchronization measures (PLV, PLI, Kuramoto order parameter) connect theoretical models to experimental EEG/MEG data, but require careful statistical validation.
+  </Body>
+
+  <SingleSelect id="q7-key-insight">
+    <Prompt>What is the main advantage of metastable dynamics in neural networks compared to stable fixed-point synchronization?</Prompt>
+    <Options>
+      <Option>Metastable dynamics consume less energy</Option>
+      <Option correct="true">Metastability allows flexible transitions between functional configurations</Option>
+      <Option>Stable synchronization cannot occur in biological networks</Option>
+      <Option>Metastability eliminates the need for time delays</Option>
+    </Options>
+  </SingleSelect>
+
+  <Subjective id="q8-experimental-connection">
+    <Prompt>
+      Explain how you would design an experiment to test whether a specific brain region exhibits chimera-like dynamics during a cognitive task. Describe the data you would collect, the analysis methods you would apply, and the criteria you would use to distinguish chimera states from other forms of partial synchronization.
+    </Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Describes appropriate experimental design with EEG/MEG or intracranial recordings during cognitive task</Requirement>
+        <Indicators>EEG, MEG, intracranial, electrode, recording, task, cognitive, experiment</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Explains phase extraction and synchronization analysis methods</Requirement>
+        <Indicators>phase, Hilbert, PLV, synchronization, order parameter, bandpass, filter</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Specifies criteria for distinguishing chimera states including spatial coherence/incoherence structure</Requirement>
+        <Indicators>spatial, coherent, incoherent, structure, domain, region, localized</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses statistical validation using surrogate methods or comparison conditions</Requirement>
+        <Indicators>surrogate, statistical, significance, null, control, p-value, threshold</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Acknowledges limitations or potential confounds</Requirement>
+        <Indicators>limitation, confound, volume conduction, artifact, assumption, caveat</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="400" />
+  </Subjective>
+
+  <Subjective id="q9-synthesis">
+    <Prompt>
+      A colleague proposes that disrupted synchronization in Parkinson's disease could be modeled by adding uniform time delays to a Kuramoto model of the basal ganglia-cortical loop. Critically evaluate this proposal, discussing what aspects of the pathophysiology it might capture, what it would miss, and what extensions would make the model more realistic.
+    </Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Evaluates whether uniform delays capture relevant Parkinson's pathophysiology</Requirement>
+        <Indicators>Parkinson, basal ganglia, dopamine, beta, oscillation, pathology, delay</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Identifies limitations of uniform delay assumption</Requirement>
+        <Indicators>heterogeneous, non-uniform, limitation, simplification, assumption, miss</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Proposes realistic extensions such as heterogeneous coupling, specific topology, or noise</Requirement>
+        <Indicators>extension, heterogeneous, topology, noise, realistic, improve, coupling matrix</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Connects to experimental observations or therapeutic implications</Requirement>
+        <Indicators>DBS, deep brain stimulation, experimental, treatment, therapy, data, recording</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Demonstrates understanding of model validation requirements</Requirement>
+        <Indicators>validate, test, predict, compare, data, experiment, parameter</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="400" />
+  </Subjective>
+
+</Lesson>

@@ -1,0 +1,609 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-09-03</Id>
+    <Title>Neural Manifolds and Dimensionality Reduction</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>neural-manifolds</Tag>
+      <Tag>dimensionality-reduction</Tag>
+      <Tag>PCA</Tag>
+      <Tag>latent-dynamics</Tag>
+      <Tag>population-coding</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Neural Manifolds and Dimensionality Reduction</H1>
+
+  <Body>High-dimensional neural population activity often lies on low-dimensional manifolds, revealing computational structure and enabling dimensionality reduction techniques to uncover latent dynamics underlying behavior and cognition. This lesson explores the mathematical foundations of dimensionality reduction and manifold analysis in neural data, connecting population-level activity to behavioral and cognitive variables.</Body>
+
+  <H2>From Single Neurons to Population Activity</H2>
+
+  <Body>In previous modules, we studied individual neuron models with state spaces of modest dimension—the Hodgkin-Huxley model has four state variables, while the FitzHugh-Nagumo model has two. When we record from neural populations, however, the dimensionality explodes. Consider a recording from N = 100 neurons: the instantaneous population state is a point in a 100-dimensional space, where each dimension represents one neuron's firing rate or voltage.</Body>
+
+  <Body>Remarkably, neural population activity rarely fills this high-dimensional space uniformly. Instead, activity is typically constrained to a low-dimensional subspace or manifold embedded within the full space. This observation has profound implications: it suggests that the brain's computations may be intrinsically low-dimensional, and that we can capture the essential dynamics with far fewer variables than the number of neurons recorded.</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+# Simulate population activity: 100 neurons, 1000 time points
+# Activity is driven by 3 underlying latent factors
+N_neurons = 100
+N_timepoints = 1000
+N_latent = 3
+
+# Generate latent dynamics (e.g., slow oscillations)
+t = np.linspace(0, 10, N_timepoints)
+latent = np.array([
+    np.sin(2 * np.pi * 0.5 * t),           # Latent factor 1
+    np.cos(2 * np.pi * 0.3 * t),           # Latent factor 2
+    np.sin(2 * np.pi * 0.2 * t + np.pi/4)  # Latent factor 3
+])
+
+# Random mixing matrix: how each neuron weights the latent factors
+W = np.random.randn(N_neurons, N_latent)
+
+# Generate neural activity: X = W @ latent + noise
+X = W @ latent + 0.3 * np.random.randn(N_neurons, N_timepoints)
+
+print(f"Data shape: {X.shape}")  # (100 neurons, 1000 timepoints)
+print(f"Intrinsic dimensionality: {N_latent}")
+  </Code>
+
+  <FlashCard id="fc1">
+    <Front>What is a neural manifold?</Front>
+    <Back>A neural manifold is a low-dimensional surface or subspace embedded within the high-dimensional space of neural population activity. It represents the constrained set of activity patterns that a population actually produces, reflecting the underlying computational structure.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What is the "curse of dimensionality" in neural data analysis?</Front>
+    <Back>The curse of dimensionality refers to the exponential growth in data requirements and computational complexity as dimensionality increases. In neural data, this makes direct analysis of high-dimensional population activity impractical, motivating the use of dimensionality reduction to find lower-dimensional representations.</Back>
+  </FlashCard>
+
+  <H2>Principal Component Analysis (PCA)</H2>
+
+  <Body>Principal Component Analysis (PCA) is the most widely used linear dimensionality reduction technique in neuroscience. PCA finds orthogonal directions (principal components) that maximize variance in the data. The first principal component (PC1) captures the most variance, PC2 the second most (orthogonal to PC1), and so on.</Body>
+
+  <Body>Mathematically, PCA solves an eigenvalue problem. Given data matrix X of size N neurons × T timepoints (mean-centered), we compute the covariance matrix C = (1/T) X X^T. The principal components are the eigenvectors of C, ordered by their eigenvalues (variance explained).</Body>
+
+  <Code lang="python">
+# Apply PCA to neural population data
+from sklearn.decomposition import PCA
+
+# Center the data (subtract mean across time for each neuron)
+X_centered = X - X.mean(axis=1, keepdims=True)
+
+# Fit PCA
+pca = PCA()
+X_pca = pca.fit_transform(X_centered.T)  # Shape: (timepoints, components)
+
+# Analyze variance explained
+var_explained = pca.explained_variance_ratio_
+cumulative_var = np.cumsum(var_explained)
+
+print(f"Variance explained by first 3 PCs: {cumulative_var[2]:.1%}")
+print(f"Number of PCs for 95% variance: {np.argmax(cumulative_var >= 0.95) + 1}")
+
+# The eigenvalue spectrum reveals intrinsic dimensionality
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+plt.plot(var_explained[:20], 'o-')
+plt.xlabel('Principal Component')
+plt.ylabel('Variance Explained')
+plt.title('Scree Plot')
+
+plt.subplot(1, 2, 2)
+plt.plot(cumulative_var[:20], 'o-')
+plt.axhline(0.95, color='r', linestyle='--', label='95% threshold')
+plt.xlabel('Number of Components')
+plt.ylabel('Cumulative Variance')
+plt.title('Cumulative Variance Explained')
+plt.legend()
+  </Code>
+
+  <Body>The scree plot (eigenvalue spectrum) is crucial for determining the intrinsic dimensionality of neural data. A sharp "elbow" indicates the transition from signal-dominated to noise-dominated components. Various criteria exist for choosing the number of components: the "elbow" heuristic, variance threshold (e.g., 95%), parallel analysis, or cross-validation.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What does the scree plot reveal about neural data?</Front>
+    <Back>The scree plot shows eigenvalues (variance explained) vs. principal component number. An "elbow" in the plot indicates the intrinsic dimensionality—where meaningful signal transitions to noise. A steep initial decline followed by a plateau suggests that a small number of dimensions capture most of the variance.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q1">
+    <Prompt>In PCA applied to neural population data (N neurons × T timepoints), what does the covariance matrix C = (1/T) X X^T represent?</Prompt>
+    <Options>
+      <Option correct="true">The N × N matrix of pairwise covariances between neurons' activity patterns</Option>
+      <Option>The T × T matrix of temporal correlations between time points</Option>
+      <Option>The variance of each neuron's firing rate over time</Option>
+      <Option>The correlation between neural activity and behavioral variables</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Nonlinear Dimensionality Reduction Methods</H2>
+
+  <Body>While PCA is powerful for linear structure, neural manifolds are often curved (nonlinear). Several methods have been developed to preserve different aspects of manifold geometry:</Body>
+
+  <Body>Isomap preserves geodesic (along-manifold) distances between points. It first constructs a neighborhood graph, computes shortest-path distances, then applies classical MDS to these distances. Isomap is particularly effective when the manifold is isometric to Euclidean space.</Body>
+
+  <Body>Locally Linear Embedding (LLE) preserves local neighborhood structure. Each point is reconstructed as a linear combination of its neighbors, and these reconstruction weights are preserved in the low-dimensional embedding. LLE excels at unfolding curved manifolds.</Body>
+
+  <Body>t-SNE (t-distributed Stochastic Neighbor Embedding) focuses on preserving local structure while allowing global distances to vary. It converts distances to probabilities and minimizes KL divergence between high- and low-dimensional representations. t-SNE is excellent for visualization but does not preserve global geometry.</Body>
+
+  <Body>UMAP (Uniform Manifold Approximation and Projection) is based on Riemannian geometry and algebraic topology. It preserves both local and some global structure better than t-SNE, and is computationally faster. UMAP has become a standard tool for neural data visualization.</Body>
+
+  <Code lang="python">
+from sklearn.manifold import TSNE, Isomap, LocallyLinearEmbedding
+# Note: UMAP requires: pip install umap-learn
+# import umap
+
+# Apply t-SNE
+tsne = TSNE(n_components=2, perplexity=30, random_state=42)
+X_tsne = tsne.fit_transform(X_centered.T)
+
+# Apply Isomap
+isomap = Isomap(n_components=2, n_neighbors=10)
+X_isomap = isomap.fit_transform(X_centered.T)
+
+# Apply LLE
+lle = LocallyLinearEmbedding(n_components=2, n_neighbors=10)
+X_lle = lle.fit_transform(X_centered.T)
+
+# Compare projections
+fig, axes = plt.subplots(1, 4, figsize=(16, 4))
+methods = ['PCA', 't-SNE', 'Isomap', 'LLE']
+projections = [X_pca[:, :2], X_tsne, X_isomap, X_lle]
+
+for ax, method, proj in zip(axes, methods, projections):
+    ax.scatter(proj[:, 0], proj[:, 1], c=t, cmap='viridis', s=5)
+    ax.set_title(method)
+    ax.set_xlabel('Dim 1')
+    ax.set_ylabel('Dim 2')
+plt.colorbar(ax.collections[0], label='Time')
+  </Code>
+
+  <MatchPairs id="q2">
+    <Prompt>Match each dimensionality reduction method with its key property:</Prompt>
+    <Pairs>
+      <Pair><Left>PCA</Left><Right>Preserves maximum variance along orthogonal axes</Right></Pair>
+      <Pair><Left>Isomap</Left><Right>Preserves geodesic (along-manifold) distances</Right></Pair>
+      <Pair><Left>t-SNE</Left><Right>Preserves local neighborhood probabilities via KL divergence</Right></Pair>
+      <Pair><Left>UMAP</Left><Right>Based on Riemannian geometry, preserves local and some global structure</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Maximizes mutual information between dimensions</Distractor>
+      <Distractor>Preserves angular relationships between all point pairs</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FlashCard id="fc4">
+    <Front>Why might t-SNE produce misleading visualizations of neural manifolds?</Front>
+    <Back>t-SNE optimizes local neighborhood preservation but does not preserve global distances or the overall manifold shape. Clusters that appear separated in t-SNE may actually be close in the original space, and the relative distances between clusters are not meaningful. It should be used for visualization only, not for quantitative manifold analysis.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q3">
+    <Prompt>Which of the following are valid reasons to prefer UMAP over t-SNE for neural manifold visualization?</Prompt>
+    <Options>
+      <Option correct="true">UMAP generally preserves more global structure than t-SNE</Option>
+      <Option correct="true">UMAP is computationally faster, especially for large datasets</Option>
+      <Option correct="true">UMAP can embed new points without recomputing the entire embedding</Option>
+      <Option>UMAP guarantees that the embedding is an isometry of the original manifold</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Neural Manifolds: Geometry and Structure</H2>
+
+  <Body>A neural manifold is a smooth, low-dimensional surface embedded in the high-dimensional neural activity space. The manifold hypothesis posits that meaningful neural activity is constrained to such manifolds, with different regions corresponding to different behavioral states or task conditions.</Body>
+
+  <Body>Key geometric properties of neural manifolds include:</Body>
+
+  <Body>Dimensionality: The intrinsic dimension of the manifold, often much smaller than the number of neurons. Motor cortex activity during reaching, for example, often lies on manifolds of dimension 5-15, despite being recorded from hundreds of neurons.</Body>
+
+  <Body>Curvature: Neural manifolds are typically curved rather than flat. The curvature reflects nonlinear relationships between neural activity and behavioral variables. Methods like Isomap or UMAP can unfold this curvature for analysis.</Body>
+
+  <Body>Topology: The global shape of the manifold may have interesting topological features. For example, head direction cells in rodents produce activity on a ring-shaped manifold (a 1-dimensional torus embedded in high-dimensional space).</Body>
+
+  <Code lang="python">
+# Simulate a ring manifold (like head direction cells)
+N_neurons = 50
+N_points = 500
+
+# Angular position on the ring
+theta = np.linspace(0, 2 * np.pi, N_points)
+
+# Each neuron has a preferred direction
+preferred_directions = np.linspace(0, 2 * np.pi, N_neurons)
+
+# Tuning curves: von Mises-like (cosine tuning)
+kappa = 2.0  # Concentration parameter
+X_ring = np.zeros((N_neurons, N_points))
+for i, pref in enumerate(preferred_directions):
+    X_ring[i, :] = np.exp(kappa * np.cos(theta - pref))
+
+# Add noise
+X_ring += 0.2 * np.random.randn(N_neurons, N_points)
+
+# Apply PCA - should reveal ring structure
+pca_ring = PCA(n_components=3)
+X_ring_pca = pca_ring.fit_transform(X_ring.T)
+
+# The first two PCs should form a ring
+fig = plt.figure(figsize=(12, 4))
+ax1 = fig.add_subplot(131)
+ax1.scatter(X_ring_pca[:, 0], X_ring_pca[:, 1], c=theta, cmap='hsv', s=10)
+ax1.set_xlabel('PC1')
+ax1.set_ylabel('PC2')
+ax1.set_title('Ring Manifold in PC1-PC2')
+
+ax2 = fig.add_subplot(132, projection='3d')
+ax2.scatter(X_ring_pca[:, 0], X_ring_pca[:, 1], X_ring_pca[:, 2],
+            c=theta, cmap='hsv', s=10)
+ax2.set_title('Ring Manifold in 3D PCA')
+
+# Variance explained
+ax3 = fig.add_subplot(133)
+ax3.bar(range(1, 11), pca_ring.explained_variance_ratio_[:10])
+ax3.set_xlabel('PC')
+ax3.set_ylabel('Variance Explained')
+ax3.set_title('Scree Plot')
+  </Code>
+
+  <SortQuiz id="q4">
+    <Prompt>Order the following steps in the correct sequence for identifying a neural manifold from population recordings:</Prompt>
+    <SortedItems>
+      <Item>Preprocess data: spike sorting, binning, and trial alignment</Item>
+      <Item>Mean-center and optionally z-score the neural activity matrix</Item>
+      <Item>Apply dimensionality reduction (PCA or nonlinear methods)</Item>
+      <Item>Determine intrinsic dimensionality using scree plot or cross-validation</Item>
+      <Item>Validate manifold structure against behavioral variables or held-out data</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Dynamical Systems on Neural Manifolds</H2>
+
+  <Body>Once we identify a low-dimensional neural manifold, we can analyze the dynamics—how the population state evolves over time on the manifold. This reveals the computational mechanisms underlying behavior.</Body>
+
+  <Body>Flow fields describe the velocity of population activity at each point on the manifold. For a trajectory x(t) on the manifold, the flow is dx/dt. Visualizing flow fields reveals attractors, repellers, saddle points, and oscillatory dynamics.</Body>
+
+  <Body>Fixed points on the manifold correspond to stable population states—these may represent maintained representations (working memory), decisions, or rest states. Limit cycles correspond to oscillatory computations like motor pattern generation.</Body>
+
+  <Code lang="python">
+# Dynamical analysis: estimate flow field on neural manifold
+# Using Gaussian process or polynomial regression to estimate dx/dt from data
+
+from sklearn.linear_model import Ridge
+
+# Project data to low-dimensional manifold
+X_manifold = X_pca[:, :3]  # First 3 PCs
+
+# Estimate derivatives (velocity) using finite differences
+dt = t[1] - t[0]
+V_manifold = np.gradient(X_manifold, dt, axis=0)
+
+# Fit a polynomial model for the flow field: dx/dt = f(x)
+# Using quadratic features for nonlinear dynamics
+from sklearn.preprocessing import PolynomialFeatures
+
+poly = PolynomialFeatures(degree=2, include_bias=False)
+X_poly = poly.fit_transform(X_manifold)
+
+# Fit velocity as function of position
+flow_model = Ridge(alpha=1.0)
+flow_model.fit(X_poly, V_manifold)
+
+# Create a grid for flow field visualization (2D slice)
+x1_range = np.linspace(X_manifold[:, 0].min(), X_manifold[:, 0].max(), 15)
+x2_range = np.linspace(X_manifold[:, 1].min(), X_manifold[:, 1].max(), 15)
+X1, X2 = np.meshgrid(x1_range, x2_range)
+
+# Predict flow at each grid point (set PC3 = 0 for visualization)
+grid_points = np.column_stack([X1.ravel(), X2.ravel(), np.zeros(X1.size)])
+grid_poly = poly.transform(grid_points)
+flow_pred = flow_model.predict(grid_poly)
+
+# Plot flow field
+plt.figure(figsize=(10, 8))
+plt.quiver(X1, X2, flow_pred[:, 0].reshape(X1.shape),
+           flow_pred[:, 1].reshape(X2.shape), alpha=0.7)
+plt.scatter(X_manifold[:, 0], X_manifold[:, 1], c=t, cmap='viridis', s=10, alpha=0.5)
+plt.xlabel('PC1')
+plt.ylabel('PC2')
+plt.title('Flow Field on Neural Manifold')
+plt.colorbar(label='Time')
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What does a fixed point on a neural manifold represent computationally?</Front>
+    <Back>A fixed point on a neural manifold represents a stable population activity pattern where the dynamics converge and remain stationary. Computationally, fixed points can encode maintained representations in working memory, categorical decisions, or attractor states that the network settles into. The stability properties (stable node, saddle, etc.) determine how perturbations evolve.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q5">
+    <Prompt>When estimating the flow field dx/dt on a neural manifold from data, why might using a linear model (dx/dt = Ax) be insufficient?</Prompt>
+    <Options>
+      <Option correct="true">Neural dynamics are often nonlinear, with multiple fixed points and limit cycles that linear models cannot capture</Option>
+      <Option>Linear models require more data than nonlinear models</Option>
+      <Option>Linear models cannot be applied to time series data</Option>
+      <Option>The manifold coordinates are always nonlinearly related to the original neural activity</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Behavioral Decoding from Manifold Coordinates</H2>
+
+  <Body>One of the most powerful applications of neural manifolds is behavioral decoding: predicting behavioral variables (movement direction, decision outcome, spatial location) from the manifold coordinates. If the manifold captures the computationally relevant activity, decoding from manifold coordinates should be as accurate as—or more accurate than—decoding from raw neural activity.</Body>
+
+  <Body>Decoding validates that the manifold captures behaviorally relevant structure. It also enables brain-machine interfaces (BMIs) to extract motor intentions from neural activity.</Body>
+
+  <Code lang="python">
+# Simulate behavioral decoding from manifold coordinates
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import cross_val_score
+
+# Behavioral variable: e.g., hand velocity (2D)
+# Assume it's related to the first two latent factors
+behavior = latent[:2, :].T  # (timepoints, 2)
+
+# Decode from full neural activity (100 neurons)
+model_full = LinearRegression()
+scores_full = cross_val_score(model_full, X_centered.T, behavior, cv=5,
+                               scoring='r2')
+
+# Decode from manifold coordinates (3 PCs)
+X_reduced = X_pca[:, :3]
+model_reduced = LinearRegression()
+scores_reduced = cross_val_score(model_reduced, X_reduced, behavior, cv=5,
+                                  scoring='r2')
+
+# Decode from very reduced coordinates (2 PCs)
+X_2pc = X_pca[:, :2]
+model_2pc = LinearRegression()
+scores_2pc = cross_val_score(model_2pc, X_2pc, behavior, cv=5, scoring='r2')
+
+print(f"Decoding R² from 100 neurons: {np.mean(scores_full):.3f} ± {np.std(scores_full):.3f}")
+print(f"Decoding R² from 3 PCs: {np.mean(scores_reduced):.3f} ± {np.std(scores_reduced):.3f}")
+print(f"Decoding R² from 2 PCs: {np.mean(scores_2pc):.3f} ± {np.std(scores_2pc):.3f}")
+
+# Key insight: reduced representation often decodes as well as full data
+# while being more robust and interpretable
+  </Code>
+
+  <FillBlanks id="q6">
+    <Prompt>In behavioral decoding from neural manifolds, we fit a model to predict <Blank>behavioral</Blank> variables from <Blank>manifold</Blank> coordinates. If the R² from reduced coordinates matches the R² from full neural activity, this suggests the manifold captures the <Blank>computationally relevant</Blank> structure. Cross-validation is essential to avoid <Blank>overfitting</Blank>.</Prompt>
+    <Distractors>
+      <Distractor>spike timing</Distractor>
+      <Distractor>eigenvalue</Distractor>
+      <Distractor>noise-dominated</Distractor>
+      <Distractor>underfitting</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Applications in Motor Cortex and Decision-Making</H2>
+
+  <Body>Motor Cortex: Groundbreaking work by Churchland, Shenoy, and colleagues revealed that motor cortex activity during reaching tasks lies on a low-dimensional manifold (~10-15 dimensions) despite recordings from hundreds of neurons. The dynamics on this manifold are rotational, suggesting that motor cortex implements a dynamical system that generates movement-related signals.</Body>
+
+  <Body>Decision-Making: In decision tasks, neural manifolds in prefrontal cortex often show "choice dimensions" along which activity diverges based on the eventual choice. The dynamics reveal how evidence is accumulated over time, with fixed points corresponding to categorical decisions.</Body>
+
+  <Body>Memory: Working memory representations can be viewed as stable fixed points or slow dynamics on neural manifolds. Ring attractors, like those found in head direction systems, maintain continuous-valued representations.</Body>
+
+  <Code lang="python">
+# Example: Rotational dynamics in motor cortex
+# Simulate reaching task with rotational dynamics
+
+# Time and conditions
+t_reach = np.linspace(0, 0.5, 100)  # 500 ms reach
+n_conditions = 8  # 8 reach directions
+
+# Rotational dynamics: x(t) = exp(At) * x(0)
+# where A has complex eigenvalues (rotation + decay)
+omega = 2 * np.pi * 3  # 3 Hz rotation frequency
+decay = -2
+
+# Generate rotational trajectories for each condition
+fig = plt.figure(figsize=(12, 5))
+
+ax1 = fig.add_subplot(121)
+colors = plt.cm.hsv(np.linspace(0, 1, n_conditions))
+
+for i in range(n_conditions):
+    # Initial condition depends on reach direction
+    angle_init = 2 * np.pi * i / n_conditions
+    x0 = np.array([np.cos(angle_init), np.sin(angle_init)])
+
+    # Rotational trajectory
+    x_traj = np.zeros((len(t_reach), 2))
+    for j, ti in enumerate(t_reach):
+        rot = np.array([[np.cos(omega * ti), -np.sin(omega * ti)],
+                        [np.sin(omega * ti), np.cos(omega * ti)]])
+        x_traj[j] = np.exp(decay * ti) * rot @ x0
+
+    ax1.plot(x_traj[:, 0], x_traj[:, 1], color=colors[i], linewidth=2)
+    ax1.scatter(x_traj[0, 0], x_traj[0, 1], color=colors[i], s=100, marker='o')
+
+ax1.set_xlabel('PC1 (a.u.)')
+ax1.set_ylabel('PC2 (a.u.)')
+ax1.set_title('Rotational Dynamics in Motor Cortex')
+ax1.axis('equal')
+
+# Show dynamics: dx/dt vs x for one dimension
+ax2 = fig.add_subplot(122)
+omega_range = np.linspace(0, 2*np.pi*5, 50)
+for i in range(n_conditions):
+    angle_init = 2 * np.pi * i / n_conditions
+    x0 = np.array([np.cos(angle_init), np.sin(angle_init)])
+
+    x_traj = []
+    dx_traj = []
+    for ti in t_reach:
+        rot = np.array([[np.cos(omega * ti), -np.sin(omega * ti)],
+                        [np.sin(omega * ti), np.cos(omega * ti)]])
+        x = np.exp(decay * ti) * rot @ x0
+
+        # Derivative: d/dt[exp(decay*t) * R(omega*t) * x0]
+        drot = omega * np.array([[-np.sin(omega * ti), -np.cos(omega * ti)],
+                                  [np.cos(omega * ti), -np.sin(omega * ti)]])
+        dx = np.exp(decay * ti) * (decay * rot + drot) @ x0
+
+        x_traj.append(x[0])
+        dx_traj.append(dx[0])
+
+    ax2.plot(x_traj, dx_traj, color=colors[i], linewidth=2)
+
+ax2.set_xlabel('PC1')
+ax2.set_ylabel('d(PC1)/dt')
+ax2.set_title('Phase Portrait: Rotational Structure')
+ax2.axhline(0, color='k', linestyle='--', alpha=0.3)
+ax2.axvline(0, color='k', linestyle='--', alpha=0.3)
+  </Code>
+
+  <FlashCard id="fc6">
+    <Front>What does rotational dynamics on a neural manifold suggest about motor cortex computation?</Front>
+    <Back>Rotational dynamics suggest that motor cortex implements a dynamical system that generates time-varying signals through intrinsic network dynamics rather than simply encoding static movement parameters. The rotations convert initial condition information (related to movement direction) into time-varying patterns that drive muscles. This supports a dynamical systems view of motor control.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q7">
+    <Prompt>Which of the following are valid conclusions if neural activity during a decision task shows diverging trajectories along a "choice axis" in the manifold?</Prompt>
+    <Options>
+      <Option correct="true">The manifold structure captures choice-relevant information</Option>
+      <Option correct="true">Different choices correspond to different regions of the manifold</Option>
+      <Option>The dimensionality reduction method is biased toward the chosen option</Option>
+      <Option correct="true">Decoding choice from manifold coordinates should be possible</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Statistical Validation of Manifold Structure</H2>
+
+  <Body>A critical but often overlooked step is validating that the identified manifold structure is real (signal) rather than an artifact (noise or overfitting). Key validation approaches include:</Body>
+
+  <Body>Cross-validation: Hold out portions of data (trials, time segments) and test whether the manifold structure generalizes. If PCA loadings from one half of the data explain variance in the other half, the structure is reproducible.</Body>
+
+  <Body>Shuffling controls: Compare the scree plot to that of shuffled data (breaking trial structure or neuron-neuron correlations). Real manifold structure shows more variance in top PCs than shuffled data.</Body>
+
+  <Body>Participation ratio: A measure of effective dimensionality. For eigenvalues λᵢ, PR = (Σλᵢ)² / Σλᵢ². A PR near 1 indicates one dominant dimension; a PR near N indicates uniform variance across dimensions.</Body>
+
+  <Code lang="python">
+# Statistical validation of manifold structure
+
+# 1. Cross-validation: split-half reliability
+from scipy.stats import pearsonr
+
+# Split data in half (by time)
+half = N_timepoints // 2
+X_half1 = X_centered[:, :half]
+X_half2 = X_centered[:, half:]
+
+# PCA on each half
+pca_half1 = PCA(n_components=10).fit(X_half1.T)
+pca_half2 = PCA(n_components=10).fit(X_half2.T)
+
+# Compare loadings (should be similar for real structure)
+loading_corrs = []
+for i in range(5):
+    # Account for sign ambiguity
+    corr = np.abs(pearsonr(pca_half1.components_[i], pca_half2.components_[i])[0])
+    loading_corrs.append(corr)
+    print(f"PC{i+1} loading correlation: {corr:.3f}")
+
+# 2. Shuffle control: break temporal structure
+n_shuffles = 100
+shuffle_var_explained = np.zeros((n_shuffles, 10))
+
+for s in range(n_shuffles):
+    X_shuffled = X_centered.copy()
+    # Shuffle each neuron's time series independently
+    for n in range(N_neurons):
+        np.random.shuffle(X_shuffled[n, :])
+
+    pca_shuf = PCA(n_components=10).fit(X_shuffled.T)
+    shuffle_var_explained[s, :] = pca_shuf.explained_variance_ratio_
+
+# Compare real vs shuffled
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, 11), var_explained[:10], 'b-o', label='Real data', linewidth=2)
+plt.fill_between(range(1, 11),
+                 np.percentile(shuffle_var_explained, 5, axis=0),
+                 np.percentile(shuffle_var_explained, 95, axis=0),
+                 alpha=0.3, color='gray', label='Shuffled 90% CI')
+plt.xlabel('Principal Component')
+plt.ylabel('Variance Explained')
+plt.title('Scree Plot: Real vs Shuffled Data')
+plt.legend()
+
+# 3. Participation ratio
+eigenvalues = pca.explained_variance_
+PR = (np.sum(eigenvalues)**2) / np.sum(eigenvalues**2)
+print(f"\nParticipation ratio: {PR:.2f}")
+print(f"Effective dimensionality: ~{int(np.round(PR))} dimensions")
+  </Code>
+
+  <SingleSelect id="q8">
+    <Prompt>What does the participation ratio (PR) measure, and what does a PR of 5 indicate for a dataset with 100 neurons?</Prompt>
+    <Options>
+      <Option correct="true">PR measures effective dimensionality; PR = 5 indicates variance is concentrated in approximately 5 effective dimensions</Option>
+      <Option>PR measures the number of neurons contributing to each PC; PR = 5 indicates 5 neurons dominate</Option>
+      <Option>PR measures explained variance; PR = 5 indicates 5% of total variance is explained</Option>
+      <Option>PR measures noise level; PR = 5 indicates a signal-to-noise ratio of 5</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Common Pitfalls and Best Practices</H2>
+
+  <Body>Dimensionality reduction and manifold analysis are powerful but require careful application. Common pitfalls include:</Body>
+
+  <Body>Overinterpreting t-SNE/UMAP: These methods are for visualization only. Clusters and distances in the embedding may not reflect true manifold geometry. Never draw quantitative conclusions from t-SNE/UMAP plots alone.</Body>
+
+  <Body>Confusing dimensionality reduction with feature selection: PCA finds combinations of neurons, not individual important neurons. Each PC is a weighted sum of all neurons' activities.</Body>
+
+  <Body>Neglecting temporal structure: Standard PCA treats time points as independent samples. For dynamics analysis, consider methods that explicitly model temporal evolution (e.g., GPFA, LFADS).</Body>
+
+  <Body>Assuming linear structure: If the underlying manifold is highly curved, PCA may require many dimensions to capture it. Consider nonlinear methods or check for nonlinearity before concluding high dimensionality.</Body>
+
+  <FlashCard id="fc7">
+    <Front>Why is it problematic to interpret principal components as having direct biological meaning?</Front>
+    <Back>Principal components are mathematical abstractions—linear combinations of all recorded neurons optimized to capture variance, not biological function. A PC might mix activity from neurons with different functions. Furthermore, PC directions depend on what neurons were recorded; adding or removing neurons changes the PCs. Biological interpretation requires relating PCs to behavioral variables or known functional categories.</Back>
+  </FlashCard>
+
+  <Subjective id="q9">
+    <Prompt>Explain why linear dimensionality reduction methods (like PCA) might fail to reveal the true structure of a neural manifold. Describe a scenario where this would occur and what alternative approach you would use.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that PCA can only find linear subspaces, while neural manifolds may be curved or nonlinear</Requirement>
+        <Indicators>linear, curved, nonlinear, subspace, hyperplane, cannot capture</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Provides a concrete example scenario (e.g., ring manifold, Swiss roll, curved reaching trajectories)</Requirement>
+        <Indicators>ring, torus, head direction, Swiss roll, curved, example, scenario, reaching</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Identifies appropriate alternative methods (Isomap, LLE, UMAP, t-SNE, or nonlinear methods)</Requirement>
+        <Indicators>Isomap, LLE, UMAP, t-SNE, nonlinear, geodesic, local</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses how many PCs would be needed to capture curved structure with PCA vs. intrinsic dimensionality</Requirement>
+        <Indicators>many PCs, more dimensions, intrinsic, overestimate, embedding dimension</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="200" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>Neural manifolds provide a powerful framework for understanding population-level neural computations. Key takeaways from this lesson:</Body>
+
+  <Body>1. High-dimensional neural recordings typically contain low-dimensional structure—activity is constrained to neural manifolds reflecting computational organization.</Body>
+
+  <Body>2. PCA is the workhorse for linear dimensionality reduction, revealing the number of effective dimensions through the scree plot and providing interpretable projections.</Body>
+
+  <Body>3. Nonlinear methods (Isomap, LLE, t-SNE, UMAP) can unfold curved manifolds, but require careful interpretation—especially t-SNE/UMAP for visualization only.</Body>
+
+  <Body>4. Dynamical analysis on manifolds reveals computational mechanisms: fixed points encode stable representations, rotational dynamics generate time-varying signals for motor control.</Body>
+
+  <Body>5. Behavioral decoding validates that manifolds capture computationally relevant structure and enables brain-machine interface applications.</Body>
+
+  <Body>6. Statistical validation (cross-validation, shuffling, participation ratio) is essential to distinguish real structure from noise artifacts.</Body>
+
+  <FlashCard id="fc8">
+    <Front>What is the key insight of the neural manifold framework?</Front>
+    <Back>The key insight is that high-dimensional neural population activity is often constrained to low-dimensional manifolds, and analyzing dynamics on these manifolds reveals the computational structure underlying behavior and cognition. This allows us to capture the essential features of neural computation with far fewer variables than neurons.</Back>
+  </FlashCard>
+
+</Lesson>

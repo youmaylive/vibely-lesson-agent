@@ -1,0 +1,694 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-06-04</Id>
+    <Title>Neural Complexity and Redundancy</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>information-theory</Tag>
+      <Tag>neural-coding</Tag>
+      <Tag>complexity</Tag>
+      <Tag>redundancy</Tag>
+      <Tag>synergy</Tag>
+      <Tag>population-coding</Tag>
+      <Tag>partial-information-decomposition</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Neural Complexity and Redundancy</H1>
+
+  <Body>
+    In the previous lessons, we explored mutual information for characterizing how single neurons encode stimuli. However, the brain processes information through populations of neurons that exhibit rich patterns of correlation and interaction. This lesson extends information-theoretic analysis to neural populations, revealing how complexity, redundancy, and synergy shape the efficiency and robustness of neural codes.
+  </Body>
+
+  <Body>
+    A central question in computational neuroscience is: how do neural populations represent information more effectively than the sum of their individual contributions? The answer lies in understanding the intricate balance between redundancy (overlapping information across neurons) and synergy (emergent information from neuron combinations). This balance determines both coding efficiency and noise robustness.
+  </Body>
+
+  <H2>Neural Complexity</H2>
+
+  <Body>
+    Neural complexity quantifies the richness and diversity of activity patterns within a neural population. It captures the extent to which neurons exhibit both individual variability and collective organization. Mathematically, neural complexity C is defined as the difference between the sum of individual entropies and the joint entropy:
+  </Body>
+
+  <Code lang="python">
+# Neural Complexity Definition
+# C = Σᵢ H(Xᵢ) - H(X₁, X₂, ..., Xₙ)
+
+import numpy as np
+from scipy.stats import entropy
+
+def neural_complexity(joint_distribution, marginal_distributions):
+    """
+    Compute neural complexity for a population.
+
+    Parameters:
+    -----------
+    joint_distribution : ndarray
+        Joint probability distribution P(X₁, X₂, ..., Xₙ)
+    marginal_distributions : list of ndarrays
+        Marginal distributions [P(X₁), P(X₂), ..., P(Xₙ)]
+
+    Returns:
+    --------
+    C : float
+        Neural complexity (in bits if using log₂)
+    """
+    # Sum of individual entropies
+    sum_individual_H = sum(entropy(p, base=2) for p in marginal_distributions)
+
+    # Joint entropy
+    joint_H = entropy(joint_distribution.flatten(), base=2)
+
+    # Complexity = sum of marginals - joint
+    C = sum_individual_H - joint_H
+
+    return C
+  </Code>
+
+  <Body>
+    The neural complexity measure has important properties. When C = 0, the neurons are statistically independent—there are no correlations or shared information. When C is maximized, there exist strong dependencies among neurons. However, maximum complexity does not occur with perfect correlation (where all neurons carry identical information) but rather at intermediate correlation levels where subgroups of neurons show coordinated activity while maintaining diversity.
+  </Body>
+
+  <FlashCard id="fc-complexity">
+    <Front>What is neural complexity and how is it computed?</Front>
+    <Back>Neural complexity C = Σᵢ H(Xᵢ) - H(X₁,...,Xₙ) measures the richness of population activity. It equals zero for independent neurons and increases with correlations, reaching maximum at intermediate correlation levels where diverse subgroups show coordinated activity.</Back>
+  </FlashCard>
+
+  <H2>Redundancy in Neural Coding</H2>
+
+  <Body>
+    Redundancy refers to information that is shared across multiple neurons—the same information represented multiple times. For two neurons X₁ and X₂ encoding a stimulus S, redundancy captures the overlap in their individual contributions:
+  </Body>
+
+  <Code lang="python">
+def compute_redundancy_simple(p_x1_s, p_x2_s, p_x1_x2_s, p_s):
+    """
+    Estimate redundancy using the minimum information approach.
+
+    Redundancy ≈ min(I(X₁;S), I(X₂;S)) when neurons encode the same features
+
+    For a more rigorous approach, see Partial Information Decomposition.
+    """
+    # Individual mutual informations
+    I_x1_s = mutual_information(p_x1_s, p_s)
+    I_x2_s = mutual_information(p_x2_s, p_s)
+
+    # Simple redundancy estimate (Williams-Beer minimum)
+    redundancy = min(I_x1_s, I_x2_s)
+
+    return redundancy
+
+# Example: Overlapping receptive fields
+# Two retinal ganglion cells with partially overlapping receptive fields
+# share redundant information about the stimulus in the overlap region
+  </Code>
+
+  <Body>
+    Redundancy is often viewed negatively from a pure efficiency standpoint—why dedicate multiple neurons to the same information? However, redundancy provides critical functional advantages:
+  </Body>
+
+  <Body>
+    1. **Noise robustness**: Redundant representations allow errors in one neuron to be corrected by others. The brain can average across redundant neurons to improve signal-to-noise ratio by a factor of √n for n independent noise sources.
+  </Body>
+
+  <Body>
+    2. **Fault tolerance**: If neurons die or malfunction, redundant information ensures the representation persists. This is essential for a biological system prone to cell death and synaptic failures.
+  </Body>
+
+  <Body>
+    3. **Fast readout**: Redundant coding allows downstream neurons to integrate information quickly, as consistent signals from multiple sources arrive simultaneously.
+  </Body>
+
+  <FlashCard id="fc-redundancy">
+    <Front>What are the functional advantages of redundancy in neural coding?</Front>
+    <Back>Redundancy provides: (1) noise robustness through averaging (SNR improves by √n), (2) fault tolerance against neuron death or malfunction, and (3) fast readout through simultaneous consistent signals from multiple sources.</Back>
+  </FlashCard>
+
+  <H2>Synergy: Emergent Information</H2>
+
+  <Body>
+    Synergy represents the opposite of redundancy—information that emerges only when multiple neurons are considered together but is absent in any individual neuron. Synergistic coding is particularly powerful because it allows populations to represent information that no single neuron encodes.
+  </Body>
+
+  <Code lang="python">
+# XOR-like synergistic coding example
+# Consider two neurons X₁ and X₂ encoding stimulus S
+
+# Stimulus S can be 0 or 1 with equal probability
+# X₁ = S XOR noise₁
+# X₂ = S XOR noise₂ XOR X₁
+
+# Individually: I(X₁; S) ≈ 0, I(X₂; S) ≈ 0
+# Together: I(X₁, X₂; S) = 1 bit (perfect encoding)
+# This extra bit is SYNERGISTIC information!
+
+import numpy as np
+
+def xor_synergy_example():
+    """
+    Demonstrate synergistic coding with XOR-like scheme.
+    """
+    np.random.seed(42)
+    n_samples = 10000
+
+    # Stimulus: random bits
+    S = np.random.randint(0, 2, n_samples)
+
+    # Independent random bits
+    R1 = np.random.randint(0, 2, n_samples)
+    R2 = np.random.randint(0, 2, n_samples)
+
+    # Neuron responses
+    X1 = R1  # Random, independent of S
+    X2 = (S + R1) % 2  # S XOR R1
+
+    # Individual MI with S: approximately 0 for both
+    # Joint: X1 XOR X2 = S exactly! Full 1 bit synergy
+
+    decoded_S = (X1 + X2) % 2
+    accuracy = np.mean(decoded_S == S)
+
+    print(f"Decoding accuracy from X₁ XOR X₂: {accuracy:.4f}")
+    # Should be 1.0 - perfect synergistic coding
+
+    return X1, X2, S
+
+# Real neural example: direction selectivity
+# Some V1 neurons are individually orientation-selective
+# but direction information emerges only from their combination
+  </Code>
+
+  <Body>
+    The XOR example illustrates pure synergy: each individual neuron appears random and uninformative about the stimulus, yet together they perfectly encode it. While biological neurons rarely implement exact XOR, similar synergistic effects arise through nonlinear interactions and gain modulation.
+  </Body>
+
+  <FlashCard id="fc-synergy">
+    <Front>What is synergy in neural coding, and how does XOR illustrate it?</Front>
+    <Back>Synergy is information present only when multiple neurons are combined, absent in any individual neuron. XOR coding demonstrates pure synergy: if X₁ is random and X₂ = S⊕X₁, then I(X₁;S) = I(X₂;S) = 0, but I(X₁,X₂;S) = 1 bit. The stimulus S is perfectly decodable from X₁⊕X₂ despite being absent from either alone.</Back>
+  </FlashCard>
+
+  <H2>Partial Information Decomposition</H2>
+
+  <Body>
+    Partial Information Decomposition (PID) provides a rigorous framework for separating the total information that two sources X₁ and X₂ carry about a target S into four non-negative components:
+  </Body>
+
+  <Body>
+    • **Redundancy (R)**: Information that both X₁ and X₂ individually provide about S
+  </Body>
+
+  <Body>
+    • **Unique information from X₁ (U₁)**: Information that only X₁ provides about S
+  </Body>
+
+  <Body>
+    • **Unique information from X₂ (U₂)**: Information that only X₂ provides about S
+  </Body>
+
+  <Body>
+    • **Synergy (Syn)**: Information that requires both X₁ and X₂ together
+  </Body>
+
+  <Code lang="python">
+# Partial Information Decomposition relationships
+#
+# I(X₁; S) = R + U₁           (what X₁ alone tells about S)
+# I(X₂; S) = R + U₂           (what X₂ alone tells about S)
+# I(X₁, X₂; S) = R + U₁ + U₂ + Syn  (total information)
+#
+# Co-information: I(X₁; X₂; S) = I(X₁; S) + I(X₂; S) - I(X₁, X₂; S)
+#                              = R - Syn
+#
+# If co-information &gt; 0: redundancy dominates
+# If co-information &lt; 0: synergy dominates
+
+def partial_information_decomposition(I_x1_s, I_x2_s, I_x1x2_s, redundancy):
+    """
+    Compute PID components given mutual informations and redundancy measure.
+
+    Parameters:
+    -----------
+    I_x1_s : float
+        Mutual information I(X₁; S)
+    I_x2_s : float
+        Mutual information I(X₂; S)
+    I_x1x2_s : float
+        Joint mutual information I(X₁, X₂; S)
+    redundancy : float
+        Redundancy measure R (requires separate computation)
+
+    Returns:
+    --------
+    dict with keys: 'redundancy', 'unique_1', 'unique_2', 'synergy'
+    """
+    R = redundancy
+    U1 = I_x1_s - R
+    U2 = I_x2_s - R
+    Syn = I_x1x2_s - R - U1 - U2
+
+    return {
+        'redundancy': R,
+        'unique_1': U1,
+        'unique_2': U2,
+        'synergy': Syn
+    }
+
+# Williams-Beer minimum redundancy
+def williams_beer_redundancy(p_x1_x2_s):
+    """
+    Compute redundancy using Williams-Beer minimum information.
+    R_min(S; X₁, X₂) = Σₛ min_{x₁,x₂} I(Xᵢ=xᵢ; S=s)
+    """
+    # Implementation requires specific information calculations
+    # See Williams &amp; Beer (2010) for details
+    pass
+  </Code>
+
+  <Body>
+    The co-information I(X₁; X₂; S) = R - Syn provides a quick diagnostic: positive values indicate redundancy-dominated coding (typical of overlapping receptive fields), while negative values indicate synergy-dominated coding (typical of nonlinear feature combinations). Real neural populations typically show mixtures of both.
+  </Body>
+
+  <FlashCard id="fc-pid">
+    <Front>What are the four components of Partial Information Decomposition?</Front>
+    <Back>PID decomposes I(X₁,X₂;S) into: (1) Redundancy R - information both sources provide, (2) Unique₁ U₁ - information only X₁ provides, (3) Unique₂ U₂ - information only X₂ provides, (4) Synergy Syn - information requiring both sources together. These satisfy: I(X₁,X₂;S) = R + U₁ + U₂ + Syn.</Back>
+  </FlashCard>
+
+  <H2>Population Coding Efficiency</H2>
+
+  <Body>
+    Population coding efficiency compares the total information encoded by a population to the sum of individual contributions. This reveals whether neurons cooperate constructively (synergy), destructively (redundancy), or independently:
+  </Body>
+
+  <Code lang="python">
+def population_coding_efficiency(joint_mi, individual_mis):
+    """
+    Compute population coding efficiency.
+
+    Efficiency &gt; 1: Synergy dominates (super-additive)
+    Efficiency = 1: Independent coding
+    Efficiency &lt; 1: Redundancy dominates (sub-additive)
+
+    Parameters:
+    -----------
+    joint_mi : float
+        I(X₁, X₂, ..., Xₙ; S) - joint mutual information
+    individual_mis : list of floats
+        [I(X₁; S), I(X₂; S), ..., I(Xₙ; S)]
+
+    Returns:
+    --------
+    efficiency : float
+    """
+    sum_individual = sum(individual_mis)
+
+    if sum_individual == 0:
+        return float('inf') if joint_mi &gt; 0 else 1.0
+
+    efficiency = joint_mi / sum_individual
+
+    return efficiency
+
+# Example: Gaussian population with correlations
+def gaussian_population_info(n_neurons, correlation, signal_variance, noise_variance):
+    """
+    Information for correlated Gaussian population.
+
+    For equi-correlated Gaussian neurons:
+    I(X₁,...,Xₙ; S) = 0.5 * log₂(1 + n*SNR / (1 + (n-1)*ρ))
+
+    where ρ is pairwise correlation and SNR = signal_var/noise_var
+    """
+    SNR = signal_variance / noise_variance
+
+    # Joint information
+    denominator = 1 + (n_neurons - 1) * correlation
+    joint_info = 0.5 * np.log2(1 + n_neurons * SNR / denominator)
+
+    # Individual information (same for all neurons)
+    individual_info = 0.5 * np.log2(1 + SNR)
+
+    return {
+        'joint_info': joint_info,
+        'individual_info': individual_info,
+        'sum_individual': n_neurons * individual_info,
+        'efficiency': joint_info / (n_neurons * individual_info)
+    }
+  </Code>
+
+  <Body>
+    For the important case of equi-correlated Gaussian neurons, we can derive closed-form expressions. With n neurons, pairwise correlation ρ, and signal-to-noise ratio SNR:
+  </Body>
+
+  <Body>
+    I(X₁,...,Xₙ; S) = ½ log₂(1 + n·SNR / (1 + (n-1)ρ))
+  </Body>
+
+  <Body>
+    This formula reveals key insights: positive correlation (ρ &gt; 0) reduces joint information compared to independent neurons (ρ = 0), reflecting redundancy. However, negative correlation (ρ &lt; 0, achievable through lateral inhibition) can increase joint information, creating synergy. The optimal correlation depends on the noise structure and population size.
+  </Body>
+
+  <H2>Correlation Effects: Noise vs. Signal Correlations</H2>
+
+  <Body>
+    Not all correlations are equal. It is essential to distinguish between noise correlations (shared variability unrelated to the stimulus) and signal correlations (similarity in tuning curves):
+  </Body>
+
+  <Code lang="python">
+# Correlation decomposition
+# Total correlation: Corr(X₁, X₂) = Corr_signal + Corr_noise
+
+def decompose_correlations(responses, stimuli):
+    """
+    Decompose total correlation into signal and noise components.
+
+    Parameters:
+    -----------
+    responses : ndarray, shape (n_trials, 2)
+        Responses of two neurons across trials
+    stimuli : ndarray, shape (n_trials,)
+        Stimulus labels for each trial
+
+    Returns:
+    --------
+    dict with total, signal, and noise correlations
+    """
+    unique_stimuli = np.unique(stimuli)
+
+    # Mean responses for each stimulus (tuning curves)
+    mean_responses = np.array([
+        responses[stimuli == s].mean(axis=0)
+        for s in unique_stimuli
+    ])
+
+    # Signal correlation: correlation between tuning curves
+    signal_corr = np.corrcoef(mean_responses[:, 0], mean_responses[:, 1])[0, 1]
+
+    # Noise correlation: average within-stimulus correlation
+    noise_corrs = []
+    for s in unique_stimuli:
+        trial_responses = responses[stimuli == s]
+        if len(trial_responses) &gt; 1:
+            noise_corrs.append(np.corrcoef(trial_responses[:, 0],
+                                            trial_responses[:, 1])[0, 1])
+    noise_corr = np.nanmean(noise_corrs)
+
+    # Total correlation
+    total_corr = np.corrcoef(responses[:, 0], responses[:, 1])[0, 1]
+
+    return {
+        'total': total_corr,
+        'signal': signal_corr,
+        'noise': noise_corr
+    }
+  </Code>
+
+  <Body>
+    The impact of correlations on coding depends critically on the relationship between noise and signal correlations. When noise correlations align with signal correlations (both positive or both negative), information is lost—the noise mimics the signal. When they are opposite in sign, the noise is "orthogonal" to the signal direction and causes less harm. This principle, known as the "limited range" of noise correlations, constrains how much correlations can degrade population codes.
+  </Body>
+
+  <FlashCard id="fc-correlations">
+    <Front>How do signal and noise correlations differently affect population coding?</Front>
+    <Back>Signal correlations reflect tuning curve similarity; noise correlations reflect shared trial-to-trial variability. When noise correlations align with signal correlations, information is degraded (noise mimics signal). When they oppose each other, noise is orthogonal to the signal dimension and less harmful. This "limited range" effect constrains how correlations affect coding.</Back>
+  </FlashCard>
+
+  <H2>Optimal Coding: Balancing Complexity and Redundancy</H2>
+
+  <Body>
+    The optimal neural code balances several competing demands. Pure efficiency (maximizing information per spike) favors independent, non-redundant codes. But biological constraints favor some redundancy for robustness. The "efficient coding hypothesis" must be modified to account for these trade-offs:
+  </Body>
+
+  <Code lang="python">
+def optimal_redundancy_tradeoff(n_neurons, noise_level, failure_prob):
+    """
+    Model optimal redundancy given noise and neuron failure.
+
+    The optimal code maximizes:
+    J = I(X; S) - λ₁ * metabolic_cost - λ₂ * error_rate
+
+    where metabolic cost increases with activity,
+    and error rate decreases with redundancy.
+    """
+    # Without failures: minimize redundancy for efficiency
+    # With failures: maintain redundancy for fault tolerance
+
+    # Effective neurons after failures
+    effective_n = n_neurons * (1 - failure_prob)
+
+    # Minimum redundancy factor for reliable decoding
+    # Rule of thumb: need ~3x redundancy for 99% reliability
+    min_redundancy_factor = 1 / (1 - failure_prob)**2
+
+    return {
+        'effective_population': effective_n,
+        'recommended_redundancy': min_redundancy_factor,
+        'coding_efficiency': 1 / min_redundancy_factor
+    }
+
+# Optimal complexity is achieved at intermediate correlation levels
+# Too low: independent, potentially vulnerable to noise
+# Too high: fully correlated, wasted neural resources
+# Optimal: diverse subgroups with internal coordination
+  </Code>
+
+  <Body>
+    The "complexity matching" hypothesis suggests that neural populations adapt their complexity to match stimulus complexity. Simple stimuli (e.g., uniform illumination) require low-complexity responses, while complex stimuli (e.g., natural scenes) require high-complexity responses with rich correlation structure. Evidence from retinal ganglion cells and cortical populations supports this adaptive matching.
+  </Body>
+
+  <H2>Biological Examples</H2>
+
+  <H3>Retinal Ganglion Cells</H3>
+
+  <Body>
+    Retinal ganglion cells (RGCs) provide a well-studied model for population coding. Adjacent RGCs with overlapping receptive fields show significant redundancy—typically 20-40% of their information is shared. This redundancy:
+  </Body>
+
+  <Body>
+    • Improves spatial continuity of visual representations
+  </Body>
+
+  <Body>
+    • Provides robustness against photoreceptor noise
+  </Body>
+
+  <Body>
+    • Enables downstream neurons to verify signal consistency
+  </Body>
+
+  <Body>
+    However, RGCs also exhibit synergy through nonlinear contrast gain control, where population responses to contrast are more informative than individual responses would predict.
+  </Body>
+
+  <H3>Cortical Populations</H3>
+
+  <Body>
+    In visual cortex, populations of neurons show both redundancy (for similar preferred orientations) and synergy (for representing higher-order features like contour continuity). Studies using multi-electrode arrays reveal that noise correlations in V1 are typically small (ρ ≈ 0.1-0.2) but can significantly affect population coding when aligned with signal correlations.
+  </Body>
+
+  <Body>
+    Motor cortex populations demonstrate how redundancy enables robust movement control despite neural variability. The "neural manifold" hypothesis suggests that redundant coding constrains neural activity to low-dimensional subspaces, with movement-relevant signals along specific dimensions and noise orthogonal to them.
+  </Body>
+
+  <FlashCard id="fc-biological">
+    <Front>How do retinal ganglion cells demonstrate both redundancy and synergy?</Front>
+    <Back>RGCs show redundancy through overlapping receptive fields (20-40% shared information), providing spatial continuity and noise robustness. They show synergy through nonlinear contrast gain control, where population contrast encoding exceeds individual predictions. This balance optimizes both reliability and efficiency of visual information transmission.</Back>
+  </FlashCard>
+
+  <H2>Summary: Key Principles</H2>
+
+  <Body>
+    Information theory provides powerful tools for understanding neural population codes. Neural complexity quantifies the richness of population activity patterns. Redundancy and synergy represent two fundamental modes of population coding—the former providing robustness, the latter enabling emergent representations. Partial information decomposition offers a principled framework for separating these contributions. The optimal neural code balances efficiency with robustness, adapting complexity to match stimulus statistics and physiological constraints.
+  </Body>
+
+  <H1>Knowledge Assessment</H1>
+
+  <H2>Conceptual Questions</H2>
+
+  <SingleSelect id="q1-complexity-max">
+    <Prompt>When does neural complexity reach its maximum value?</Prompt>
+    <Options>
+      <Option>When all neurons fire independently</Option>
+      <Option>When all neurons are perfectly correlated (identical responses)</Option>
+      <Option correct="true">At intermediate correlation levels with diverse coordinated subgroups</Option>
+      <Option>When neurons exhibit purely random firing patterns</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2-coinformation">
+    <Prompt>If the co-information I(X₁; X₂; S) is negative, what does this indicate about the population code?</Prompt>
+    <Options>
+      <Option>Redundancy dominates the code</Option>
+      <Option correct="true">Synergy dominates the code</Option>
+      <Option>The neurons are independent</Option>
+      <Option>The code has an error</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3-noise-signal">
+    <Prompt>When do noise correlations most severely degrade population coding?</Prompt>
+    <Options>
+      <Option>When noise correlations are zero</Option>
+      <Option>When noise correlations are negative</Option>
+      <Option correct="true">When noise correlations align with signal correlations</Option>
+      <Option>When noise correlations are orthogonal to signal correlations</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4-redundancy-advantages">
+    <Prompt>Which of the following are functional advantages of redundancy in neural coding? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Improved noise robustness through averaging</Option>
+      <Option correct="true">Fault tolerance against neuron death</Option>
+      <Option>Maximized information per spike</Option>
+      <Option correct="true">Faster readout by downstream neurons</Option>
+      <Option>Reduced metabolic cost</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5-pid-components">
+    <Prompt>In Partial Information Decomposition for two sources X₁ and X₂ about target S, which relationships are correct? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">I(X₁; S) = Redundancy + Unique₁</Option>
+      <Option correct="true">I(X₁, X₂; S) = Redundancy + Unique₁ + Unique₂ + Synergy</Option>
+      <Option>Synergy = I(X₁; S) + I(X₂; S)</Option>
+      <Option correct="true">Co-information = Redundancy - Synergy</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Computational Understanding</H2>
+
+  <SortQuiz id="q6-correlation-info">
+    <Prompt>Order the following population configurations from LOWEST to HIGHEST joint mutual information I(X₁,...,Xₙ; S), assuming equal individual mutual information and equal-magnitude correlations:</Prompt>
+    <SortedItems>
+      <Item>High positive correlation aligned with signal correlations</Item>
+      <Item>Moderate positive correlation</Item>
+      <Item>Independent neurons (zero correlation)</Item>
+      <Item>Moderate negative correlation (lateral inhibition)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7-concepts-match">
+    <Prompt>Match each information-theoretic concept with its correct definition or property:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>Neural Complexity</Left>
+        <Right>Σᵢ H(Xᵢ) - H(X₁,...,Xₙ)</Right>
+      </Pair>
+      <Pair>
+        <Left>Synergy</Left>
+        <Right>Information present only in combinations</Right>
+      </Pair>
+      <Pair>
+        <Left>Redundancy</Left>
+        <Right>Information shared across multiple neurons</Right>
+      </Pair>
+      <Pair>
+        <Left>Co-information</Left>
+        <Right>I(X₁;S) + I(X₂;S) - I(X₁,X₂;S)</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>H(X|S) - H(X)</Distractor>
+      <Distractor>Total entropy of the population</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q8-examples-match">
+    <Prompt>Match each biological example with its primary information-theoretic property:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>Overlapping RGC receptive fields</Left>
+        <Right>Redundancy</Right>
+      </Pair>
+      <Pair>
+        <Left>Nonlinear contrast gain control</Left>
+        <Right>Synergy</Right>
+      </Pair>
+      <Pair>
+        <Left>XOR-like population coding</Left>
+        <Right>Pure synergy</Right>
+      </Pair>
+      <Pair>
+        <Left>Motor cortex neural manifolds</Left>
+        <Right>Redundant low-dimensional coding</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Maximum entropy coding</Distractor>
+      <Distractor>Independent sparse coding</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q9-gaussian-formula">
+    <Prompt>For n equi-correlated Gaussian neurons with pairwise correlation ρ and SNR, the joint mutual information is: I(X₁,...,Xₙ; S) = ½ log₂(1 + n·SNR / (1 + (<Blank>n-1</Blank>)·<Blank>ρ</Blank>)). When ρ = 0 (independent neurons), this simplifies to ½ log₂(1 + <Blank>n·SNR</Blank>), showing that information grows with population size.</Prompt>
+    <Distractors>
+      <Distractor>n+1</Distractor>
+      <Distractor>SNR</Distractor>
+      <Distractor>log₂(n)</Distractor>
+      <Distractor>H(S)</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q10-pid-relations">
+    <Prompt>In Partial Information Decomposition, the co-information equals <Blank>Redundancy</Blank> minus <Blank>Synergy</Blank>. Positive co-information indicates that <Blank>redundancy</Blank> dominates the population code.</Prompt>
+    <Distractors>
+      <Distractor>Entropy</Distractor>
+      <Distractor>Unique information</Distractor>
+      <Distractor>noise correlations</Distractor>
+      <Distractor>Complexity</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Applied Analysis</H2>
+
+  <Subjective id="q11-retinal-coding">
+    <Prompt>A computational neuroscientist measures responses from two adjacent retinal ganglion cells and finds that I(X₁; S) = 2.1 bits, I(X₂; S) = 1.9 bits, and I(X₁, X₂; S) = 3.2 bits. Calculate the co-information and interpret what this reveals about the coding strategy. Then explain why evolution might have favored this particular balance of redundancy and synergy in the retina.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly calculates co-information as I(X₁;S) + I(X₂;S) - I(X₁,X₂;S) = 2.1 + 1.9 - 3.2 = 0.8 bits</Requirement>
+        <Indicators>0.8, co-information, sum, subtract, positive</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly interprets positive co-information as indicating redundancy dominates over synergy in this pair</Requirement>
+        <Indicators>redundancy, dominates, positive, overlap, shared</Indicators>
+      </Criterion>
+      <Criterion points="4">
+        <Requirement>Provides compelling evolutionary rationale connecting redundancy to noise robustness, fault tolerance, or reliable transmission through the optic nerve</Requirement>
+        <Indicators>evolution, noise, robust, reliable, fault, tolerance, survival, optic nerve</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Notes that not all information is redundant (3.2 &gt; 2.1 and 3.2 &gt; 1.9), indicating some unique or synergistic information</Requirement>
+        <Indicators>unique, synergy, combination, greater than, additional</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="250" />
+  </Subjective>
+
+  <Subjective id="q12-optimal-coding">
+    <Prompt>The efficient coding hypothesis suggests neural codes should maximize information transmission. However, this lesson shows that purely efficient (non-redundant) codes may not be optimal. Discuss at least three factors that modify the efficient coding hypothesis and explain how each factor influences the optimal level of redundancy in a neural population code.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies and explains noise/reliability as a factor favoring redundancy (averaging improves SNR)</Requirement>
+        <Indicators>noise, reliability, averaging, SNR, signal-to-noise, robustness</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies and explains neuron failure/fault tolerance as a factor favoring redundancy</Requirement>
+        <Indicators>failure, fault, tolerance, death, damage, backup, redundant</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies and explains at least one additional factor (readout speed, metabolic constraints, developmental constraints, or decoding complexity)</Requirement>
+        <Indicators>readout, speed, metabolic, energy, development, decoding, downstream</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Synthesizes factors into a coherent view of optimal coding as a multi-objective trade-off</Requirement>
+        <Indicators>trade-off, balance, optimal, multiple, competing, constraints</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Writing is clear, well-organized, and uses appropriate technical terminology</Requirement>
+        <Indicators>clear, organized, precise, technical</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="120" maxWords="350" />
+  </Subjective>
+
+</Lesson>

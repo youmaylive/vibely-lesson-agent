@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-02</Id>
+    <Title>Integrate-and-Fire Models: Minimal Neuronal Dynamics</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>integrate-and-fire</Tag>
+      <Tag>neuronal-dynamics</Tag>
+      <Tag>dynamical-systems</Tag>
+      <Tag>spiking-neurons</Tag>
+      <Tag>RC-circuits</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Integrate-and-Fire Models: Minimal Neuronal Dynamics</H1>
+
+  <Body>The integrate-and-fire (IF) model stands as one of the most elegant reductions in computational neuroscience—capturing the essential features of neuronal excitability with minimal mathematical complexity. While biological neurons exhibit intricate biophysical mechanisms involving dozens of ion channel types, the IF model distills excitability to its core: continuous integration of input current followed by a discrete spike and reset when voltage crosses a threshold.</Body>
+
+  <Body>This lesson builds directly on the dynamical systems concepts from Lesson 1.1. Recall that fixed point attractors describe the resting state of neurons. The IF model extends this framework by introducing a threshold mechanism that interrupts the continuous dynamics, creating a hybrid system that alternates between smooth integration and instantaneous reset.</Body>
+
+  <H2>The RC Circuit Analogy</H2>
+
+  <Body>The foundation of the integrate-and-fire model lies in treating the neuronal membrane as an electrical circuit. The cell membrane acts as a capacitor (storing charge) in parallel with a resistor (leak conductance representing ion channels). This RC circuit analogy provides both physical intuition and mathematical tractability.</Body>
+
+  <Body>Applying Kirchhoff's current law to this circuit yields the fundamental membrane equation:</Body>
+
+  <Code lang="plaintext">
+C (dV/dt) = -g_L (V - V_rest) + I(t)
+  </Code>
+
+  <Body>Here, C is the membrane capacitance (typically ~1 μF/cm²), g_L is the leak conductance, V_rest is the resting potential (typically around -70 mV), and I(t) represents the injected or synaptic current. The term -g_L(V - V_rest) represents the leak current that pulls the membrane potential back toward rest.</Body>
+
+  <Body>Dividing through by g_L and defining the membrane time constant τ = C/g_L, we obtain the standard form:</Body>
+
+  <Code lang="plaintext">
+τ (dV/dt) = -(V - V_rest) + R_m I(t)
+  </Code>
+
+  <Body>where R_m = 1/g_L is the membrane resistance. The membrane time constant τ typically ranges from 10-30 ms in cortical neurons, setting the timescale over which the neuron integrates its inputs.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the membrane time constant τ and what does it represent physically?</Front>
+    <Back>τ = C/g_L (membrane capacitance divided by leak conductance). It represents the characteristic time over which the membrane potential responds to input—the timescale of subthreshold integration. Typical values are 10-30 ms.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What two physical components does the RC circuit model of a neuron include?</Front>
+    <Back>A capacitor (representing the lipid bilayer membrane that stores charge) in parallel with a resistor (representing the leak conductance from ion channels that allow current to flow across the membrane).</Back>
+  </FlashCard>
+
+  <H2>Threshold, Spike, and Reset</H2>
+
+  <Body>The key feature distinguishing the integrate-and-fire model from a simple RC circuit is the threshold mechanism. When the membrane potential V reaches a threshold value V_thr (typically around -55 mV), the neuron "fires" a spike, and the voltage is instantaneously reset to a reset potential V_reset (often equal to V_rest or slightly below).</Body>
+
+  <Body>Mathematically, we express this as a conditional rule:</Body>
+
+  <Code lang="plaintext">
+if V(t) ≥ V_thr:
+    record spike at time t
+    V(t) → V_reset
+  </Code>
+
+  <Body>This hybrid structure—continuous subthreshold dynamics interrupted by discrete reset events—is what allows the IF model to generate spike trains from continuous input. The model does not attempt to reproduce the actual shape of the action potential; instead, it treats the spike as an instantaneous event characterized only by its timing.</Body>
+
+  <Body>This abstraction is justified because much of neural computation depends on spike timing rather than spike shape. For rate-coded information, only the frequency of spikes matters; for temporal coding, the precise timing of spikes carries information, but the detailed voltage waveform during the spike is typically not information-bearing.</Body>
+
+  <FlashCard id="fc3">
+    <Front>What happens in an integrate-and-fire model when V reaches V_thr?</Front>
+    <Back>Three things occur: (1) a spike is recorded at that time, (2) the membrane potential is instantaneously reset to V_reset, and (3) integration begins again from the reset value. The spike itself is treated as a discrete, instantaneous event.</Back>
+  </FlashCard>
+
+  <H2>Analytical Solution for Constant Input</H2>
+
+  <Body>For constant input current I, the IF model admits an analytical solution. The subthreshold dynamics follow:</Body>
+
+  <Code lang="plaintext">
+τ (dV/dt) = -(V - V_rest) + R_m I
+  </Code>
+
+  <Body>This is a first-order linear ODE. Solving with initial condition V(0) = V_reset yields:</Body>
+
+  <Code lang="plaintext">
+V(t) = V_rest + R_m I (1 - exp(-t/τ)) + (V_reset - V_rest) exp(-t/τ)
+  </Code>
+
+  <Body>If V_reset = V_rest (a common choice), this simplifies to:</Body>
+
+  <Code lang="plaintext">
+V(t) = V_rest + R_m I (1 - exp(-t/τ))
+  </Code>
+
+  <Body>The voltage asymptotically approaches V_∞ = V_rest + R_m I. For the neuron to fire, we require V_∞ &gt; V_thr, which means the input must exceed the rheobase current I_rh = (V_thr - V_rest)/R_m.</Body>
+
+  <SingleSelect id="q1">
+    <Prompt>For a leaky integrate-and-fire neuron with V_rest = -70 mV, V_thr = -55 mV, and R_m = 10 MΩ, what is the minimum constant current (rheobase) required to elicit spiking?</Prompt>
+    <Options>
+      <Option correct="true">1.5 nA</Option>
+      <Option>0.5 nA</Option>
+      <Option>15 nA</Option>
+      <Option>0.15 nA</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Firing Rate Calculation</H2>
+
+  <Body>For suprathreshold constant input (I &gt; I_rh), we can calculate the firing rate analytically. The interspike interval (ISI) T is the time required for V to travel from V_reset to V_thr. Setting V(T) = V_thr and solving:</Body>
+
+  <Code lang="plaintext">
+V_thr = V_rest + R_m I (1 - exp(-T/τ))
+
+Solving for T:
+T = τ ln(R_m I / (R_m I - (V_thr - V_rest)))
+
+Or equivalently:
+T = τ ln((V_∞ - V_rest) / (V_∞ - V_thr))
+  </Code>
+
+  <Body>The firing rate f = 1/T is therefore:</Body>
+
+  <Code lang="plaintext">
+f = 1 / (τ ln(R_m I / (R_m I - (V_thr - V_rest))))
+  </Code>
+
+  <Body>This relationship between input current and firing rate is called the f-I curve (frequency-current curve). Note several important features:</Body>
+
+  <Body>1. The curve has a sharp onset at I = I_rh (the rheobase), below which f = 0.</Body>
+  <Body>2. For I slightly above I_rh, the firing rate increases rapidly.</Body>
+  <Body>3. For large I, the rate approaches f → 1/(τ ln(1)) → ∞, but this is unrealistic—real neurons have refractory periods that limit maximum firing rates.</Body>
+
+  <FlashCard id="fc4">
+    <Front>What is the f-I curve and what shape does it have for a standard IF neuron?</Front>
+    <Back>The f-I curve (frequency-current curve) shows firing rate as a function of input current. For IF neurons, it has a sharp onset at the rheobase current, then increases nonlinearly. Without a refractory period, it approaches infinity for large currents; with a refractory period, it saturates at 1/t_ref.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q2">
+    <Prompt>Which of the following are true statements about the f-I curve of a leaky integrate-and-fire neuron without refractory period?</Prompt>
+    <Options>
+      <Option correct="true">The firing rate is zero for input below the rheobase current</Option>
+      <Option correct="true">The curve shows a sharp (discontinuous derivative) onset at rheobase</Option>
+      <Option>The f-I curve is perfectly linear throughout its range</Option>
+      <Option correct="true">The firing rate increases without bound as input increases</Option>
+      <Option>The neuron fires even for arbitrarily small positive currents</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Numerical Implementation</H2>
+
+  <Body>While constant input admits analytical solutions, time-varying inputs require numerical integration. The Euler method provides a straightforward approach:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def simulate_lif(I, dt, T, tau=20e-3, V_rest=-70e-3, V_thr=-55e-3, V_reset=-70e-3, R_m=10e6):
+    """
+    Simulate a leaky integrate-and-fire neuron.
+
+    Parameters:
+    -----------
+    I : array-like
+        Input current over time (in Amperes)
+    dt : float
+        Time step (in seconds)
+    T : float
+        Total simulation time (in seconds)
+    tau : float
+        Membrane time constant (default 20 ms)
+    V_rest : float
+        Resting potential (default -70 mV)
+    V_thr : float
+        Threshold potential (default -55 mV)
+    V_reset : float
+        Reset potential (default -70 mV)
+    R_m : float
+        Membrane resistance (default 10 MΩ)
+
+    Returns:
+    --------
+    t : array
+        Time vector
+    V : array
+        Membrane potential over time
+    spike_times : list
+        Times at which spikes occurred
+    """
+    n_steps = int(T / dt)
+    t = np.arange(n_steps) * dt
+    V = np.zeros(n_steps)
+    V[0] = V_rest
+    spike_times = []
+
+    for i in range(1, n_steps):
+        # Euler integration of subthreshold dynamics
+        dV = (-(V[i-1] - V_rest) + R_m * I[i-1]) / tau
+        V[i] = V[i-1] + dV * dt
+
+        # Threshold detection and reset
+        if V[i] &gt;= V_thr:
+            spike_times.append(t[i])
+            V[i] = V_reset
+
+    return t, V, spike_times
+  </Code>
+
+  <Body>Critical implementation details include:</Body>
+
+  <Body>1. Threshold detection must occur after each integration step</Body>
+  <Body>2. The reset must be applied immediately upon threshold crossing</Body>
+  <Body>3. For accurate spike timing, smaller time steps or interpolation methods improve precision</Body>
+  <Body>4. The spike time should be recorded before resetting the voltage</Body>
+
+  <SortQuiz id="q3">
+    <Prompt>Arrange the following steps in the correct order for implementing one time step of an IF neuron simulation:</Prompt>
+    <SortedItems>
+      <Item>Calculate dV/dt from the membrane equation</Item>
+      <Item>Update V using Euler method: V_new = V_old + dV * dt</Item>
+      <Item>Check if V_new ≥ V_thr</Item>
+      <Item>If threshold crossed, record spike time</Item>
+      <Item>If threshold crossed, reset V to V_reset</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Validating Numerical Against Analytical Solutions</H2>
+
+  <Body>A crucial step in computational neuroscience is validating numerical implementations against analytical solutions when available. For constant input, we can compare the numerically computed interspike intervals and firing rates against the theoretical predictions.</Body>
+
+  <Code lang="python">
+# Validation: compare numerical and analytical firing rates
+def analytical_firing_rate(I, tau, V_rest, V_thr, R_m):
+    """Calculate analytical firing rate for constant input."""
+    V_inf = V_rest + R_m * I
+    if V_inf &lt;= V_thr:
+        return 0.0
+    T_isi = tau * np.log((V_inf - V_rest) / (V_inf - V_thr))
+    return 1.0 / T_isi
+
+# Example validation
+I_const = 2e-9  # 2 nA constant input
+dt = 0.1e-3    # 0.1 ms time step
+T_sim = 1.0    # 1 second simulation
+
+I_array = np.ones(int(T_sim/dt)) * I_const
+t, V, spikes = simulate_lif(I_array, dt, T_sim)
+
+numerical_rate = len(spikes) / T_sim
+analytical_rate = analytical_firing_rate(I_const, 20e-3, -70e-3, -55e-3, 10e6)
+
+print(f"Numerical firing rate: {numerical_rate:.2f} Hz")
+print(f"Analytical firing rate: {analytical_rate:.2f} Hz")
+  </Code>
+
+  <FillBlanks id="q4">
+    <Prompt>To validate a numerical IF simulation, we compare the computed <Blank>interspike interval</Blank> against the analytical formula T = τ ln(V_∞ - V_rest) / (V_∞ - V_thr). For constant input, the analytical and numerical <Blank>firing rates</Blank> should match closely when using a sufficiently small <Blank>time step</Blank>.</Prompt>
+    <Distractors>
+      <Distractor>membrane potential</Distractor>
+      <Distractor>threshold voltage</Distractor>
+      <Distractor>reset value</Distractor>
+      <Distractor>capacitance</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Response Properties</H2>
+
+  <Body>The IF model exhibits several important response properties that relate to neural computation:</Body>
+
+  <Body>Latency to First Spike: For a step current turning on at t=0, the time to the first spike depends on how far above threshold the asymptotic voltage lies. This latency carries information about input strength.</Body>
+
+  <Body>Phase Response: Brief perturbations to the input current can advance or delay the next spike depending on when they occur during the interspike interval. Early in the ISI, positive perturbations have less effect; near threshold, small perturbations can trigger immediate spikes.</Body>
+
+  <Body>Integration Window: The membrane time constant τ determines the temporal window over which inputs are integrated. Inputs separated by more than ~3τ are essentially independent; inputs within τ sum together.</Body>
+
+  <MatchPairs id="q5">
+    <Prompt>Match each IF model parameter to its primary influence on neural response:</Prompt>
+    <Pairs>
+      <Pair><Left>Membrane time constant τ</Left><Right>Temporal integration window</Right></Pair>
+      <Pair><Left>Threshold V_thr</Left><Right>Minimum voltage for spike initiation</Right></Pair>
+      <Pair><Left>Reset potential V_reset</Left><Right>Starting voltage after each spike</Right></Pair>
+      <Pair><Left>Membrane resistance R_m</Left><Right>Voltage response amplitude to current</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Action potential duration</Distractor>
+      <Distractor>Synaptic weight strength</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Limitations of the IF Model</H2>
+
+  <Body>While powerful in its simplicity, the IF model has significant limitations:</Body>
+
+  <Body>No Action Potential Shape: The model produces only spike times, not the characteristic voltage waveform of real action potentials. This precludes studying phenomena that depend on spike shape, such as certain forms of spike-timing-dependent plasticity.</Body>
+
+  <Body>No Intrinsic Refractoriness: Without modification, the basic IF model can fire arbitrarily fast. Real neurons have absolute refractory periods (typically 1-2 ms) during which they cannot fire regardless of input, and relative refractory periods during which firing requires stronger input.</Body>
+
+  <Body>No Spike-Frequency Adaptation: Real neurons often show decreasing firing rates in response to constant input due to slow potassium currents. The basic IF model maintains constant firing for constant input.</Body>
+
+  <Body>No Subthreshold Oscillations: Some neuron types exhibit subthreshold membrane potential oscillations that influence spike timing. The IF model's single stable fixed point cannot generate such oscillations.</Body>
+
+  <SingleSelect id="q6">
+    <Prompt>A researcher observes that a cortical neuron's firing rate decreases from 50 Hz to 20 Hz over 500 ms despite receiving constant current injection. Which IF model limitation does this observation highlight?</Prompt>
+    <Options>
+      <Option correct="true">Lack of spike-frequency adaptation</Option>
+      <Option>Absence of action potential shape</Option>
+      <Option>Missing absolute refractory period</Option>
+      <Option>No subthreshold oscillations</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Extensions: Adding Refractoriness</H2>
+
+  <Body>The most common extension to address unlimited firing rates is adding a refractory period. After each spike, the neuron is held at V_reset for a duration t_ref before integration resumes:</Body>
+
+  <Code lang="python">
+def simulate_lif_refractory(I, dt, T, tau=20e-3, V_rest=-70e-3, V_thr=-55e-3,
+                            V_reset=-70e-3, R_m=10e6, t_ref=2e-3):
+    """LIF neuron with absolute refractory period."""
+    n_steps = int(T / dt)
+    t = np.arange(n_steps) * dt
+    V = np.zeros(n_steps)
+    V[0] = V_rest
+    spike_times = []
+    refractory_until = 0.0
+
+    for i in range(1, n_steps):
+        if t[i] &lt; refractory_until:
+            # During refractory period, hold at reset
+            V[i] = V_reset
+        else:
+            # Normal integration
+            dV = (-(V[i-1] - V_rest) + R_m * I[i-1]) / tau
+            V[i] = V[i-1] + dV * dt
+
+            if V[i] &gt;= V_thr:
+                spike_times.append(t[i])
+                V[i] = V_reset
+                refractory_until = t[i] + t_ref
+
+    return t, V, spike_times
+  </Code>
+
+  <Body>With a refractory period, the maximum firing rate becomes f_max = 1/t_ref. The f-I curve now saturates at this maximum rather than growing unboundedly.</Body>
+
+  <FlashCard id="fc5">
+    <Front>How does adding an absolute refractory period t_ref modify the f-I curve?</Front>
+    <Back>The f-I curve saturates at a maximum firing rate of f_max = 1/t_ref instead of increasing without bound. For example, with t_ref = 2 ms, the maximum rate is 500 Hz. The curve shape below saturation is similar to the standard IF model.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc6">
+    <Front>What is the difference between absolute and relative refractory periods?</Front>
+    <Back>During the absolute refractory period, the neuron cannot fire regardless of input strength (voltage-gated Na+ channels are inactivated). During the relative refractory period, the neuron can fire but requires stronger-than-normal input (some Na+ channels still inactivated, K+ channels still open).</Back>
+  </FlashCard>
+
+  <H2>Constructing the f-I Curve</H2>
+
+  <Body>The frequency-current (f-I) curve is a fundamental characterization of neuronal excitability. To construct it computationally:</Body>
+
+  <Code lang="python">
+def compute_fi_curve(I_values, dt=0.1e-3, T=1.0, **lif_params):
+    """
+    Compute f-I curve for a range of input currents.
+
+    Parameters:
+    -----------
+    I_values : array-like
+        Array of constant current values to test
+    dt : float
+        Simulation time step
+    T : float
+        Simulation duration for each current value
+    **lif_params : dict
+        Parameters passed to simulate_lif_refractory
+
+    Returns:
+    --------
+    f_values : array
+        Firing rates corresponding to each input current
+    """
+    f_values = []
+    for I in I_values:
+        I_array = np.ones(int(T/dt)) * I
+        _, _, spikes = simulate_lif_refractory(I_array, dt, T, **lif_params)
+        f_values.append(len(spikes) / T)
+    return np.array(f_values)
+
+# Example: construct f-I curve
+I_range = np.linspace(0, 5e-9, 50)  # 0 to 5 nA
+f_curve = compute_fi_curve(I_range, t_ref=2e-3)
+  </Code>
+
+  <Body>The f-I curve reveals important properties of neural coding. The slope of the curve indicates gain—how sensitively the neuron's output changes with input. Different neuron types have characteristically different f-I curves, reflecting their computational roles in neural circuits.</Body>
+
+  <Subjective id="q7">
+    <Prompt>Explain why the integrate-and-fire model, despite its simplicity, remains valuable in computational neuroscience. In your answer, discuss at least two specific advantages of the IF model and one scenario where its limitations would make it inappropriate.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies at least two valid advantages of the IF model (e.g., analytical tractability, computational efficiency, captures essential threshold dynamics, amenable to large-scale network simulations, parameters can be fit to data)</Requirement>
+        <Indicators>analytical, tractable, efficient, simple, network, large-scale, mathematical, solvable</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies a specific scenario where IF limitations matter (e.g., studying spike shape-dependent plasticity, intrinsic oscillations, detailed biophysics, adaptation, bursting)</Requirement>
+        <Indicators>adaptation, bursting, oscillation, spike shape, STDP, biophysical, ion channel, realistic</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Demonstrates understanding of the trade-off between model complexity and tractability</Requirement>
+        <Indicators>trade-off, balance, complexity, simplicity, appropriate, depends, context</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Uses specific examples or connects to real neuroscience applications</Requirement>
+        <Indicators>example, application, cortex, circuit, network, experiment, recording</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>The integrate-and-fire model captures the essence of neuronal excitability: continuous integration of inputs interrupted by discrete spike-and-reset events. Starting from RC circuit principles, we derived the membrane equation and its analytical solution for constant input. The threshold mechanism converts continuous voltage dynamics into discrete spike trains, with the firing rate determined by the interspike interval.</Body>
+
+  <Body>Key insights from this lesson include:</Body>
+
+  <Body>• The membrane time constant τ = C/g_L sets the integration timescale</Body>
+  <Body>• Firing requires suprathreshold input exceeding the rheobase I_rh</Body>
+  <Body>• The f-I curve characterizes input-output relationships</Body>
+  <Body>• Numerical implementation requires careful threshold detection and reset</Body>
+  <Body>• Extensions like refractory periods address key limitations</Body>
+
+  <Body>In subsequent lessons, we will build on this foundation to explore more sophisticated models including the exponential integrate-and-fire, adaptive models, and ultimately conductance-based models that capture the full richness of neuronal dynamics.</Body>
+
+  <SingleSelect id="q8">
+    <Prompt>You implement an IF model but observe that your simulated neuron fires during the first time step even with zero input current. What is the most likely cause?</Prompt>
+    <Options>
+      <Option>The time step dt is too large</Option>
+      <Option correct="true">The initial voltage V(0) was set above threshold</Option>
+      <Option>The membrane time constant is too small</Option>
+      <Option>The reset potential equals the resting potential</Option>
+    </Options>
+  </SingleSelect>
+
+  <MatchPairs id="q9">
+    <Prompt>Match each concept from this lesson to its connection with dynamical systems theory (Lesson 1.1):</Prompt>
+    <Pairs>
+      <Pair><Left>Resting potential V_rest</Left><Right>Stable fixed point of subthreshold dynamics</Right></Pair>
+      <Pair><Left>Threshold crossing and reset</Left><Right>Discontinuous jump in state space</Right></Pair>
+      <Pair><Left>Subthreshold decay to rest</Left><Right>Attraction toward fixed point</Right></Pair>
+      <Pair><Left>Membrane time constant τ</Left><Right>Rate of approach to fixed point</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Limit cycle oscillation</Distractor>
+      <Distractor>Saddle-node bifurcation</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+</Lesson>

@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-06-02</Id>
+    <Title>Mutual Information: Quantifying Neural Coding</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>information-theory</Tag>
+      <Tag>mutual-information</Tag>
+      <Tag>neural-coding</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>entropy</Tag>
+      <Tag>bias-correction</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Mutual Information: Quantifying Neural Coding</H1>
+
+  <Body>Mutual information provides a powerful, model-free framework for quantifying how much information neural responses carry about stimuli. Unlike correlation measures that capture only linear relationships, mutual information detects any statistical dependency between variables, making it the gold standard for assessing neural coding quality in computational neuroscience.</Body>
+
+  <H2>From Entropy to Mutual Information</H2>
+
+  <Body>In the previous lesson, we established that entropy H(X) quantifies uncertainty about a random variable X. Mutual information extends this concept to measure the shared uncertainty—or equivalently, the information transfer—between two random variables. When a neuron responds to a stimulus, knowing the response should reduce our uncertainty about what stimulus was presented. Mutual information precisely quantifies this reduction.</Body>
+
+  <H3>Definition and Intuition</H3>
+
+  <Body>Mutual information I(X;Y) between random variables X (stimulus) and Y (response) can be defined in several equivalent ways:</Body>
+
+  <Code lang="python">
+# Mutual Information Definitions
+# Let X = stimulus, Y = neural response
+
+# Definition 1: Reduction in uncertainty about Y given X
+I(X;Y) = H(Y) - H(Y|X)
+
+# Definition 2: Reduction in uncertainty about X given Y
+I(X;Y) = H(X) - H(X|Y)
+
+# Definition 3: Symmetric form using joint entropy
+I(X;Y) = H(X) + H(Y) - H(X,Y)
+
+# Definition 4: Kullback-Leibler divergence form
+I(X;Y) = D_KL(P(X,Y) || P(X)P(Y))
+  </Code>
+
+  <Body>The first definition is particularly intuitive for neural coding: H(Y) represents our uncertainty about the neural response before observing the stimulus, while H(Y|X) is the remaining uncertainty after the stimulus is known. The difference—mutual information—tells us how much the stimulus "explains" the response variability.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What does I(X;Y) = H(Y) - H(Y|X) tell us about neural coding?</Front>
+    <Back>It quantifies how much knowing the stimulus X reduces our uncertainty about the neural response Y. This represents the information the response carries about the stimulus.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>Why is mutual information symmetric, i.e., I(X;Y) = I(Y;X)?</Front>
+    <Back>Symmetry follows from the definition I(X;Y) = H(X) + H(Y) - H(X,Y). The amount of information X provides about Y equals the information Y provides about X, though the causal relationship may be asymmetric.</Back>
+  </FlashCard>
+
+  <H3>Fundamental Bounds</H3>
+
+  <Body>Mutual information satisfies important bounds that constrain its interpretation:</Body>
+
+  <Code lang="python">
+# Fundamental bounds on mutual information
+
+# Non-negativity: MI is always non-negative
+I(X;Y) ≥ 0
+
+# Equality holds if and only if X and Y are independent
+I(X;Y) = 0  ⟺  P(X,Y) = P(X)P(Y)
+
+# Upper bounds: MI cannot exceed either marginal entropy
+I(X;Y) ≤ min(H(X), H(Y))
+
+# For neural coding: if stimulus has 3 bits of entropy,
+# the response can convey at most 3 bits about it
+I(stimulus; response) ≤ H(stimulus)
+  </Code>
+
+  <Body>The upper bound has profound implications for neural coding: a neuron cannot transmit more information about a stimulus than the stimulus itself contains. If a stimulus set has entropy H(X) = 3 bits (e.g., 8 equally likely stimuli), no neural code can exceed 3 bits of mutual information with that stimulus.</Body>
+
+  <SingleSelect id="q1">
+    <Prompt>A visual stimulus can take one of 16 equally likely orientations, giving H(stimulus) = 4 bits. A neuron responds with spike counts that have H(response) = 2.5 bits. What is the maximum possible mutual information I(stimulus; response)?</Prompt>
+    <Options>
+      <Option>4 bits</Option>
+      <Option correct="true">2.5 bits</Option>
+      <Option>6.5 bits</Option>
+      <Option>1.5 bits</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Computing Mutual Information</H2>
+
+  <H3>Discrete Case</H3>
+
+  <Body>For discrete random variables, mutual information is computed directly from probability distributions:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def mutual_information_discrete(p_xy):
+    """
+    Compute mutual information from joint probability distribution.
+
+    Parameters:
+    -----------
+    p_xy : 2D array
+        Joint probability distribution P(X,Y) where
+        p_xy[i,j] = P(X=x_i, Y=y_j)
+
+    Returns:
+    --------
+    I_xy : float
+        Mutual information in bits
+    """
+    # Marginal distributions
+    p_x = p_xy.sum(axis=1)  # Sum over Y
+    p_y = p_xy.sum(axis=0)  # Sum over X
+
+    # Compute mutual information
+    I_xy = 0.0
+    for i in range(len(p_x)):
+        for j in range(len(p_y)):
+            if p_xy[i,j] &gt; 0 and p_x[i] &gt; 0 and p_y[j] &gt; 0:
+                I_xy += p_xy[i,j] * np.log2(p_xy[i,j] / (p_x[i] * p_y[j]))
+
+    return I_xy
+
+# Example: Binary stimulus and noisy binary response
+# Stimulus: P(X=0) = P(X=1) = 0.5
+# Channel: P(Y=X) = 0.9, P(Y≠X) = 0.1
+
+p_xy = np.array([
+    [0.45, 0.05],   # P(X=0, Y=0), P(X=0, Y=1)
+    [0.05, 0.45]    # P(X=1, Y=0), P(X=1, Y=1)
+])
+
+I = mutual_information_discrete(p_xy)
+print(f"Mutual information: {I:.4f} bits")  # ≈ 0.531 bits
+  </Code>
+
+  <FlashCard id="fc3">
+    <Front>What is the conditional entropy H(Y|X) and how does it relate to noise in neural coding?</Front>
+    <Back>H(Y|X) = Σₓ P(x)H(Y|X=x) is the average uncertainty in Y that remains after knowing X. In neural coding, this represents response variability (noise) that is not explained by the stimulus—the "noise entropy."</Back>
+  </FlashCard>
+
+  <H3>Continuous Case</H3>
+
+  <Body>For continuous random variables, we use differential entropy and probability density functions:</Body>
+
+  <Code lang="python">
+# Continuous mutual information
+# I(X;Y) = ∫∫ f(x,y) log₂(f(x,y) / (f_X(x) f_Y(y))) dx dy
+
+# Special case: Jointly Gaussian variables
+# If (X,Y) are jointly Gaussian with correlation coefficient ρ:
+
+def mi_gaussian(rho):
+    """
+    Mutual information for jointly Gaussian variables.
+
+    Parameters:
+    -----------
+    rho : float
+        Correlation coefficient, -1 &lt; rho &lt; 1
+
+    Returns:
+    --------
+    I : float
+        Mutual information in bits
+    """
+    return -0.5 * np.log2(1 - rho**2)
+
+# Examples:
+# ρ = 0.0: I = 0 bits (independent)
+# ρ = 0.5: I ≈ 0.19 bits
+# ρ = 0.9: I ≈ 1.28 bits
+# ρ → 1.0: I → ∞ (perfect dependence)
+  </Code>
+
+  <Body>For Gaussian variables, mutual information depends only on the correlation coefficient and diverges as correlation approaches ±1. This provides a useful benchmark: if your neural data shows higher mutual information than predicted by the Gaussian formula at the same correlation, there must be additional non-linear dependencies being captured.</Body>
+
+  <MatchPairs id="q2">
+    <Prompt>Match each mutual information value with its interpretation in neural coding:</Prompt>
+    <Pairs>
+      <Pair><Left>I(X;Y) = 0</Left><Right>Stimulus and response are statistically independent</Right></Pair>
+      <Pair><Left>I(X;Y) = H(X)</Left><Right>Response perfectly encodes stimulus (no noise)</Right></Pair>
+      <Pair><Left>I(X;Y) = H(Y)</Left><Right>All response variability is stimulus-driven</Right></Pair>
+      <Pair><Left>H(Y|X)</Left><Right>Noise entropy in the neural response</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Channel capacity reached</Distractor>
+      <Distractor>Non-Gaussian response distribution</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Estimation from Neural Data</H2>
+
+  <H3>Histogram-Based Estimation</H3>
+
+  <Body>In practice, we must estimate mutual information from finite samples of stimulus-response pairs. The most common approach discretizes continuous variables into bins:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def estimate_mi_histogram(stimuli, responses, n_bins=10):
+    """
+    Estimate mutual information using histogram method.
+
+    Parameters:
+    -----------
+    stimuli : array
+        Stimulus values for each trial
+    responses : array
+        Neural response values for each trial
+    n_bins : int
+        Number of bins for discretization
+
+    Returns:
+    --------
+    I_naive : float
+        Naive (biased) mutual information estimate
+    """
+    # Create 2D histogram (joint distribution)
+    hist_2d, x_edges, y_edges = np.histogram2d(
+        stimuli, responses, bins=n_bins
+    )
+
+    # Normalize to get probabilities
+    p_xy = hist_2d / hist_2d.sum()
+
+    # Marginals
+    p_x = p_xy.sum(axis=1)
+    p_y = p_xy.sum(axis=0)
+
+    # Compute MI (avoiding log(0))
+    I = 0.0
+    for i in range(n_bins):
+        for j in range(n_bins):
+            if p_xy[i,j] &gt; 0:
+                I += p_xy[i,j] * np.log2(p_xy[i,j] / (p_x[i] * p_y[j] + 1e-12))
+
+    return I
+
+# Demonstration with synthetic data
+np.random.seed(42)
+n_trials = 1000
+
+# Generate correlated stimulus-response pairs
+stimulus = np.random.randn(n_trials)
+noise = np.random.randn(n_trials)
+response = 0.8 * stimulus + 0.6 * noise  # SNR determines MI
+
+# True MI (Gaussian): I = -0.5 * log2(1 - 0.64) ≈ 0.74 bits
+I_est = estimate_mi_histogram(stimulus, response, n_bins=20)
+print(f"Estimated MI: {I_est:.3f} bits")
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>Why does the naive histogram estimator of mutual information have a positive bias?</Front>
+    <Back>With finite samples, random sampling fluctuations create apparent structure in the joint histogram even for independent variables. This spurious structure is interpreted as mutual information, causing systematic overestimation that grows with the number of bins and shrinks with sample size.</Back>
+  </FlashCard>
+
+  <H3>The Finite Sample Bias Problem</H3>
+
+  <Body>A critical issue in mutual information estimation is positive bias: with limited data, even independent variables appear to share information due to sampling fluctuations. This bias scales approximately as:</Body>
+
+  <Code lang="python">
+# Finite sample bias (first-order approximation)
+#
+# E[Î] ≈ I_true + (|X| - 1)(|Y| - 1) / (2N ln(2))
+#
+# where:
+#   |X| = number of stimulus bins
+#   |Y| = number of response bins
+#   N = number of samples
+
+def bias_first_order(n_x_bins, n_y_bins, n_samples):
+    """
+    First-order bias correction term.
+    """
+    return (n_x_bins - 1) * (n_y_bins - 1) / (2 * n_samples * np.log(2))
+
+# Example: 10x10 bins with 500 samples
+bias = bias_first_order(10, 10, 500)
+print(f"Expected bias: {bias:.3f} bits")  # ≈ 0.117 bits
+  </Code>
+
+  <Body>This bias can be substantial! With 10×10 bins and 500 samples, the expected bias exceeds 0.1 bits. For neural coding applications where true mutual information might be 0.5-2 bits, this represents a significant systematic error.</Body>
+
+  <SingleSelect id="q3">
+    <Prompt>You estimate I(stimulus; spike_count) = 0.3 bits using 20×20 bins and 400 trials. The first-order bias correction is approximately 0.28 bits. What should you conclude?</Prompt>
+    <Options>
+      <Option>The neuron transmits 0.3 bits about the stimulus</Option>
+      <Option correct="true">The neuron may transmit near-zero information; the estimate is dominated by bias</Option>
+      <Option>The neuron transmits 0.58 bits about the stimulus</Option>
+      <Option>The bias correction is too large to be valid</Option>
+    </Options>
+  </SingleSelect>
+
+  <H3>Panzeri-Treves Bias Correction</H3>
+
+  <Body>The Panzeri-Treves method provides a principled bias correction by estimating the bias from the data itself:</Body>
+
+  <Code lang="python">
+def panzeri_treves_correction(stimuli, responses, n_stim_bins, n_resp_bins):
+    """
+    Panzeri-Treves bias-corrected mutual information estimator.
+
+    This method estimates bias from the empirical distributions
+    and provides a more accurate correction than the first-order
+    approximation.
+    """
+    n_samples = len(stimuli)
+
+    # Digitize into bins
+    stim_bins = np.digitize(stimuli,
+                           np.linspace(stimuli.min(), stimuli.max(), n_stim_bins+1)[:-1])
+    resp_bins = np.digitize(responses,
+                           np.linspace(responses.min(), responses.max(), n_resp_bins+1)[:-1])
+
+    # Count occurrences
+    joint_counts = np.zeros((n_stim_bins, n_resp_bins))
+    for s, r in zip(stim_bins, resp_bins):
+        if 1 &lt;= s &lt;= n_stim_bins and 1 &lt;= r &lt;= n_resp_bins:
+            joint_counts[s-1, r-1] += 1
+
+    # Compute naive MI
+    p_xy = joint_counts / n_samples
+    p_x = p_xy.sum(axis=1)
+    p_y = p_xy.sum(axis=0)
+
+    I_naive = 0.0
+    for i in range(n_stim_bins):
+        for j in range(n_resp_bins):
+            if p_xy[i,j] &gt; 0:
+                I_naive += p_xy[i,j] * np.log2(p_xy[i,j] / (p_x[i] * p_y[j] + 1e-12))
+
+    # Panzeri-Treves bias correction
+    # Count non-empty bins
+    n_x_occupied = np.sum(p_x &gt; 0)
+    n_y_occupied = np.sum(p_y &gt; 0)
+    n_xy_occupied = np.sum(p_xy &gt; 0)
+
+    # Bias estimate
+    bias_H_Y = (n_y_occupied - 1) / (2 * n_samples * np.log(2))
+    bias_H_Y_given_X = (n_xy_occupied - n_x_occupied) / (2 * n_samples * np.log(2))
+
+    bias_MI = bias_H_Y - bias_H_Y_given_X
+
+    # Corrected estimate
+    I_corrected = max(0, I_naive - bias_MI)
+
+    return I_naive, I_corrected, bias_MI
+
+# Example usage
+I_naive, I_corrected, bias = panzeri_treves_correction(
+    stimulus, response, n_stim_bins=15, n_resp_bins=15
+)
+print(f"Naive: {I_naive:.3f} bits")
+print(f"Bias estimate: {bias:.3f} bits")
+print(f"Corrected: {I_corrected:.3f} bits")
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What is the key insight behind the Panzeri-Treves bias correction?</Front>
+    <Back>The method estimates bias from the number of occupied bins in the empirical distribution, recognizing that bias depends on the effective dimensionality of the data (occupied bins) rather than the total number of bins. This provides a data-adaptive correction.</Back>
+  </FlashCard>
+
+  <FillBlanks id="q4">
+    <Prompt>
+      The finite sample bias in mutual information estimation scales with <Blank>bins</Blank> in the numerator and <Blank>samples</Blank> in the denominator. To reduce bias, one should either use fewer bins or collect more <Blank>data</Blank>. The Panzeri-Treves method estimates bias from the number of <Blank>occupied</Blank> bins.
+    </Prompt>
+    <Distractors>
+      <Distractor>entropy</Distractor>
+      <Distractor>variance</Distractor>
+      <Distractor>neurons</Distractor>
+      <Distractor>stimuli</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Application: Comparing Neural Coding Schemes</H2>
+
+  <H3>Rate Coding vs. Temporal Coding</H3>
+
+  <Body>A fundamental question in neuroscience is whether neurons encode information primarily in their firing rates or in the precise timing of spikes. Mutual information provides a principled framework to compare these coding schemes:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def analyze_coding_schemes(stimuli, spike_trains, dt=0.001, T=0.5):
+    """
+    Compare rate and temporal coding using mutual information.
+
+    Parameters:
+    -----------
+    stimuli : array of shape (n_trials,)
+        Stimulus identity for each trial
+    spike_trains : list of arrays
+        Spike times for each trial
+    dt : float
+        Time bin width for temporal coding (seconds)
+    T : float
+        Trial duration (seconds)
+
+    Returns:
+    --------
+    I_rate : float
+        MI using spike count (rate code)
+    I_temporal : float
+        MI using binned spike pattern (temporal code)
+    """
+    n_trials = len(stimuli)
+    n_time_bins = int(T / dt)
+
+    # Rate code: total spike count per trial
+    spike_counts = np.array([len(train) for train in spike_trains])
+
+    # Temporal code: binary pattern in time bins
+    # (simplified: use first 8 bins for tractability)
+    n_pattern_bins = min(8, n_time_bins)
+    temporal_patterns = []
+    for train in spike_trains:
+        pattern = 0
+        for spike_time in train:
+            bin_idx = int(spike_time / dt)
+            if bin_idx &lt; n_pattern_bins:
+                pattern |= (1 &lt;&lt; bin_idx)
+        temporal_patterns.append(pattern)
+    temporal_patterns = np.array(temporal_patterns)
+
+    # Estimate MI for rate code
+    I_rate = estimate_mi_discrete(stimuli, spike_counts)
+
+    # Estimate MI for temporal code
+    I_temporal = estimate_mi_discrete(stimuli, temporal_patterns)
+
+    return I_rate, I_temporal
+
+def estimate_mi_discrete(x, y):
+    """Estimate MI between discrete variables."""
+    # Build joint histogram
+    x_vals = np.unique(x)
+    y_vals = np.unique(y)
+
+    joint_counts = np.zeros((len(x_vals), len(y_vals)))
+    for xi, yi in zip(x, y):
+        i = np.where(x_vals == xi)[0][0]
+        j = np.where(y_vals == yi)[0][0]
+        joint_counts[i, j] += 1
+
+    p_xy = joint_counts / joint_counts.sum()
+    p_x = p_xy.sum(axis=1)
+    p_y = p_xy.sum(axis=0)
+
+    I = 0.0
+    for i in range(len(x_vals)):
+        for j in range(len(y_vals)):
+            if p_xy[i,j] &gt; 0:
+                I += p_xy[i,j] * np.log2(p_xy[i,j] / (p_x[i] * p_y[j] + 1e-12))
+    return I
+  </Code>
+
+  <Body>When I_temporal significantly exceeds I_rate, it indicates that spike timing carries information beyond what's available in the rate code. This has been observed in auditory cortex, where temporal patterns encode sound features that rate alone cannot capture.</Body>
+
+  <MultiSelect id="q5">
+    <Prompt>Which of the following are valid advantages of using mutual information to compare neural coding schemes?</Prompt>
+    <Options>
+      <Option correct="true">It captures non-linear relationships that correlation misses</Option>
+      <Option correct="true">It provides a common scale (bits) for comparing different codes</Option>
+      <Option>It requires no assumptions about the neural response distribution</Option>
+      <Option correct="true">It quantifies the fundamental limit on stimulus discrimination</Option>
+    </Options>
+  </MultiSelect>
+
+  <H3>Information-Theoretic Coding Efficiency</H3>
+
+  <Body>We can define coding efficiency as the ratio of transmitted information to the maximum possible:</Body>
+
+  <Code lang="python">
+def coding_efficiency(I_transmitted, H_stimulus, H_response):
+    """
+    Compute coding efficiency metrics.
+
+    Parameters:
+    -----------
+    I_transmitted : float
+        Mutual information I(stimulus; response) in bits
+    H_stimulus : float
+        Stimulus entropy H(stimulus) in bits
+    H_response : float
+        Response entropy H(response) in bits
+
+    Returns:
+    --------
+    efficiency_stim : float
+        Fraction of stimulus information captured (I/H_stim)
+    efficiency_resp : float
+        Fraction of response used for coding (I/H_resp)
+    """
+    efficiency_stim = I_transmitted / H_stimulus
+    efficiency_resp = I_transmitted / H_response
+
+    return efficiency_stim, efficiency_resp
+
+# Example: Retinal ganglion cell
+H_stim = 3.0    # 8 stimulus categories
+H_resp = 2.5    # Response entropy
+I = 1.8         # Measured mutual information
+
+eff_stim, eff_resp = coding_efficiency(I, H_stim, H_resp)
+print(f"Stimulus info captured: {eff_stim:.1%}")  # 60%
+print(f"Response used for coding: {eff_resp:.1%}")  # 72%
+  </Code>
+
+  <Body>High stimulus efficiency (I/H_stimulus close to 1) means the neuron captures most of the available stimulus information. High response efficiency (I/H_response close to 1) means most response variability is signal-driven rather than noise. Real neurons typically achieve 30-80% efficiency depending on the stimulus ensemble and recording conditions.</Body>
+
+  <FlashCard id="fc6">
+    <Front>What does coding efficiency η = I(X;Y)/H(X) = 0.5 tell us about a neural code?</Front>
+    <Back>The neural response captures 50% of the available stimulus information. Half of the stimulus entropy is lost, either due to noise in the neural response or because the neuron is not sensitive to all stimulus dimensions.</Back>
+  </FlashCard>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these steps for properly estimating mutual information from neural recording data:</Prompt>
+    <SortedItems>
+      <Item>Record stimulus-response pairs across many trials</Item>
+      <Item>Choose appropriate binning for stimulus and response spaces</Item>
+      <Item>Construct the joint probability histogram</Item>
+      <Item>Calculate naive mutual information estimate</Item>
+      <Item>Apply bias correction (e.g., Panzeri-Treves)</Item>
+      <Item>Validate estimate stability across bin sizes</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Advanced Topics: Information Bottleneck</H2>
+
+  <Body>The information bottleneck principle provides a framework for understanding how neural systems compress stimulus information while preserving what's relevant for behavior. Given input X (stimulus), representation Y (neural response), and target Z (behavioral goal), the bottleneck finds representations that minimize I(X;Y) while maximizing I(Y;Z):</Body>
+
+  <Code lang="python">
+# Information Bottleneck Objective
+#
+# Minimize: L = I(X;Y) - β * I(Y;Z)
+#
+# where:
+#   X = stimulus (high-dimensional sensory input)
+#   Y = neural representation (compressed code)
+#   Z = task-relevant variable (category, action)
+#   β = Lagrange multiplier (compression-relevance tradeoff)
+
+# At different β values:
+# β → 0: Maximum compression, Y independent of X
+# β → ∞: Maximum relevance, Y preserves all info about Z
+
+# The information plane plots I(X;Y) vs I(Y;Z) for neural layers
+# Efficient representations lie on the Pareto frontier
+  </Code>
+
+  <Body>The information bottleneck framework has been applied to understand hierarchical processing in deep neural networks and the brain. Early sensory areas tend to preserve more stimulus information (high I(X;Y)), while higher areas compress toward task-relevant features (high I(Y;Z) relative to I(X;Y)).</Body>
+
+  <FlashCard id="fc7">
+    <Front>What tradeoff does the information bottleneck principle capture in neural coding?</Front>
+    <Back>It captures the tradeoff between compression (minimizing I(X;Y) to reduce metabolic cost and noise) and relevance preservation (maximizing I(Y;Z) to maintain behavioral performance). Efficient neural codes balance these competing objectives.</Back>
+  </FlashCard>
+
+  <H2>Common Pitfalls and Best Practices</H2>
+
+  <Body>Several issues frequently arise when applying mutual information analysis to neural data:</Body>
+
+  <Code lang="python">
+# PITFALL 1: Insufficient data for the chosen binning
+# Rule of thumb: Need at least 10-20 samples per bin on average
+n_bins_safe = int(np.sqrt(n_samples / 5))
+
+# PITFALL 2: Ignoring trial-to-trial correlations
+# If trials are not independent, effective sample size is smaller
+# Solution: Use cross-validation or bootstrap
+
+# PITFALL 3: Confusing MI with channel capacity
+# MI depends on stimulus distribution P(X)
+# Channel capacity = max over P(X) of I(X;Y)
+
+# PITFALL 4: Over-interpreting small MI differences
+# Statistical significance testing is essential
+def bootstrap_mi_confidence(stimuli, responses, n_bootstrap=1000, alpha=0.05):
+    """Compute confidence interval for MI estimate."""
+    n_samples = len(stimuli)
+    mi_estimates = []
+
+    for _ in range(n_bootstrap):
+        idx = np.random.choice(n_samples, n_samples, replace=True)
+        mi_est = estimate_mi_histogram(stimuli[idx], responses[idx])
+        mi_estimates.append(mi_est)
+
+    ci_low = np.percentile(mi_estimates, 100 * alpha / 2)
+    ci_high = np.percentile(mi_estimates, 100 * (1 - alpha / 2))
+
+    return ci_low, ci_high
+  </Code>
+
+  <SingleSelect id="q7">
+    <Prompt>A researcher finds I(stimulus; V1_response) = 0.8 bits and I(stimulus; MT_response) = 0.6 bits using the same stimuli. They conclude that V1 transmits more stimulus information than MT. What critical issue might invalidate this conclusion?</Prompt>
+    <Options>
+      <Option>Mutual information cannot be compared across brain areas</Option>
+      <Option correct="true">Different response dimensionalities and sample sizes may lead to different bias levels</Option>
+      <Option>MT always has lower mutual information than V1</Option>
+      <Option>The stimuli should be different for each area</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Summary</H2>
+
+  <Body>Mutual information provides a principled, model-free measure of neural coding quality that captures all statistical dependencies between stimuli and responses. Key takeaways:</Body>
+
+  <Body>• I(X;Y) = H(Y) - H(Y|X) quantifies how much stimulus knowledge reduces response uncertainty</Body>
+  <Body>• Mutual information is bounded: 0 ≤ I(X;Y) ≤ min(H(X), H(Y))</Body>
+  <Body>• Finite sample estimation suffers from positive bias requiring correction</Body>
+  <Body>• The Panzeri-Treves method provides data-adaptive bias correction</Body>
+  <Body>• MI enables principled comparison of rate vs. temporal coding schemes</Body>
+  <Body>• The information bottleneck framework connects coding to behavioral relevance</Body>
+
+  <Subjective id="q8">
+    <Prompt>A collaborator argues that correlation coefficient is sufficient for characterizing neural coding and that mutual information is unnecessarily complex. Write a response explaining when and why mutual information provides insights that correlation cannot, using a specific neural coding example.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains that correlation only captures linear relationships while MI captures all statistical dependencies</Requirement>
+        <Indicators>linear, nonlinear, statistical dependency, any relationship, captures all</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Provides a concrete neural coding example where correlation would miss important structure</Requirement>
+        <Indicators>example, spike, neuron, tuning curve, temporal pattern, binary, threshold</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions that MI provides a natural unit (bits) for quantifying information transmission</Requirement>
+        <Indicators>bits, unit, quantify, scale, measure, transmission capacity</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Acknowledges practical tradeoffs (correlation is simpler, less prone to bias)</Requirement>
+        <Indicators>simpler, bias, estimation, practical, tradeoff, data requirements</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="75" maxWords="250" />
+  </Subjective>
+
+  <Subjective id="q9">
+    <Prompt>You are analyzing recordings from auditory cortex neurons responding to birdsong syllables. Design a mutual information analysis to compare rate coding versus temporal coding. Describe your approach including: (1) how you would define rate and temporal response variables, (2) your strategy for binning and bias correction, and (3) how you would interpret the results.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Clearly defines rate code variable (e.g., spike count) and temporal code variable (e.g., spike times in bins, ISIs)</Requirement>
+        <Indicators>spike count, rate, temporal, spike times, bins, ISI, pattern</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes appropriate binning strategy considering bias-variance tradeoff</Requirement>
+        <Indicators>bins, binning, resolution, tradeoff, samples per bin, adaptive</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Specifies bias correction method and why it's necessary</Requirement>
+        <Indicators>bias, correction, Panzeri, finite sample, overestimation</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains how to interpret I_temporal vs I_rate comparison</Requirement>
+        <Indicators>compare, temporal &gt; rate, additional information, timing matters</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Considers practical issues like sample size requirements or statistical validation</Requirement>
+        <Indicators>sample size, bootstrap, confidence interval, significance, validation</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="350" />
+  </Subjective>
+
+</Lesson>

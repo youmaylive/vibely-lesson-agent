@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-05-02</Id>
+    <Title>Kuramoto Model: Collective Synchronization</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>kuramoto-model</Tag>
+      <Tag>synchronization</Tag>
+      <Tag>coupled-oscillators</Tag>
+      <Tag>phase-transition</Tag>
+      <Tag>mean-field-theory</Tag>
+      <Tag>brain-rhythms</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Kuramoto Model: Collective Synchronization</H1>
+
+  <Body>The Kuramoto model stands as one of the most elegant and influential frameworks in the study of collective synchronization. First introduced by Yoshiki Kuramoto in 1975, this model captures the essential physics of how coupled oscillators can spontaneously synchronize their rhythms—a phenomenon observed across scales from firefly flashing to neuronal ensembles generating brain rhythms. In this lesson, we derive the Kuramoto model, analyze its phase transition using mean-field theory, and connect these mathematical insights to neuronal network synchronization.</Body>
+
+  <Body>The central question the Kuramoto model addresses is: Given a population of oscillators with different natural frequencies, under what conditions will they synchronize? The answer reveals a beautiful competition between coupling strength (which promotes coherence) and frequency heterogeneity (which opposes it), resolved through a phase transition at a critical coupling strength.</Body>
+
+  <H2>Connection to Phase Reduction</H2>
+
+  <Body>In the previous lesson on phase reduction (lesson_05_01), we learned how to reduce a single limit cycle oscillator to a phase variable θ evolving on a circle. The Kuramoto model extends this framework to populations of coupled oscillators, where each oscillator i has its own phase θ_i and natural frequency ω_i. The coupling between oscillators is assumed to be weak enough that the phase reduction remains valid, leading to interactions that depend only on phase differences.</Body>
+
+  <FlashCard id="fc-phase-reduction-connection">
+    <Front>How does the Kuramoto model relate to phase reduction theory?</Front>
+    <Back>Phase reduction converts each limit cycle oscillator to a single phase variable. The Kuramoto model couples many such phase-reduced oscillators through sinusoidal interactions that depend only on phase differences, valid when coupling is weak.</Back>
+  </FlashCard>
+
+  <H2>The Kuramoto Model Equations</H2>
+
+  <Body>Consider N coupled oscillators, each characterized by a phase θ_i ∈ [0, 2π) and a natural frequency ω_i. The Kuramoto model describes their evolution as:</Body>
+
+  <Code lang="plaintext">
+dθ_i/dt = ω_i + (K/N) Σ_{j=1}^{N} sin(θ_j - θ_i)    for i = 1, 2, ..., N
+  </Code>
+
+  <Body>Here, K ≥ 0 is the coupling strength, and the sum runs over all oscillators. The sinusoidal coupling sin(θ_j - θ_i) has an intuitive interpretation: oscillator i is pulled toward oscillator j when θ_j &gt; θ_i (the sine is positive) and pushed away when θ_j &lt; θ_i (the sine is negative). The factor 1/N ensures that the coupling term remains well-defined as N → ∞.</Body>
+
+  <Body>The natural frequencies ω_i are drawn from a distribution g(ω), which characterizes the heterogeneity of the population. Common choices include:</Body>
+
+  <Body>• Lorentzian (Cauchy) distribution: g(ω) = (γ/π) / [(ω - ω₀)² + γ²], centered at ω₀ with half-width γ</Body>
+  <Body>• Gaussian distribution: g(ω) = (1/√(2πσ²)) exp[-(ω - ω₀)²/(2σ²)], centered at ω₀ with standard deviation σ</Body>
+
+  <Body>The Lorentzian distribution is particularly important because it permits exact analytical solutions.</Body>
+
+  <FlashCard id="fc-kuramoto-equation">
+    <Front>Write the Kuramoto model equation and explain each term.</Front>
+    <Back>dθ_i/dt = ω_i + (K/N) Σ_j sin(θ_j - θ_i). Here ω_i is the natural frequency of oscillator i, K is the coupling strength, N is the number of oscillators, and the sinusoidal term couples oscillator i to all others, pulling phases toward alignment.</Back>
+  </FlashCard>
+
+  <H2>The Order Parameter</H2>
+
+  <Body>To quantify the degree of synchronization in the population, Kuramoto introduced the complex order parameter:</Body>
+
+  <Code lang="plaintext">
+r(t) exp(iψ(t)) = (1/N) Σ_{j=1}^{N} exp(iθ_j(t))
+  </Code>
+
+  <Body>This can be visualized by placing each oscillator's phase as a point on the unit circle. The order parameter is the centroid of these points:</Body>
+
+  <Body>• r ∈ [0, 1] measures the coherence: r = 1 means all oscillators are perfectly synchronized (all θ_j equal), while r = 0 means the phases are uniformly spread around the circle (incoherent state)</Body>
+  <Body>• ψ is the mean phase of the population</Body>
+
+  <Body>For intermediate values 0 &lt; r &lt; 1, the system exhibits partial synchronization, where some oscillators are locked to the mean field while others drift incoherently.</Body>
+
+  <FlashCard id="fc-order-parameter">
+    <Front>What does the order parameter r measure in the Kuramoto model?</Front>
+    <Back>The order parameter r ∈ [0, 1] measures the degree of phase coherence in the oscillator population. r = 0 indicates complete incoherence (phases uniformly distributed), r = 1 indicates perfect synchronization (all phases identical), and intermediate values indicate partial synchronization.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q-order-parameter-interpretation">
+    <Prompt>In a Kuramoto model simulation, you observe that the order parameter r fluctuates around 0.6. What does this indicate about the oscillator population?</Prompt>
+    <Options>
+      <Option correct="true">Partial synchronization: some oscillators are phase-locked while others drift</Option>
+      <Option>Complete incoherence: all oscillators have random, independent phases</Option>
+      <Option>Perfect synchronization: all oscillators have nearly identical phases</Option>
+      <Option>The system is at the critical coupling strength</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Mean-Field Reduction</H2>
+
+  <Body>A beautiful simplification emerges when we rewrite the Kuramoto equations using the order parameter. Multiplying the order parameter definition by exp(-iθ_i) and taking the imaginary part:</Body>
+
+  <Code lang="plaintext">
+r sin(ψ - θ_i) = (1/N) Σ_j sin(θ_j - θ_i)
+  </Code>
+
+  <Body>Substituting this into the Kuramoto equation yields the mean-field form:</Body>
+
+  <Code lang="plaintext">
+dθ_i/dt = ω_i + Kr sin(ψ - θ_i)
+  </Code>
+
+  <Body>This is a remarkable result: each oscillator couples only to the mean field (r, ψ) rather than to every other oscillator individually. The problem has been reduced from N(N-1)/2 pairwise interactions to N independent equations driven by a collective field. The oscillator experiences an effective force Kr that pulls its phase toward the mean phase ψ.</Body>
+
+  <Body>This mean-field reduction is exact for the Kuramoto model and becomes increasingly accurate as N → ∞. It reveals the self-consistent nature of synchronization: the order parameter emerges from the oscillator phases, which in turn are driven by the order parameter.</Body>
+
+  <FlashCard id="fc-mean-field">
+    <Front>What is the mean-field form of the Kuramoto model and why is it significant?</Front>
+    <Back>The mean-field form is dθ_i/dt = ω_i + Kr sin(ψ - θ_i). It shows that each oscillator interacts only with the collective order parameter (r, ψ) rather than with every other oscillator individually. This reduces the complexity from O(N²) interactions to N independent equations and reveals the self-consistent nature of synchronization.</Back>
+  </FlashCard>
+
+  <H2>Self-Consistency and Critical Coupling</H2>
+
+  <Body>In the thermodynamic limit (N → ∞), we can derive a self-consistency equation for the order parameter. Consider a stationary state where r and ψ are constant. Working in a rotating frame where ψ = 0, oscillators divide into two populations:</Body>
+
+  <Body>1. Locked oscillators: Those with |ω_i| ≤ Kr are attracted to stable fixed points with sin(θ*) = ω_i/(Kr)</Body>
+  <Body>2. Drifting oscillators: Those with |ω_i| &gt; Kr continue to rotate, contributing zero on average to the order parameter</Body>
+
+  <Body>The self-consistency equation requires that the order parameter computed from the locked oscillators equals the r used to determine which oscillators lock:</Body>
+
+  <Code lang="plaintext">
+r = ∫_{-Kr}^{Kr} g(ω) cos(θ*(ω)) dω = ∫_{-Kr}^{Kr} g(ω) √(1 - ω²/(K²r²)) dω
+  </Code>
+
+  <Body>For a Lorentzian distribution g(ω) = (γ/π) / (ω² + γ²) centered at ω₀ = 0, this integral can be evaluated analytically. The key result is that a non-trivial solution r &gt; 0 exists only when the coupling exceeds a critical value:</Body>
+
+  <Code lang="plaintext">
+K_c = 2γ = 2/(πg(0))
+  </Code>
+
+  <Body>This is the critical coupling for the onset of synchronization. For K &lt; K_c, only the incoherent state r = 0 is stable. For K &gt; K_c, a synchronized state with r &gt; 0 emerges through a continuous (second-order) phase transition.</Body>
+
+  <Body>Near the transition, the order parameter grows as:</Body>
+
+  <Code lang="plaintext">
+r ≈ √(8(K - K_c)/(πK_c³ g''(0)))    for K slightly above K_c
+  </Code>
+
+  <Body>For the Lorentzian distribution, this simplifies to r ≈ √(1 - K_c/K), showing the characteristic square-root scaling of a supercritical pitchfork bifurcation.</Body>
+
+  <SingleSelect id="q-critical-coupling">
+    <Prompt>For a population of Kuramoto oscillators with natural frequencies drawn from a Lorentzian distribution g(ω) = (γ/π)/(ω² + γ²), what is the critical coupling strength K_c for the onset of synchronization?</Prompt>
+    <Options>
+      <Option correct="true">K_c = 2γ</Option>
+      <Option>K_c = γ</Option>
+      <Option>K_c = γ/2</Option>
+      <Option>K_c = πγ</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q-phase-transition-properties">
+    <Prompt>Which of the following are true about the synchronization phase transition in the Kuramoto model?</Prompt>
+    <Options>
+      <Option correct="true">It is a continuous (second-order) phase transition</Option>
+      <Option correct="true">The order parameter r grows as √(K - K_c) just above K_c</Option>
+      <Option>Synchronization occurs for any K &gt; 0</Option>
+      <Option correct="true">The critical coupling K_c depends on the frequency distribution g(ω)</Option>
+      <Option>The transition is always discontinuous (first-order)</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Phase Transition Diagram</H2>
+
+  <Body>The behavior of the Kuramoto model can be summarized in a bifurcation diagram showing r versus K:</Body>
+
+  <Code lang="plaintext">
+     r
+     |
+   1 |                    ________________
+     |                  /
+     |                 /
+     |                /
+     |              /
+   0 |_____________/________________________ K
+     0            K_c
+
+  Incoherent (r=0)  |  Synchronized (r>0)
+  </Code>
+
+  <Body>The diagram shows:</Body>
+  <Body>• For K &lt; K_c: Only the incoherent state r = 0 is stable</Body>
+  <Body>• At K = K_c: A continuous bifurcation occurs</Body>
+  <Body>• For K &gt; K_c: A stable synchronized branch emerges with r increasing toward 1</Body>
+
+  <Body>This phase transition is analogous to the ferromagnetic transition in the Ising model, with r playing the role of magnetization and K playing the role of inverse temperature.</Body>
+
+  <SortQuiz id="q-coupling-strength-order">
+    <Prompt>Arrange the following coupling strength values from the state with lowest coherence (r closest to 0) to highest coherence (r closest to 1), assuming K_c = 2:</Prompt>
+    <SortedItems>
+      <Item>K = 0.5 (weak coupling)</Item>
+      <Item>K = 1.5 (below critical)</Item>
+      <Item>K = 2.0 (at critical threshold)</Item>
+      <Item>K = 3.0 (above critical)</Item>
+      <Item>K = 10.0 (strong coupling)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Effect of Frequency Distribution</H2>
+
+  <Body>The shape of the frequency distribution g(ω) significantly affects the synchronization behavior:</Body>
+
+  <Body>• Width: Broader distributions (larger γ or σ) require stronger coupling to synchronize. This is intuitive—more heterogeneous populations are harder to synchronize.</Body>
+
+  <Body>• Shape: The Lorentzian distribution has heavy tails, meaning some oscillators have frequencies very far from the mean. The Gaussian distribution has lighter tails. Interestingly, for the Gaussian case, K_c = √(8/π)σ ≈ 1.60σ.</Body>
+
+  <Body>• Peak height: The critical coupling is inversely proportional to g(0), the height of the distribution at its center. A sharper peak means more oscillators near the mean frequency, making synchronization easier.</Body>
+
+  <MatchPairs id="q-distribution-effects">
+    <Prompt>Match each frequency distribution characteristic with its effect on synchronization:</Prompt>
+    <Pairs>
+      <Pair><Left>Broader distribution width</Left><Right>Higher critical coupling K_c</Right></Pair>
+      <Pair><Left>Sharper peak at center</Left><Right>Lower critical coupling K_c</Right></Pair>
+      <Pair><Left>Heavy tails (Lorentzian)</Left><Right>More drifting oscillators at any K</Right></Pair>
+      <Pair><Left>All identical frequencies</Left><Right>Synchronization for any K &gt; 0</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Phase transition becomes discontinuous</Distractor>
+      <Distractor>Order parameter saturates at r = 0.5</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Numerical Implementation</H2>
+
+  <Body>Let's implement the Kuramoto model in Python to observe the synchronization transition:</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def kuramoto_rhs(theta, omega, K):
+    """Right-hand side of Kuramoto model equations."""
+    N = len(theta)
+    # Compute coupling term using broadcasting
+    coupling = np.sin(theta[np.newaxis, :] - theta[:, np.newaxis]).mean(axis=1)
+    return omega + K * coupling
+
+def compute_order_parameter(theta):
+    """Compute complex order parameter r*exp(i*psi)."""
+    z = np.exp(1j * theta).mean()
+    return np.abs(z), np.angle(z)
+
+def simulate_kuramoto(N, K, gamma, T, dt, omega0=0):
+    """
+    Simulate Kuramoto model with Lorentzian frequency distribution.
+
+    Parameters:
+    -----------
+    N : int - Number of oscillators
+    K : float - Coupling strength
+    gamma : float - Half-width of Lorentzian distribution
+    T : float - Total simulation time
+    dt : float - Time step
+    omega0 : float - Center of frequency distribution
+
+    Returns:
+    --------
+    t_array, r_array, theta_final
+    """
+    # Draw natural frequencies from Lorentzian distribution
+    omega = omega0 + gamma * np.tan(np.pi * (np.random.rand(N) - 0.5))
+
+    # Initialize phases uniformly on [0, 2*pi)
+    theta = 2 * np.pi * np.random.rand(N)
+
+    # Time integration using Euler method
+    n_steps = int(T / dt)
+    t_array = np.linspace(0, T, n_steps)
+    r_array = np.zeros(n_steps)
+
+    for i in range(n_steps):
+        r_array[i], _ = compute_order_parameter(theta)
+        theta = theta + dt * kuramoto_rhs(theta, omega, K)
+        theta = np.mod(theta, 2 * np.pi)  # Keep phases in [0, 2*pi)
+
+    return t_array, r_array, theta
+
+# Example: Compare subcritical and supercritical coupling
+N = 500
+gamma = 1.0  # Half-width of Lorentzian
+K_c = 2 * gamma  # Critical coupling
+
+# Subcritical: K = 1.0 &lt; K_c
+t1, r1, _ = simulate_kuramoto(N, K=1.0, gamma=gamma, T=50, dt=0.01)
+
+# Supercritical: K = 4.0 &gt; K_c
+t2, r2, _ = simulate_kuramoto(N, K=4.0, gamma=gamma, T=50, dt=0.01)
+  </Code>
+
+  <Body>The simulation reveals the key phenomenology: for K &lt; K_c, the order parameter fluctuates around a small value (finite-size effects prevent exactly r = 0), while for K &gt; K_c, the order parameter grows and saturates at a value close to the theoretical prediction.</Body>
+
+  <FillBlanks id="q-implementation">
+    <Prompt>
+      In the Kuramoto model simulation, natural frequencies are drawn from a <Blank>Lorentzian</Blank> distribution. The order parameter is computed as the <Blank>magnitude</Blank> of the mean of exp(iθ_j). The critical coupling strength for this distribution is K_c = <Blank>2γ</Blank>, where γ is the half-width parameter.
+    </Prompt>
+    <Distractors>
+      <Distractor>Gaussian</Distractor>
+      <Distractor>phase</Distractor>
+      <Distractor>γ/2</Distractor>
+      <Distractor>uniform</Distractor>
+      <Distractor>variance</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Biological Applications: Brain Rhythms</H2>
+
+  <Body>The Kuramoto model provides a powerful framework for understanding neural synchronization phenomena:</Body>
+
+  <H3>Alpha Rhythm (8-13 Hz)</H3>
+  <Body>The posterior alpha rhythm, prominent during relaxed wakefulness with eyes closed, emerges from synchronized activity in thalamocortical circuits. The Kuramoto model explains how this coherent oscillation can emerge from populations of neurons with heterogeneous intrinsic frequencies. The "alpha blocking" phenomenon—where alpha power decreases upon eye opening—can be modeled as a decrease in effective coupling strength K below the critical value.</Body>
+
+  <H3>Epileptic Seizures</H3>
+  <Body>Epileptic seizures are characterized by pathologically strong synchronization across large neuronal populations. In the Kuramoto framework, seizure onset can be viewed as a transition from a partially synchronized or incoherent state to a highly synchronized state (r → 1). This can occur through:</Body>
+  <Body>• Increased coupling K (e.g., due to enhanced excitatory connections or reduced inhibition)</Body>
+  <Body>• Decreased frequency heterogeneity (narrower g(ω))</Body>
+  <Body>• Both mechanisms acting together</Body>
+
+  <Body>This perspective suggests therapeutic strategies: anticonvulsant drugs that reduce coupling or increase heterogeneity would raise K_c, making the synchronized seizure state harder to reach.</Body>
+
+  <H3>Gamma Oscillations and Cognition</H3>
+  <Body>Gamma rhythms (30-100 Hz) are associated with cognitive processing, attention, and working memory. Fast-spiking inhibitory interneurons play a key role in generating gamma through mutual inhibition, which can be modeled using Kuramoto-like frameworks with modifications for inhibitory coupling. The emergence and dissolution of gamma synchronization during cognitive tasks reflects dynamic changes in effective coupling strength.</Body>
+
+  <FlashCard id="fc-seizure-kuramoto">
+    <Front>How can the Kuramoto model explain epileptic seizures?</Front>
+    <Back>Seizures represent pathological hypersynchronization (r → 1). In Kuramoto terms, this occurs when effective coupling K increases (enhanced excitation, reduced inhibition) or frequency heterogeneity decreases, both lowering the threshold for synchronized states. Anticonvulsants work by raising K_c to prevent this transition.</Back>
+  </FlashCard>
+
+  <SingleSelect id="q-alpha-blocking">
+    <Prompt>Alpha blocking (decrease in alpha rhythm power when eyes are opened) can be explained in the Kuramoto framework as:</Prompt>
+    <Options>
+      <Option correct="true">A decrease in effective coupling strength K below the critical value K_c</Option>
+      <Option>An increase in coupling strength K above K_c</Option>
+      <Option>A change in the mean natural frequency ω₀</Option>
+      <Option>An increase in the number of oscillators N</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Extensions and Limitations</H2>
+
+  <Body>The basic Kuramoto model has inspired numerous extensions that address its limitations:</Body>
+
+  <Body>• Delay coupling: Real neural connections have propagation delays, modifying the coupling to sin(θ_j(t-τ) - θ_i(t)). This can lead to multistability and complex dynamics.</Body>
+
+  <Body>• Network topology: The all-to-all coupling assumption rarely holds in real neural circuits. Network Kuramoto models on graphs with specific topologies (small-world, scale-free) reveal how structure affects synchronization.</Body>
+
+  <Body>• Higher harmonics: The sinusoidal coupling is a first-order approximation. Including higher harmonics sin(n(θ_j - θ_i)) captures more complex phase interactions.</Body>
+
+  <Body>• Noise: Adding Gaussian white noise ξ_i(t) to the equations models thermal fluctuations or synaptic noise, leading to stochastic Kuramoto models.</Body>
+
+  <Body>• Adaptive coupling: The coupling strength K can evolve based on the system's state, modeling plasticity-like mechanisms.</Body>
+
+  <MultiSelect id="q-extensions">
+    <Prompt>Which of the following are valid extensions of the basic Kuramoto model to make it more biologically realistic?</Prompt>
+    <Options>
+      <Option correct="true">Adding time delays in the coupling terms</Option>
+      <Option correct="true">Implementing coupling on specific network topologies instead of all-to-all</Option>
+      <Option correct="true">Including stochastic noise terms</Option>
+      <Option correct="true">Allowing coupling strength to vary adaptively</Option>
+      <Option>Removing the sinusoidal coupling function entirely</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Summary</H2>
+
+  <Body>The Kuramoto model elegantly captures the essence of collective synchronization in coupled oscillator systems. Key takeaways include:</Body>
+
+  <Body>1. The model describes N phase oscillators coupled through sinusoidal interactions, with natural frequencies drawn from a distribution g(ω).</Body>
+
+  <Body>2. The order parameter r ∈ [0, 1] quantifies coherence, transitioning from r = 0 (incoherent) to r &gt; 0 (synchronized) as coupling K increases past the critical value K_c.</Body>
+
+  <Body>3. Mean-field theory provides exact results in the thermodynamic limit, including K_c = 2/(πg(0)) for unimodal symmetric distributions.</Body>
+
+  <Body>4. The synchronization transition is a continuous phase transition analogous to the ferromagnetic transition, with r growing as √(K - K_c) near K_c.</Body>
+
+  <Body>5. The model provides insights into brain rhythms, including normal oscillations (alpha, gamma) and pathological states (epileptic seizures).</Body>
+
+  <FlashCard id="fc-summary">
+    <Front>What are the key ingredients of the Kuramoto model?</Front>
+    <Back>1) N phase oscillators θ_i with natural frequencies ω_i drawn from distribution g(ω), 2) sinusoidal all-to-all coupling with strength K, 3) the order parameter r measuring coherence, and 4) a phase transition at critical coupling K_c = 2/(πg(0)) from incoherent (r=0) to synchronized (r&gt;0) states.</Back>
+  </FlashCard>
+
+  <Subjective id="q-subjective-kuramoto-neuro">
+    <Prompt>Explain how the Kuramoto model can be used to understand the transition from normal brain activity to an epileptic seizure. In your answer, discuss: (1) What parameters of the model change during seizure onset, (2) How the order parameter relates to neural synchronization during seizures, and (3) What this framework suggests about potential therapeutic interventions.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly identifies that seizure onset corresponds to increased coupling K or decreased frequency heterogeneity (narrower distribution), causing the system to cross the critical threshold K_c into the synchronized state.</Requirement>
+        <Indicators>coupling strength, K increases, heterogeneity decreases, critical coupling, K_c, threshold, transition</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that the order parameter r approaches 1 during seizures, indicating pathological hypersynchronization of neuronal populations, contrasted with normal states where r is lower (partial synchronization or incoherence).</Requirement>
+        <Indicators>order parameter, r, hypersynchronization, r approaches 1, partial synchronization, incoherent, coherent</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Discusses therapeutic implications: anticonvulsants work by reducing effective coupling (blocking excitation, enhancing inhibition) or by increasing heterogeneity, both of which raise K_c and make synchronized seizure states harder to achieve.</Requirement>
+        <Indicators>therapeutic, anticonvulsant, reduce coupling, inhibition, excitation, raise K_c, heterogeneity, treatment</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Demonstrates understanding of the physical mechanisms (enhanced excitatory connections, reduced inhibition, ion channel dysfunction) that could increase K or decrease heterogeneity in biological terms.</Requirement>
+        <Indicators>excitatory, inhibitory, GABA, glutamate, synaptic, ion channel, biological mechanism</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="400" />
+  </Subjective>
+
+  <H2>Key Equations Summary</H2>
+
+  <Body>For reference, here are the fundamental equations of the Kuramoto model:</Body>
+
+  <Code lang="plaintext">
+Kuramoto Model:       dθ_i/dt = ω_i + (K/N) Σ_j sin(θ_j - θ_i)
+
+Order Parameter:      r exp(iψ) = (1/N) Σ_j exp(iθ_j)
+
+Mean-Field Form:      dθ_i/dt = ω_i + Kr sin(ψ - θ_i)
+
+Critical Coupling:    K_c = 2/(πg(0))    [for symmetric unimodal g(ω)]
+
+Lorentzian K_c:       K_c = 2γ           [where g(ω) = (γ/π)/(ω² + γ²)]
+
+Order Parameter
+Near Transition:      r ≈ √(1 - K_c/K)   [for K slightly above K_c, Lorentzian]
+  </Code>
+
+  <FillBlanks id="q-equations-summary">
+    <Prompt>
+      The Kuramoto model describes phase oscillators with <Blank>sinusoidal</Blank> coupling. The order parameter r = 1 indicates <Blank>perfect synchronization</Blank>, while r = 0 indicates <Blank>incoherence</Blank>. The phase transition at K_c is <Blank>continuous</Blank> (also called second-order).
+    </Prompt>
+    <Distractors>
+      <Distractor>linear</Distractor>
+      <Distractor>partial locking</Distractor>
+      <Distractor>chaos</Distractor>
+      <Distractor>discontinuous</Distractor>
+      <Distractor>exponential</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+</Lesson>

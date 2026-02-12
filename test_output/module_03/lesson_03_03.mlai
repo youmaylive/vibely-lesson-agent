@@ -1,0 +1,723 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-03-03</Id>
+    <Title>Jump-Diffusion Processes: Unified Stochastic Framework</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>stochastic-processes</Tag>
+      <Tag>jump-diffusion</Tag>
+      <Tag>fokker-planck</Tag>
+      <Tag>neural-modeling</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>first-passage-time</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Jump-Diffusion Processes: Unified Stochastic Framework</H1>
+
+  <Body>Real neurons inhabit a stochastic world where two fundamentally different noise sources coexist: the continuous fluctuations from ion channel gating (diffusion) and the discrete synaptic events arriving as point processes (jumps). Neither pure diffusion models nor pure jump processes alone capture this dual nature. Jump-diffusion processes provide the unified mathematical framework that integrates both stochastic components, yielding more accurate predictions of neuronal firing statistics and variability.</Body>
+
+  <Body>In this lesson, we build upon the Ornstein-Uhlenbeck diffusion processes from Lesson 3.1 and the Poisson-driven shot noise from Lesson 3.2, combining them into a coherent jump-diffusion framework. This synthesis is not merely mathematical elegance—it reflects the biophysical reality that cortical neurons receive both high-frequency synaptic bombardment (well-approximated by jumps) and continuous membrane noise (well-approximated by diffusion).</Body>
+
+  <H2>The Jump-Diffusion SDE</H2>
+
+  <Body>The general jump-diffusion stochastic differential equation for membrane potential V takes the form:</Body>
+
+  <Code lang="plaintext">
+dV = f(V)dt + σdW + a·ε·dN
+  </Code>
+
+  <Body>Here, f(V) represents the deterministic drift (often the leak current in an integrate-and-fire model), σdW is the Wiener process contribution with diffusion coefficient σ, and a·ε·dN captures discrete jumps of amplitude a·ε driven by a Poisson process N with rate λ. The parameter ε represents the individual synaptic weight, and a allows for scaling or sign (excitatory vs. inhibitory).</Body>
+
+  <Body>For the leaky integrate-and-fire (LIF) model with jump-diffusion noise:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def jump_diffusion_lif(V0, tau_m, V_rest, V_thresh, V_reset,
+                        sigma, lam, a_eps, dt, T):
+    """
+    Simulate LIF neuron with jump-diffusion noise.
+
+    Parameters:
+    -----------
+    V0 : float - initial membrane potential
+    tau_m : float - membrane time constant
+    V_rest : float - resting potential
+    V_thresh : float - spike threshold
+    V_reset : float - reset potential after spike
+    sigma : float - diffusion coefficient
+    lam : float - Poisson jump rate (Hz)
+    a_eps : float - jump amplitude
+    dt : float - time step
+    T : float - total simulation time
+
+    Returns:
+    --------
+    t : array - time points
+    V : array - membrane potential trace
+    spike_times : list - times of threshold crossings
+    """
+    n_steps = int(T / dt)
+    t = np.linspace(0, T, n_steps)
+    V = np.zeros(n_steps)
+    V[0] = V0
+    spike_times = []
+
+    # Precompute diffusion noise
+    dW = np.sqrt(dt) * np.random.randn(n_steps - 1)
+
+    # Precompute Poisson jumps
+    # Expected number of jumps per step
+    p_jump = lam * dt  # probability of jump in dt (for small dt)
+    jumps = np.random.binomial(1, p_jump, n_steps - 1)
+
+    for i in range(n_steps - 1):
+        # Drift: leak toward rest
+        drift = -(V[i] - V_rest) / tau_m
+
+        # Euler-Maruyama step with jump
+        V[i+1] = V[i] + drift * dt + sigma * dW[i] + a_eps * jumps[i]
+
+        # Threshold crossing (spike)
+        if V[i+1] >= V_thresh:
+            spike_times.append(t[i+1])
+            V[i+1] = V_reset
+
+    return t, V, spike_times
+  </Code>
+
+  <Body>The key insight is that the Euler-Maruyama scheme for the diffusion component combines naturally with event-driven handling of the Poisson jumps. For small dt, the probability of a jump in each interval is approximately λdt, and we sample from a Bernoulli distribution accordingly.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is a jump-diffusion process?</Front>
+    <Back>A stochastic process combining continuous diffusion (Wiener process) with discrete jumps (Poisson process), written as dV = f(V)dt + σdW + a·ε·dN. It models systems with both continuous fluctuations and discrete events.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>In the jump-diffusion LIF model, what do the terms σdW and a·ε·dN represent physically?</Front>
+    <Back>σdW represents continuous membrane noise from ion channel fluctuations (diffusion), while a·ε·dN represents discrete synaptic inputs arriving as point events (jumps), where λ is the arrival rate and a·ε is the amplitude.</Back>
+  </FlashCard>
+
+  <H2>Fokker-Planck Equation with Jumps</H2>
+
+  <Body>The probability density P(V, t) of the membrane potential evolves according to a modified Fokker-Planck equation that includes both differential and integral operators:</Body>
+
+  <Code lang="plaintext">
+∂P/∂t = -∂(f(V)P)/∂V + (σ²/2)∂²P/∂V² + λ∫[P(V-a·ε, t) - P(V, t)]dε
+  </Code>
+
+  <Body>The first two terms on the right are the standard Fokker-Planck contributions: the drift term -∂(fP)/∂V and the diffusion term (σ²/2)∂²P/∂V². The integral term captures the jump dynamics: the probability of being at V increases due to jumps from V-a·ε to V, and decreases due to jumps away from V.</Body>
+
+  <Body>For fixed jump amplitude ε₀, the integral simplifies to:</Body>
+
+  <Code lang="plaintext">
+∂P/∂t = -∂(f(V)P)/∂V + (σ²/2)∂²P/∂V² + λ[P(V-a·ε₀, t) - P(V, t)]
+  </Code>
+
+  <Body>This integro-differential equation is considerably more complex than the pure diffusion Fokker-Planck equation. Analytical solutions exist only in special cases, but numerical methods can solve it efficiently.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.sparse import diags
+from scipy.sparse.linalg import spsolve
+
+def fokker_planck_jump_diffusion(V_grid, P0, f_V, sigma, lam, a_eps, dt, n_steps):
+    """
+    Solve Fokker-Planck equation with jumps using finite differences.
+
+    Parameters:
+    -----------
+    V_grid : array - voltage discretization
+    P0 : array - initial probability distribution
+    f_V : array - drift evaluated at grid points
+    sigma : float - diffusion coefficient
+    lam : float - jump rate
+    a_eps : float - jump amplitude
+    dt : float - time step
+    n_steps : int - number of time steps
+
+    Returns:
+    --------
+    P : array - final probability distribution
+    """
+    N = len(V_grid)
+    dV = V_grid[1] - V_grid[0]
+    D = sigma**2 / 2  # diffusion coefficient
+
+    P = P0.copy()
+
+    # Find index shift for jumps
+    jump_idx = int(np.round(a_eps / dV))
+
+    for _ in range(n_steps):
+        # Build tridiagonal matrix for drift-diffusion
+        # Using implicit scheme for stability
+        alpha = D * dt / dV**2
+        beta = f_V * dt / (2 * dV)
+
+        # Main diagonal
+        main = 1 + 2 * alpha + lam * dt
+        # Upper diagonal (i+1)
+        upper = -alpha + beta[:-1]
+        # Lower diagonal (i-1)
+        lower = -alpha - beta[1:]
+
+        A = diags([lower, main, upper], [-1, 0, 1], format='csr')
+
+        # Jump contribution to RHS
+        P_shifted = np.zeros_like(P)
+        if jump_idx > 0:
+            P_shifted[jump_idx:] = P[:-jump_idx]
+        elif jump_idx < 0:
+            P_shifted[:jump_idx] = P[-jump_idx:]
+
+        rhs = P + lam * dt * P_shifted
+
+        # Solve linear system
+        P = spsolve(A, rhs)
+
+        # Ensure non-negativity and normalize
+        P = np.maximum(P, 0)
+        P = P / (np.sum(P) * dV)
+
+    return P
+  </Code>
+
+  <FlashCard id="fc3">
+    <Front>How does the Fokker-Planck equation change when jumps are added to a diffusion process?</Front>
+    <Back>An integral term is added: λ∫[P(V-a·ε) - P(V)]dε. This accounts for probability flux due to discrete jumps—inflow from states that can jump to V, and outflow from V due to jumps away.</Back>
+  </FlashCard>
+
+  <H2>Variance Decomposition: Diffusion vs. Jumps</H2>
+
+  <Body>A crucial insight from jump-diffusion theory is that the total variance of the membrane potential has distinct contributions from diffusion and jump components. For a stationary process with linear drift f(V) = -(V - V_rest)/τ_m:</Body>
+
+  <Code lang="plaintext">
+Total Variance = Var_diffusion + Var_jumps
+               = σ²τ_m/2 + λ(a·ε)²τ_m/2
+  </Code>
+
+  <Body>This decomposition reveals when each noise source dominates:</Body>
+
+  <Body>• Diffusion-dominated regime: σ² &gt;&gt; λ(a·ε)² — high channel noise, sparse synaptic input</Body>
+  <Body>• Jump-dominated regime: λ(a·ε)² &gt;&gt; σ² — low channel noise, strong synaptic bombardment</Body>
+  <Body>• Balanced regime: σ² ≈ λ(a·ε)² — both contributions comparable</Body>
+
+  <Code lang="python">
+def variance_decomposition(sigma, lam, a_eps, tau_m):
+    """
+    Decompose total variance into diffusion and jump components.
+
+    Parameters:
+    -----------
+    sigma : float - diffusion coefficient
+    lam : float - jump rate
+    a_eps : float - jump amplitude
+    tau_m : float - membrane time constant
+
+    Returns:
+    --------
+    var_diff : float - diffusion variance contribution
+    var_jump : float - jump variance contribution
+    var_total : float - total variance
+    ratio : float - jump/diffusion variance ratio
+    """
+    var_diff = (sigma**2 * tau_m) / 2
+    var_jump = (lam * a_eps**2 * tau_m) / 2
+    var_total = var_diff + var_jump
+    ratio = var_jump / var_diff if var_diff > 0 else np.inf
+
+    return var_diff, var_jump, var_total, ratio
+
+def identify_regime(sigma, lam, a_eps, threshold=10):
+    """
+    Identify the dominant noise regime.
+
+    Returns 'diffusion', 'jump', or 'balanced'.
+    """
+    var_diff = sigma**2
+    var_jump = lam * a_eps**2
+
+    ratio = var_jump / var_diff if var_diff > 0 else np.inf
+
+    if ratio > threshold:
+        return 'jump-dominated'
+    elif ratio < 1/threshold:
+        return 'diffusion-dominated'
+    else:
+        return 'balanced'
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>How is the total variance decomposed in a jump-diffusion process with linear drift?</Front>
+    <Back>Total Variance = σ²τ_m/2 (diffusion) + λ(a·ε)²τ_m/2 (jumps). The diffusion variance scales with σ², while jump variance scales with λ(a·ε)², the product of jump rate and squared amplitude.</Back>
+  </FlashCard>
+
+  <H2>First-Passage Time Problems</H2>
+
+  <Body>The first-passage time (FPT) to threshold is the central quantity for computing spike rates in integrate-and-fire models. For jump-diffusion processes, the FPT distribution is more complex than for pure diffusion.</Body>
+
+  <Body>The mean first-passage time T(V) from initial voltage V to threshold V_thresh satisfies an integro-differential equation:</Body>
+
+  <Code lang="plaintext">
+f(V)·dT/dV + (σ²/2)·d²T/dV² + λ[T(V+a·ε) - T(V)] = -1
+  </Code>
+
+  <Body>Boundary conditions: T(V_thresh) = 0 (absorbing boundary at threshold), with reflecting or absorbing conditions at the lower boundary depending on the model.</Body>
+
+  <Body>Numerical computation of the FPT distribution requires Monte Carlo simulation or solving the boundary value problem:</Body>
+
+  <Code lang="python">
+def mean_fpt_monte_carlo(V0, V_thresh, V_reset, tau_m, V_rest,
+                          sigma, lam, a_eps, dt, n_trials):
+    """
+    Estimate mean first-passage time via Monte Carlo.
+
+    Parameters:
+    -----------
+    V0 : float - initial voltage
+    V_thresh : float - threshold
+    V_reset : float - reset (lower reflecting boundary)
+    tau_m : float - membrane time constant
+    V_rest : float - resting potential
+    sigma : float - diffusion coefficient
+    lam : float - jump rate
+    a_eps : float - jump amplitude
+    dt : float - time step
+    n_trials : int - number of Monte Carlo trials
+
+    Returns:
+    --------
+    mean_fpt : float - estimated mean FPT
+    std_fpt : float - standard deviation of FPT
+    fpt_samples : array - individual FPT samples
+    """
+    fpt_samples = []
+    p_jump = lam * dt
+
+    for _ in range(n_trials):
+        V = V0
+        t = 0
+
+        while V < V_thresh:
+            # Drift
+            drift = -(V - V_rest) / tau_m
+
+            # Diffusion
+            dW = np.sqrt(dt) * np.random.randn()
+
+            # Jump (Bernoulli approximation)
+            jump = a_eps if np.random.rand() < p_jump else 0
+
+            # Update
+            V = V + drift * dt + sigma * dW + jump
+            t += dt
+
+            # Reflecting boundary at reset
+            if V < V_reset:
+                V = V_reset
+
+        fpt_samples.append(t)
+
+    fpt_samples = np.array(fpt_samples)
+    return np.mean(fpt_samples), np.std(fpt_samples), fpt_samples
+
+def fpt_cv(fpt_samples):
+    """Compute coefficient of variation of FPT distribution."""
+    return np.std(fpt_samples) / np.mean(fpt_samples)
+  </Code>
+
+  <Body>The coefficient of variation (CV) of the interspike interval distribution, CV = std(ISI)/mean(ISI), is a key experimentally measurable quantity. Jump-diffusion processes can produce CV values spanning from near-zero (regular firing) to greater than one (irregular, bursty firing), depending on parameter regimes.</Body>
+
+  <FlashCard id="fc5">
+    <Front>What is the first-passage time (FPT) problem in neuronal modeling?</Front>
+    <Back>The FPT is the time for the membrane potential to first reach the spike threshold from a given initial condition. It determines the interspike interval distribution and firing rate in integrate-and-fire models.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc6">
+    <Front>What equation does the mean first-passage time satisfy for a jump-diffusion process?</Front>
+    <Back>An integro-differential equation: f(V)·dT/dV + (σ²/2)·d²T/dV² + λ[T(V+a·ε) - T(V)] = -1, with T(V_thresh) = 0. The integral term accounts for how jumps affect the expected time to threshold.</Back>
+  </FlashCard>
+
+  <H2>Hybrid Numerical Schemes</H2>
+
+  <Body>Efficient simulation of jump-diffusion processes requires combining continuous-time integration with event-driven jump handling. The basic Euler-Maruyama scheme can be enhanced with exact treatment of jumps:</Body>
+
+  <Code lang="python">
+def hybrid_jump_diffusion(V0, tau_m, V_rest, V_thresh, V_reset,
+                           sigma, lam, a_eps, T, method='thinning'):
+    """
+    Hybrid simulation using exact jump times with Euler-Maruyama diffusion.
+
+    Parameters:
+    -----------
+    method : str - 'thinning' for exact Poisson times, 'binomial' for discrete approx
+
+    Returns:
+    --------
+    t_out, V_out : arrays - time and voltage traces at recorded points
+    spike_times : list - spike times
+    """
+    if method == 'thinning':
+        return _hybrid_thinning(V0, tau_m, V_rest, V_thresh, V_reset,
+                                 sigma, lam, a_eps, T)
+    else:
+        # Fall back to binomial approximation with adaptive dt
+        return _hybrid_binomial_adaptive(V0, tau_m, V_rest, V_thresh, V_reset,
+                                          sigma, lam, a_eps, T)
+
+def _hybrid_thinning(V0, tau_m, V_rest, V_thresh, V_reset,
+                      sigma, lam, a_eps, T):
+    """
+    Exact simulation using Poisson thinning for jump times.
+    Between jumps, simulate diffusion with Euler-Maruyama.
+    """
+    t = 0
+    V = V0
+    t_out = [0]
+    V_out = [V0]
+    spike_times = []
+
+    # Time step for diffusion (between jumps)
+    dt_diffusion = 0.0001  # Small for accuracy
+
+    while t < T:
+        # Generate next jump time (exponential waiting time)
+        t_next_jump = t + np.random.exponential(1/lam)
+
+        # Simulate diffusion until next jump or end
+        t_end = min(t_next_jump, T)
+
+        while t < t_end:
+            dt = min(dt_diffusion, t_end - t)
+
+            # Euler-Maruyama for diffusion
+            drift = -(V - V_rest) / tau_m
+            dW = np.sqrt(dt) * np.random.randn()
+            V = V + drift * dt + sigma * dW
+            t += dt
+
+            # Check threshold
+            if V >= V_thresh:
+                spike_times.append(t)
+                V = V_reset
+
+            t_out.append(t)
+            V_out.append(V)
+
+        # Apply jump if within simulation time
+        if t_next_jump < T:
+            V = V + a_eps
+
+            # Check threshold after jump
+            if V >= V_thresh:
+                spike_times.append(t)
+                V = V_reset
+
+            t_out.append(t)
+            V_out.append(V)
+
+    return np.array(t_out), np.array(V_out), spike_times
+  </Code>
+
+  <Body>The thinning method generates exact Poisson jump times, while Euler-Maruyama handles the diffusion between jumps. This hybrid approach is both accurate and efficient, avoiding the artifacts that arise from overly coarse time discretization of the jump process.</Body>
+
+  <H2>Parameter Regime Exploration</H2>
+
+  <Body>Understanding how different parameter regimes affect neuronal dynamics is crucial for model fitting and interpretation. Consider a systematic exploration:</Body>
+
+  <Code lang="python">
+def explore_parameter_space(sigma_range, lam_range, a_eps_fixed,
+                             tau_m, V_rest, V_thresh, V_reset, V0,
+                             T_sim, n_trials):
+    """
+    Explore firing rate and CV across parameter space.
+
+    Returns:
+    --------
+    rates : 2D array - firing rates for each (sigma, lam) combination
+    cvs : 2D array - CV of ISI for each combination
+    """
+    n_sigma = len(sigma_range)
+    n_lam = len(lam_range)
+
+    rates = np.zeros((n_sigma, n_lam))
+    cvs = np.zeros((n_sigma, n_lam))
+
+    for i, sigma in enumerate(sigma_range):
+        for j, lam in enumerate(lam_range):
+            # Run multiple trials
+            all_isis = []
+            total_spikes = 0
+
+            for _ in range(n_trials):
+                _, _, spike_times = jump_diffusion_lif(
+                    V0, tau_m, V_rest, V_thresh, V_reset,
+                    sigma, lam, a_eps_fixed, dt=0.0001, T=T_sim
+                )
+
+                total_spikes += len(spike_times)
+                if len(spike_times) > 1:
+                    isis = np.diff(spike_times)
+                    all_isis.extend(isis)
+
+            # Compute statistics
+            rates[i, j] = total_spikes / (n_trials * T_sim)
+
+            if len(all_isis) > 10:
+                all_isis = np.array(all_isis)
+                cvs[i, j] = np.std(all_isis) / np.mean(all_isis)
+            else:
+                cvs[i, j] = np.nan
+
+    return rates, cvs
+  </Code>
+
+  <Body>Key observations from parameter exploration:</Body>
+  <Body>1. Firing rate increases with both σ (diffusion) and λ (jump rate), but with different functional forms</Body>
+  <Body>2. CV tends to decrease with increasing diffusion (more regular firing) but can increase with jump rate depending on amplitude</Body>
+  <Body>3. The transition between regimes can be sharp, suggesting potential bifurcation-like behavior</Body>
+
+  <H2>Comparison with Experimental Data</H2>
+
+  <Body>Validating jump-diffusion models against experimental intracellular recordings requires careful attention to:</Body>
+
+  <Body>1. Voltage distribution: Does the stationary distribution match the histogram of subthreshold voltages?</Body>
+  <Body>2. ISI statistics: Do the mean and CV of interspike intervals match?</Body>
+  <Body>3. Power spectrum: Does the temporal structure of voltage fluctuations match?</Body>
+
+  <Code lang="python">
+def compare_with_data(experimental_voltage, experimental_isi,
+                       model_params, dt_exp, T_sim):
+    """
+    Compare model predictions with experimental recordings.
+
+    Parameters:
+    -----------
+    experimental_voltage : array - recorded voltage trace
+    experimental_isi : array - interspike intervals from data
+    model_params : dict - model parameters to test
+
+    Returns:
+    --------
+    metrics : dict - comparison metrics (KS statistic, ISI comparison, etc.)
+    """
+    # Simulate model
+    _, V_model, spike_times = jump_diffusion_lif(
+        model_params['V0'], model_params['tau_m'],
+        model_params['V_rest'], model_params['V_thresh'],
+        model_params['V_reset'], model_params['sigma'],
+        model_params['lam'], model_params['a_eps'],
+        dt=dt_exp, T=T_sim
+    )
+
+    # Compute model ISIs
+    if len(spike_times) > 1:
+        model_isi = np.diff(spike_times)
+    else:
+        model_isi = np.array([])
+
+    # Voltage distribution comparison (subthreshold)
+    from scipy.stats import ks_2samp
+    V_sub_exp = experimental_voltage[experimental_voltage < model_params['V_thresh']]
+    V_sub_model = V_model[V_model < model_params['V_thresh']]
+
+    ks_stat, ks_pval = ks_2samp(V_sub_exp, V_sub_model)
+
+    # ISI comparison
+    if len(model_isi) > 10 and len(experimental_isi) > 10:
+        ks_isi, ks_isi_pval = ks_2samp(experimental_isi, model_isi)
+        mean_exp = np.mean(experimental_isi)
+        mean_model = np.mean(model_isi)
+        cv_exp = np.std(experimental_isi) / mean_exp
+        cv_model = np.std(model_isi) / mean_model
+    else:
+        ks_isi, ks_isi_pval = np.nan, np.nan
+        mean_exp, mean_model = np.nan, np.nan
+        cv_exp, cv_model = np.nan, np.nan
+
+    return {
+        'voltage_ks': ks_stat,
+        'voltage_ks_pval': ks_pval,
+        'isi_ks': ks_isi,
+        'isi_ks_pval': ks_isi_pval,
+        'mean_isi_exp': mean_exp,
+        'mean_isi_model': mean_model,
+        'cv_exp': cv_exp,
+        'cv_model': cv_model
+    }
+  </Code>
+
+  <H2>Summary</H2>
+
+  <Body>Jump-diffusion processes provide the mathematically rigorous framework for modeling neurons under realistic conditions where both continuous and discrete stochastic influences are present. The key elements are:</Body>
+
+  <Body>• The jump-diffusion SDE combines Wiener and Poisson processes: dV = f(V)dt + σdW + a·ε·dN</Body>
+  <Body>• The Fokker-Planck equation gains an integral term capturing jump-induced probability flux</Body>
+  <Body>• Total variance decomposes into diffusion (σ²τ/2) and jump (λε²τ/2) contributions</Body>
+  <Body>• First-passage time problems require solving integro-differential equations</Body>
+  <Body>• Hybrid numerical schemes combine exact jump times with Euler-Maruyama diffusion</Body>
+  <Body>• Parameter regimes (diffusion vs. jump dominated) qualitatively change firing statistics</Body>
+
+  <Body>This framework is essential for interpreting cortical recordings where synaptic input rates are high and channel noise is non-negligible, and for building predictive models of neural variability.</Body>
+
+  <H2>Knowledge Check</H2>
+
+  <SingleSelect id="q1">
+    <Prompt>In a jump-diffusion process dV = f(V)dt + σdW + a·ε·dN, which term represents the continuous stochastic fluctuations?</Prompt>
+    <Options>
+      <Option>f(V)dt</Option>
+      <Option correct="true">σdW</Option>
+      <Option>a·ε·dN</Option>
+      <Option>dt</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>For a jump-diffusion process with linear drift, the total variance equals σ²τ_m/2 + λ(a·ε)²τ_m/2. If you double the jump rate λ while keeping all other parameters fixed, what happens to the total variance?</Prompt>
+    <Options>
+      <Option>It doubles</Option>
+      <Option>It increases by less than a factor of 2</Option>
+      <Option correct="true">It increases, but by less than doubling (unless diffusion variance is zero)</Option>
+      <Option>It remains unchanged</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>What is the primary advantage of the hybrid thinning method for simulating jump-diffusion processes?</Prompt>
+    <Options>
+      <Option>It is always faster than other methods</Option>
+      <Option>It eliminates the need for random number generation</Option>
+      <Option correct="true">It generates exact Poisson jump times, avoiding discretization artifacts</Option>
+      <Option>It automatically adapts the time step based on voltage</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following are valid interpretations of the terms in the Fokker-Planck equation with jumps: ∂P/∂t = -∂(fP)/∂V + (σ²/2)∂²P/∂V² + λ[P(V-a·ε) - P(V)]?</Prompt>
+    <Options>
+      <Option correct="true">-∂(fP)/∂V describes probability transport due to deterministic drift</Option>
+      <Option correct="true">(σ²/2)∂²P/∂V² describes probability spreading due to diffusion</Option>
+      <Option correct="true">λP(V-a·ε) represents probability inflow from states that can jump to V</Option>
+      <Option correct="true">-λP(V) represents probability outflow due to jumps away from V</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5">
+    <Prompt>Which conditions would place a neuron in a "jump-dominated" regime?</Prompt>
+    <Options>
+      <Option correct="true">High synaptic input rate λ with moderate jump amplitude</Option>
+      <Option>High diffusion coefficient σ with low jump rate</Option>
+      <Option correct="true">Large jump amplitudes a·ε with moderate input rate</Option>
+      <Option>Equal contributions from σ² and λ(a·ε)²</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6">
+    <Prompt>Order the following steps in the hybrid thinning simulation method from first to last:</Prompt>
+    <SortedItems>
+      <Item>Generate the next Poisson jump time from an exponential distribution</Item>
+      <Item>Simulate diffusion using Euler-Maruyama until the jump time</Item>
+      <Item>Apply the jump by adding a·ε to the voltage</Item>
+      <Item>Check for threshold crossing and reset if necessary</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7">
+    <Prompt>Match each variance component formula to its source:</Prompt>
+    <Pairs>
+      <Pair><Left>σ²τ_m/2</Left><Right>Diffusion (Wiener process)</Right></Pair>
+      <Pair><Left>λ(a·ε)²τ_m/2</Left><Right>Jumps (Poisson process)</Right></Pair>
+      <Pair><Left>σ²τ_m/2 + λ(a·ε)²τ_m/2</Left><Right>Total variance</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Drift (deterministic)</Distractor>
+      <Distractor>Boundary effects</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <MatchPairs id="q8">
+    <Prompt>Match each parameter regime to its characteristic feature:</Prompt>
+    <Pairs>
+      <Pair><Left>Diffusion-dominated</Left><Right>σ² &gt;&gt; λ(a·ε)², smooth voltage fluctuations</Right></Pair>
+      <Pair><Left>Jump-dominated</Left><Right>λ(a·ε)² &gt;&gt; σ², discrete voltage steps visible</Right></Pair>
+      <Pair><Left>Balanced regime</Left><Right>σ² ≈ λ(a·ε)², both noise sources contribute</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Deterministic dynamics only</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q9">
+    <Prompt>
+      In the jump-diffusion SDE, the term σdW represents the <Blank>diffusion</Blank> component driven by a Wiener process, while a·ε·dN represents discrete <Blank>jumps</Blank> driven by a Poisson process with rate <Blank>λ</Blank>.
+    </Prompt>
+    <Distractors>
+      <Distractor>drift</Distractor>
+      <Distractor>decay</Distractor>
+      <Distractor>σ</Distractor>
+      <Distractor>threshold</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <FillBlanks id="q10">
+    <Prompt>
+      The Fokker-Planck equation with jumps is an <Blank>integro-differential</Blank> equation because it contains both differential operators (∂/∂V, ∂²/∂V²) and an <Blank>integral</Blank> term that accounts for probability flux due to jumps.
+    </Prompt>
+    <Distractors>
+      <Distractor>ordinary differential</Distractor>
+      <Distractor>algebraic</Distractor>
+      <Distractor>derivative</Distractor>
+      <Distractor>boundary</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q11">
+    <Prompt>Explain why a pure diffusion approximation may fail to accurately model cortical neurons receiving strong synaptic input, and describe the key signatures in experimental data that would indicate a jump-dominated regime.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that pure diffusion assumes continuous Gaussian fluctuations, which fails when discrete synaptic events are large or sparse enough to produce visible jumps in the voltage trace</Requirement>
+        <Indicators>discrete, jumps, Gaussian, continuous approximation fails, synaptic events, non-smooth</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies experimental signatures of jump-dominated regime: visible discrete voltage steps, non-Gaussian voltage distribution (e.g., skewed or multimodal), or ISI statistics inconsistent with diffusion predictions</Requirement>
+        <Indicators>voltage steps, non-Gaussian, skewed, multimodal, ISI distribution, CV, experimental signature</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses the variance decomposition and explains that when λ(a·ε)² dominates over σ², the jump component cannot be ignored</Requirement>
+        <Indicators>variance, λ, amplitude, decomposition, dominates</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions specific biological scenarios where jumps dominate: low background activity with strong individual synapses, or specific cell types with large unitary PSPs</Requirement>
+        <Indicators>biological, synapse, unitary PSP, cell type, sparse input, strong synapse</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q12">
+    <Prompt>Describe how you would design a numerical experiment to determine whether a given set of intracellular recording data is better explained by a pure diffusion model, a pure jump model, or a jump-diffusion model. What metrics would you compare?</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Proposes fitting or simulating all three model types (pure diffusion, pure jump, jump-diffusion) with parameters estimated from the data</Requirement>
+        <Indicators>fit, simulate, compare models, parameter estimation, diffusion model, jump model, jump-diffusion</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies appropriate comparison metrics: voltage distribution (KS test), ISI distribution (mean, CV), power spectrum, or likelihood-based model comparison (AIC/BIC)</Requirement>
+        <Indicators>KS test, ISI, CV, power spectrum, AIC, BIC, likelihood, distribution comparison</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses the importance of subthreshold voltage statistics as a discriminator between models, since jump-dominated processes produce distinct distributional signatures</Requirement>
+        <Indicators>subthreshold, voltage statistics, distribution shape, discriminate</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions cross-validation, out-of-sample prediction, or other rigorous model selection procedures</Requirement>
+        <Indicators>cross-validation, prediction, model selection, out-of-sample, validation</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="350" />
+  </Subjective>
+
+</Lesson>

@@ -1,0 +1,615 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-08-01</Id>
+    <Title>Maximum Likelihood Estimation for Neuronal Models</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>maximum-likelihood</Tag>
+      <Tag>parameter-estimation</Tag>
+      <Tag>fisher-information</Tag>
+      <Tag>neuronal-models</Tag>
+      <Tag>statistical-inference</Tag>
+      <Tag>optimization</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Maximum Likelihood Estimation for Neuronal Models</H1>
+
+  <Body>Maximum likelihood estimation (MLE) provides a principled, general framework for fitting neuronal models to experimental data. By finding the parameter values that make observed data most probable, MLE connects mathematical models to biological measurements in a rigorous way. This lesson develops the theoretical foundations of MLE, demonstrates its application to neuronal models, and introduces Fisher information as a tool for quantifying estimation accuracy.</Body>
+
+  <H2>Callback: Fisher Information and Estimation Accuracy</H2>
+
+  <Body>Recall from Lesson 6.3 that Fisher information quantifies how much information data carries about an unknown parameter. The Cramér-Rao bound states that the variance of any unbiased estimator is bounded below by the inverse of Fisher information. Maximum likelihood estimation achieves this theoretical limit asymptotically—meaning that for large samples, MLE is the most efficient estimator possible. This deep connection between information theory and statistical estimation underlies our approach to fitting neuronal models.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the likelihood function L(θ|data)?</Front>
+    <Back>The likelihood function L(θ|data) = P(data|θ) is the probability of observing the data as a function of the model parameters θ. It treats the data as fixed and the parameters as the variable of interest.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>Why do we typically work with the log-likelihood ℓ(θ) instead of the likelihood L(θ)?</Front>
+    <Back>The log-likelihood ℓ(θ) = log L(θ) is easier to optimize because: (1) products become sums, simplifying derivatives; (2) numerical stability is improved for small probabilities; (3) the maximum occurs at the same parameter values since log is monotonic.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc3">
+    <Front>What is the Cramér-Rao bound?</Front>
+    <Back>The Cramér-Rao bound states that for any unbiased estimator θ̂, the variance satisfies Var(θ̂) ≥ I(θ)⁻¹, where I(θ) is the Fisher information. This provides a fundamental limit on estimation precision.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc4">
+    <Front>What does it mean for a parameter to be identifiable?</Front>
+    <Back>A parameter is identifiable if different parameter values lead to different probability distributions for the data. Non-identifiability occurs when multiple parameter combinations produce identical likelihoods, making unique estimation impossible.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc5">
+    <Front>What is the asymptotic distribution of the MLE?</Front>
+    <Back>Under regularity conditions, the MLE is asymptotically normal: θ̂_MLE ~ N(θ_true, I(θ)⁻¹) as sample size approaches infinity. This means the MLE is asymptotically unbiased and achieves the Cramér-Rao bound.</Back>
+  </FlashCard>
+
+  <H2>The Likelihood Function</H2>
+
+  <Body>The likelihood function is the cornerstone of statistical inference. Given observed data and a parametric model, the likelihood L(θ|data) = P(data|θ) expresses the probability of obtaining the observed data as a function of the unknown parameters θ. Critically, the likelihood is not a probability distribution over parameters—it does not integrate to one over θ. Rather, it provides a measure of how well each parameter value explains the observed data.</Body>
+
+  <Body>For neuronal data, the likelihood depends on both the model structure and the assumed noise process. Consider spike trains recorded from a neuron: if we model spiking as a Poisson process with rate λ, then observing k spikes in time T has likelihood:</Body>
+
+  <Code lang="python">
+# Poisson likelihood for spike count data
+import numpy as np
+from scipy.special import factorial
+
+def poisson_likelihood(k, T, lam):
+    """
+    Likelihood of observing k spikes in time T
+    given firing rate lambda.
+
+    L(λ|k,T) = (λT)^k * exp(-λT) / k!
+    """
+    return (lam * T)**k * np.exp(-lam * T) / factorial(k)
+
+# Example: observed 15 spikes in 1 second
+k_observed = 15
+T = 1.0
+
+# Evaluate likelihood across different rate hypotheses
+rates = np.linspace(5, 25, 100)
+likelihoods = [poisson_likelihood(k_observed, T, r) for r in rates]
+</Code>
+
+  <H2>Log-Likelihood and Optimization</H2>
+
+  <Body>In practice, we work with the log-likelihood ℓ(θ) = log L(θ|data) rather than the likelihood itself. This transformation offers several advantages. First, products of independent probabilities become sums, dramatically simplifying both analytical and numerical calculations. Second, for small probabilities (common with realistic neuronal data), working in log-space prevents numerical underflow. Third, since the logarithm is a monotonically increasing function, maximizing the log-likelihood yields the same parameter estimates as maximizing the likelihood.</Body>
+
+  <Body>The maximum likelihood estimate (MLE) is defined as:</Body>
+
+  <Body>θ̂_MLE = argmax_θ ℓ(θ) = argmax_θ log P(data|θ)</Body>
+
+  <Body>For simple models, the MLE can sometimes be found analytically by setting the gradient of the log-likelihood to zero: ∇ℓ(θ) = 0. For the Poisson neuron example, this yields θ̂_MLE = k/T—the observed spike count divided by observation time, which is simply the sample mean firing rate.</Body>
+
+  <Code lang="python">
+def poisson_log_likelihood(k, T, lam):
+    """
+    Log-likelihood for Poisson spike count.
+
+    ℓ(λ) = k*log(λT) - λT - log(k!)
+    """
+    return k * np.log(lam * T) - lam * T - np.log(factorial(k))
+
+def poisson_mle(k, T):
+    """
+    Analytical MLE for Poisson rate parameter.
+
+    Setting dℓ/dλ = k/λ - T = 0 gives λ̂ = k/T
+    """
+    return k / T
+
+# For k=15 spikes in T=1 second
+k, T = 15, 1.0
+lambda_mle = poisson_mle(k, T)
+print(f"MLE firing rate: {lambda_mle} Hz")  # Output: 15.0 Hz
+</Code>
+
+  <H2>Numerical Optimization Methods</H2>
+
+  <Body>Most neuronal models are too complex for analytical MLE solutions. We must rely on numerical optimization algorithms to find the maximum of the log-likelihood surface. The choice of algorithm depends on the problem structure, dimensionality, and available derivative information.</Body>
+
+  <H3>Gradient Descent</H3>
+
+  <Body>Gradient descent iteratively updates parameters in the direction of steepest ascent:</Body>
+
+  <Body>θ_{t+1} = θ_t + η ∇ℓ(θ_t)</Body>
+
+  <Body>where η is the learning rate. While simple to implement, basic gradient descent can be slow for ill-conditioned problems where the likelihood surface has different curvatures along different directions.</Body>
+
+  <H3>Newton-Raphson Method</H3>
+
+  <Body>Newton-Raphson uses second-derivative (Hessian) information to achieve faster convergence:</Body>
+
+  <Body>θ_{t+1} = θ_t - H(θ_t)⁻¹ ∇ℓ(θ_t)</Body>
+
+  <Body>where H is the Hessian matrix of second derivatives. Near the maximum, this method converges quadratically—much faster than gradient descent. However, computing and inverting the Hessian is expensive for high-dimensional problems.</Body>
+
+  <H3>BFGS and Quasi-Newton Methods</H3>
+
+  <Body>The BFGS algorithm approximates the Hessian using gradient information alone, providing a practical compromise between gradient descent and Newton-Raphson. This is often the method of choice for moderate-dimensional problems.</Body>
+
+  <Code lang="python">
+from scipy.optimize import minimize
+import numpy as np
+
+def negative_log_likelihood_if(params, voltage_data, time_data, dt):
+    """
+    Negative log-likelihood for integrate-and-fire model
+    with Gaussian observation noise.
+
+    Parameters:
+        params: [tau_m, V_th, sigma] - membrane time constant,
+                threshold, and noise std
+        voltage_data: observed membrane potential
+        time_data: observation times
+        dt: time step
+    """
+    tau_m, V_th, sigma = params
+
+    # Ensure parameters are in valid range
+    if tau_m &lt;= 0 or sigma &lt;= 0:
+        return np.inf
+
+    # Simple IF model: dV/dt = -V/tau_m + I(t)
+    # Predict voltage trajectory
+    V_pred = np.zeros_like(voltage_data)
+    V_pred[0] = voltage_data[0]
+
+    for i in range(1, len(voltage_data)):
+        # Euler integration
+        dV = -V_pred[i-1] / tau_m * dt
+        V_pred[i] = V_pred[i-1] + dV
+
+        # Reset if threshold crossed
+        if V_pred[i] &gt;= V_th:
+            V_pred[i] = 0.0
+
+    # Gaussian likelihood for observed vs predicted
+    residuals = voltage_data - V_pred
+    nll = 0.5 * np.sum(residuals**2) / sigma**2
+    nll += len(voltage_data) * np.log(sigma)
+
+    return nll
+
+# Example: fit IF model to simulated data
+# Initial parameter guess
+params_init = [15.0, 1.0, 0.1]  # tau_m, V_th, sigma
+
+# Optimization using BFGS
+result = minimize(
+    negative_log_likelihood_if,
+    params_init,
+    args=(voltage_data, time_data, dt),
+    method='BFGS',
+    options={'disp': True}
+)
+
+params_mle = result.x
+print(f"MLE parameters: tau_m={params_mle[0]:.2f}, "
+      f"V_th={params_mle[1]:.2f}, sigma={params_mle[2]:.3f}")
+</Code>
+
+  <SingleSelect id="q1">
+    <Prompt>A researcher observes 120 spikes from a neuron over 10 seconds and models spiking as a homogeneous Poisson process. What is the maximum likelihood estimate of the firing rate λ?</Prompt>
+    <Options>
+      <Option correct="true">12 Hz</Option>
+      <Option>120 Hz</Option>
+      <Option>10 Hz</Option>
+      <Option>1200 Hz</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>Which optimization method uses second-derivative (Hessian) information to achieve quadratic convergence near the optimum?</Prompt>
+    <Options>
+      <Option>Gradient descent</Option>
+      <Option correct="true">Newton-Raphson</Option>
+      <Option>Stochastic gradient descent</Option>
+      <Option>Coordinate descent</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>Why is the likelihood function L(θ|data) NOT a probability distribution over the parameters θ?</Prompt>
+    <Options>
+      <Option>Because it is always negative</Option>
+      <Option>Because it has no maximum</Option>
+      <Option correct="true">Because it does not integrate to 1 over θ</Option>
+      <Option>Because it depends on the data</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Fisher Information and Parameter Uncertainty</H2>
+
+  <Body>The Fisher information quantifies how sensitive the likelihood is to changes in the parameter. For a single parameter θ, the Fisher information is defined as:</Body>
+
+  <Body>I(θ) = E[(∂ log P(X|θ)/∂θ)²] = -E[∂² log P(X|θ)/∂θ²]</Body>
+
+  <Body>The second form shows that Fisher information equals the expected curvature (negative second derivative) of the log-likelihood at the true parameter value. High curvature means the likelihood is sharply peaked, allowing precise estimation; low curvature means the likelihood is flat, indicating poor identifiability.</Body>
+
+  <Body>For multiple parameters, we compute the Fisher information matrix with elements:</Body>
+
+  <Body>I_ij(θ) = -E[∂²ℓ/∂θ_i∂θ_j]</Body>
+
+  <Body>In practice, we often estimate the Fisher information from the observed Hessian at the MLE, computed numerically:</Body>
+
+  <Code lang="python">
+from scipy.optimize import approx_fprime
+import numpy as np
+
+def compute_fisher_information(log_likelihood_func, theta_mle, epsilon=1e-5):
+    """
+    Estimate Fisher information matrix numerically
+    using finite differences for the Hessian.
+
+    Parameters:
+        log_likelihood_func: function returning log-likelihood
+        theta_mle: MLE parameter values
+        epsilon: step size for finite differences
+
+    Returns:
+        Fisher information matrix (observed)
+    """
+    n_params = len(theta_mle)
+    hessian = np.zeros((n_params, n_params))
+
+    for i in range(n_params):
+        for j in range(n_params):
+            # Four-point finite difference for mixed partial
+            theta_pp = theta_mle.copy()
+            theta_pm = theta_mle.copy()
+            theta_mp = theta_mle.copy()
+            theta_mm = theta_mle.copy()
+
+            theta_pp[i] += epsilon
+            theta_pp[j] += epsilon
+            theta_pm[i] += epsilon
+            theta_pm[j] -= epsilon
+            theta_mp[i] -= epsilon
+            theta_mp[j] += epsilon
+            theta_mm[i] -= epsilon
+            theta_mm[j] -= epsilon
+
+            hessian[i, j] = (
+                log_likelihood_func(theta_pp)
+                - log_likelihood_func(theta_pm)
+                - log_likelihood_func(theta_mp)
+                + log_likelihood_func(theta_mm)
+            ) / (4 * epsilon**2)
+
+    # Fisher information is negative expected Hessian
+    fisher_info = -hessian
+    return fisher_info
+
+def compute_confidence_intervals(theta_mle, fisher_info, alpha=0.05):
+    """
+    Compute asymptotic confidence intervals using
+    Fisher information.
+
+    CI = θ̂ ± z_{α/2} * sqrt(I(θ)⁻¹)
+    """
+    from scipy.stats import norm
+
+    # Covariance matrix is inverse Fisher information
+    cov_matrix = np.linalg.inv(fisher_info)
+
+    # Standard errors are square roots of diagonal
+    std_errors = np.sqrt(np.diag(cov_matrix))
+
+    # Critical value for confidence level
+    z = norm.ppf(1 - alpha/2)
+
+    # Confidence intervals
+    ci_lower = theta_mle - z * std_errors
+    ci_upper = theta_mle + z * std_errors
+
+    return ci_lower, ci_upper, std_errors
+</Code>
+
+  <H2>Asymptotic Properties of MLE</H2>
+
+  <Body>Under regularity conditions (smoothness of likelihood, identifiability, etc.), the MLE possesses several desirable asymptotic properties:</Body>
+
+  <Body>1. Consistency: θ̂_MLE → θ_true as sample size n → ∞</Body>
+
+  <Body>2. Asymptotic normality: √n(θ̂_MLE - θ_true) → N(0, I(θ)⁻¹) in distribution</Body>
+
+  <Body>3. Asymptotic efficiency: The MLE achieves the Cramér-Rao bound, making it the most efficient estimator asymptotically</Body>
+
+  <Body>These properties justify using the inverse Fisher information to construct confidence intervals. For the MLE θ̂ with Fisher information I(θ), an approximate 95% confidence interval is:</Body>
+
+  <Body>θ̂ ± 1.96 × √(I(θ̂)⁻¹)</Body>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following are asymptotic properties of the maximum likelihood estimator under standard regularity conditions? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Consistency (converges to true parameter)</Option>
+      <Option correct="true">Asymptotic normality</Option>
+      <Option correct="true">Asymptotic efficiency (achieves Cramér-Rao bound)</Option>
+      <Option>Unbiasedness for finite samples</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Parameter Identifiability</H2>
+
+  <Body>A critical consideration in neuronal modeling is whether parameters can be uniquely determined from data. A model is identifiable if different parameter values produce different probability distributions for the observed data. Non-identifiability manifests as a flat or ridge-like likelihood surface, where multiple parameter combinations explain the data equally well.</Body>
+
+  <Body>Common sources of non-identifiability in neuronal models include:</Body>
+
+  <Body>1. Structural non-identifiability: The model structure inherently conflates parameters. For example, in a simple linear model y = a × b × x, only the product ab is identifiable, not a and b individually.</Body>
+
+  <Body>2. Practical non-identifiability: Parameters are theoretically identifiable but data is insufficient to distinguish them. This occurs when Fisher information is very small for certain parameter directions.</Body>
+
+  <Body>3. Redundant parameterizations: Multiple parameter sets produce identical model behavior, common in conductance-based models where ratios of conductances may matter more than absolute values.</Body>
+
+  <Code lang="python">
+def analyze_identifiability(fisher_info, param_names, threshold=1e-6):
+    """
+    Analyze parameter identifiability using
+    eigenvalue decomposition of Fisher information.
+
+    Small eigenvalues indicate directions of
+    poor identifiability (flat likelihood).
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(fisher_info)
+
+    print("Fisher Information Eigenanalysis:")
+    print("-" * 50)
+
+    for i, (eigval, eigvec) in enumerate(
+        zip(eigenvalues, eigenvectors.T)
+    ):
+        print(f"\nEigenvalue {i+1}: {eigval:.6f}")
+
+        if eigval &lt; threshold:
+            print("  ⚠ POORLY IDENTIFIABLE DIRECTION")
+
+        # Show which parameters contribute to this direction
+        print("  Parameter weights:")
+        for name, weight in zip(param_names, eigvec):
+            if abs(weight) &gt; 0.1:
+                print(f"    {name}: {weight:.3f}")
+
+    # Condition number indicates overall identifiability
+    condition_number = eigenvalues.max() / eigenvalues.min()
+    print(f"\nCondition number: {condition_number:.2e}")
+
+    if condition_number &gt; 1e6:
+        print("⚠ High condition number suggests "
+              "near-non-identifiability")
+
+    return eigenvalues, eigenvectors
+
+# Example output for a 3-parameter IF model:
+# Eigenvalue 1: 0.000012  ⚠ POORLY IDENTIFIABLE
+#   Parameter weights:
+#     tau_m: 0.707
+#     V_th: 0.707
+# Eigenvalue 2: 0.234
+#   ...
+# This indicates tau_m and V_th are correlated
+</Code>
+
+  <SortQuiz id="q5">
+    <Prompt>Order the following optimization methods from slowest to fastest convergence rate near the optimum:</Prompt>
+    <SortedItems>
+      <Item>Gradient descent (linear convergence)</Item>
+      <Item>BFGS quasi-Newton (superlinear convergence)</Item>
+      <Item>Newton-Raphson (quadratic convergence)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Practical Example: MLE for Hodgkin-Huxley Conductances</H2>
+
+  <Body>Fitting conductance-based models like Hodgkin-Huxley to voltage clamp data exemplifies both the power and challenges of MLE. Voltage clamp experiments hold membrane potential at fixed values, allowing direct measurement of ionic currents. The goal is to estimate maximal conductances (ḡ_Na, ḡ_K, ḡ_L) and other parameters from the recorded current traces.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+
+class HHModel:
+    """Hodgkin-Huxley model for voltage clamp analysis."""
+
+    def __init__(self, g_Na, g_K, g_L, E_Na=50, E_K=-77, E_L=-54.4):
+        self.g_Na = g_Na  # mS/cm²
+        self.g_K = g_K
+        self.g_L = g_L
+        self.E_Na = E_Na  # mV
+        self.E_K = E_K
+        self.E_L = E_L
+
+    def alpha_n(self, V):
+        return 0.01 * (V + 55) / (1 - np.exp(-(V + 55) / 10))
+
+    def beta_n(self, V):
+        return 0.125 * np.exp(-(V + 65) / 80)
+
+    def alpha_m(self, V):
+        return 0.1 * (V + 40) / (1 - np.exp(-(V + 40) / 10))
+
+    def beta_m(self, V):
+        return 4 * np.exp(-(V + 65) / 18)
+
+    def alpha_h(self, V):
+        return 0.07 * np.exp(-(V + 65) / 20)
+
+    def beta_h(self, V):
+        return 1 / (1 + np.exp(-(V + 35) / 10))
+
+    def steady_state(self, V):
+        """Compute steady-state gating variables."""
+        n_inf = self.alpha_n(V) / (self.alpha_n(V) + self.beta_n(V))
+        m_inf = self.alpha_m(V) / (self.alpha_m(V) + self.beta_m(V))
+        h_inf = self.alpha_h(V) / (self.alpha_h(V) + self.beta_h(V))
+        return n_inf, m_inf, h_inf
+
+    def current(self, V, n, m, h):
+        """Compute ionic currents at voltage V."""
+        I_Na = self.g_Na * m**3 * h * (V - self.E_Na)
+        I_K = self.g_K * n**4 * (V - self.E_K)
+        I_L = self.g_L * (V - self.E_L)
+        return I_Na + I_K + I_L
+
+
+def hh_negative_log_likelihood(params, V_clamp, I_observed, sigma):
+    """
+    Negative log-likelihood for HH conductances
+    from voltage clamp data.
+
+    Assumes Gaussian observation noise on current.
+    """
+    g_Na, g_K, g_L = params
+
+    # Parameter constraints
+    if g_Na &lt;= 0 or g_K &lt;= 0 or g_L &lt;= 0:
+        return np.inf
+
+    model = HHModel(g_Na, g_K, g_L)
+
+    nll = 0
+    for V, I_obs in zip(V_clamp, I_observed):
+        # Steady-state at clamped voltage
+        n, m, h = model.steady_state(V)
+        I_pred = model.current(V, n, m, h)
+
+        # Gaussian likelihood
+        nll += 0.5 * ((I_obs - I_pred) / sigma)**2
+
+    return nll
+
+
+# Fit HH model to voltage clamp data
+def fit_hh_conductances(V_clamp, I_observed, sigma=0.1):
+    """
+    Maximum likelihood estimation of HH conductances.
+    """
+    # Initial guess
+    params_init = [100.0, 30.0, 0.3]  # g_Na, g_K, g_L
+
+    result = minimize(
+        hh_negative_log_likelihood,
+        params_init,
+        args=(V_clamp, I_observed, sigma),
+        method='L-BFGS-B',
+        bounds=[(0.1, 500), (0.1, 200), (0.01, 10)]
+    )
+
+    return result.x, result
+</Code>
+
+  <MatchPairs id="q6">
+    <Prompt>Match each concept to its definition:</Prompt>
+    <Pairs>
+      <Pair><Left>Likelihood function L(θ|data)</Left><Right>P(data|θ) as a function of θ</Right></Pair>
+      <Pair><Left>Fisher information I(θ)</Left><Right>Expected curvature of log-likelihood</Right></Pair>
+      <Pair><Left>Cramér-Rao bound</Left><Right>Var(θ̂) ≥ I(θ)⁻¹ for unbiased estimators</Right></Pair>
+      <Pair><Left>Identifiability</Left><Right>Unique mapping from parameters to distributions</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Probability distribution over parameters</Distractor>
+      <Distractor>Maximum of the posterior distribution</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q7">
+    <Prompt>The maximum likelihood estimate is defined as θ̂_MLE = <Blank>argmax</Blank> ℓ(θ), where ℓ(θ) is the <Blank>log-likelihood</Blank>. Asymptotically, the MLE achieves the <Blank>Cramér-Rao</Blank> bound, meaning it is the most <Blank>efficient</Blank> estimator.</Prompt>
+    <Distractors>
+      <Distractor>argmin</Distractor>
+      <Distractor>posterior</Distractor>
+      <Distractor>Chebyshev</Distractor>
+      <Distractor>unbiased</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Common Pitfalls and Misconceptions</H2>
+
+  <Body>Several conceptual errors are common when applying MLE to neuronal models:</Body>
+
+  <Body>1. Confusing likelihood with parameter probability: The likelihood L(θ|data) is NOT the probability that θ is the true parameter. That interpretation requires Bayesian inference with a prior distribution.</Body>
+
+  <Body>2. Assuming MLE is always unbiased: While MLE is consistent (converges to truth), it can be biased for finite samples. Bias correction may be needed for small datasets.</Body>
+
+  <Body>3. Neglecting local maxima: Complex models often have multimodal likelihood surfaces. A single optimization run may find a local rather than global maximum. Multiple random restarts or global optimization methods help address this.</Body>
+
+  <Body>4. Misinterpreting confidence intervals: Frequentist confidence intervals from Fisher information are NOT Bayesian credible intervals. A 95% CI means that 95% of such intervals (computed from repeated experiments) would contain the true parameter, not that there's a 95% probability the parameter lies in the interval.</Body>
+
+  <SingleSelect id="q8">
+    <Prompt>A researcher finds that two parameters in their neuronal model have a correlation of 0.98 in the Fisher information matrix inverse (covariance matrix). What does this most likely indicate?</Prompt>
+    <Options>
+      <Option correct="true">The parameters are nearly non-identifiable; only their combination is constrained by the data</Option>
+      <Option>The MLE has converged to an incorrect solution</Option>
+      <Option>The model is overfit to the data</Option>
+      <Option>The likelihood function is multimodal</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Summary</H2>
+
+  <Body>Maximum likelihood estimation provides a principled framework for fitting neuronal models to experimental data. The key insights are:</Body>
+
+  <Body>• The likelihood L(θ|data) = P(data|θ) measures how well parameters explain observations</Body>
+
+  <Body>• The MLE maximizes the log-likelihood: θ̂_MLE = argmax ℓ(θ)</Body>
+
+  <Body>• Numerical optimization (gradient descent, Newton-Raphson, BFGS) finds the MLE for complex models</Body>
+
+  <Body>• Fisher information I(θ) quantifies estimation precision via the Cramér-Rao bound</Body>
+
+  <Body>• Asymptotically, MLE is consistent, normal, and efficient</Body>
+
+  <Body>• Identifiability analysis reveals when parameters can be uniquely determined</Body>
+
+  <Body>The next lesson extends these ideas to Bayesian inference, which incorporates prior beliefs and provides full posterior distributions over parameters rather than point estimates.</Body>
+
+  <Subjective id="q9">
+    <Prompt>A colleague claims that their maximum likelihood estimate for a Hodgkin-Huxley model parameter is "the true parameter value." Explain what is wrong with this statement, and describe what the MLE actually represents and how confidence in the estimate should be properly characterized.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains that MLE is an estimate, not the true value, and identifies that different data samples would yield different MLEs</Requirement>
+        <Indicators>estimate, not the true, uncertainty, sample, random, different data, sampling variability</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes what MLE represents: the parameter value that maximizes the probability of observing the data</Requirement>
+        <Indicators>maximize, probability, likelihood, most probable, best explains, observed data</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Explains how to characterize uncertainty using Fisher information, confidence intervals, or standard errors</Requirement>
+        <Indicators>Fisher information, confidence interval, standard error, uncertainty, variance, Cramér-Rao</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions asymptotic properties or finite-sample considerations (e.g., potential bias for small samples)</Requirement>
+        <Indicators>asymptotic, finite sample, bias, consistency, convergence, large sample</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q10">
+    <Prompt>You are fitting a conductance-based neuronal model and find that the optimization algorithm converges to different parameter values depending on the initial conditions. Describe at least three strategies you would use to address this problem and find the global maximum likelihood estimate.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Describes multiple random restarts or initialization strategies</Requirement>
+        <Indicators>random restart, multiple initial, different starting, initialization, grid search</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Suggests using global optimization methods (simulated annealing, genetic algorithms, basin hopping)</Requirement>
+        <Indicators>global optimization, simulated annealing, genetic algorithm, basin hopping, evolutionary, global search</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Mentions examining the likelihood landscape or using profile likelihood analysis</Requirement>
+        <Indicators>likelihood landscape, profile likelihood, contour, surface, visualization, multiple modes</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses comparing final likelihood values across runs or using information criteria</Requirement>
+        <Indicators>compare likelihood, best solution, highest likelihood, information criterion, AIC, BIC</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="60" maxWords="250" />
+  </Subjective>
+
+</Lesson>

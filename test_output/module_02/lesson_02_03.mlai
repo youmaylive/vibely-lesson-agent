@@ -1,0 +1,668 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-02-03</Id>
+    <Title>Perturbation Theory: Noise Effects on Stability</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>perturbation-theory</Tag>
+      <Tag>stochastic-systems</Tag>
+      <Tag>kramers-formula</Tag>
+      <Tag>coherence-resonance</Tag>
+      <Tag>fokker-planck</Tag>
+      <Tag>noise-analysis</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Perturbation Theory: Noise Effects on Stability</H1>
+
+  <Body>In our previous exploration of stability analysis (lesson_02_01), we examined deterministic systems where the future is entirely determined by initial conditions. However, real neuronal systems operate in noisy environments where molecular fluctuations, synaptic variability, and channel stochasticity introduce randomness at every level. This lesson develops the mathematical machinery to understand when and how noise qualitatively alters the predictions of deterministic theory.</Body>
+
+  <Body>The central insight is profound: small noise can fundamentally change system behavior. Noise can stabilize otherwise unstable states, induce spontaneous transitions between attractors, and even optimize signal detection through phenomena like stochastic resonance. Perturbation theory provides the systematic framework to analyze these effects when noise is weak but not negligible.</Body>
+
+  <H2>The Perturbation Expansion Framework</H2>
+
+  <Body>Perturbation theory begins with the assumption that we can expand the solution in powers of a small parameter. For stochastic systems, this parameter is typically the noise strength. Consider a stochastic differential equation (SDE):</Body>
+
+  <Code lang="python">
+# General form of a stochastic differential equation
+# dx = f(x)dt + sigma * dW
+# where sigma is noise intensity and dW is Wiener process increment
+
+import numpy as np
+
+def stochastic_euler(f, x0, sigma, dt, T):
+    """
+    Euler-Maruyama integration for SDE: dx = f(x)dt + sigma*dW
+
+    Parameters:
+    -----------
+    f : callable - Drift function f(x)
+    x0 : float - Initial condition
+    sigma : float - Noise intensity
+    dt : float - Time step
+    T : float - Total simulation time
+
+    Returns:
+    --------
+    t, x : arrays - Time points and solution trajectory
+    """
+    n_steps = int(T / dt)
+    t = np.linspace(0, T, n_steps + 1)
+    x = np.zeros(n_steps + 1)
+    x[0] = x0
+
+    for i in range(n_steps):
+        # Deterministic drift
+        drift = f(x[i]) * dt
+        # Stochastic diffusion (Wiener increment scales as sqrt(dt))
+        diffusion = sigma * np.sqrt(dt) * np.random.randn()
+        x[i+1] = x[i] + drift + diffusion
+
+    return t, x
+  </Code>
+
+  <Body>The perturbation expansion assumes the solution can be written as:</Body>
+
+  <Code lang="plaintext">
+x(t) = x₀(t) + ε·x₁(t) + ε²·x₂(t) + O(ε³)
+
+where:
+- x₀(t) is the deterministic solution (σ = 0)
+- x₁(t) is the first-order noise correction
+- ε = σ is the small perturbation parameter
+  </Code>
+
+  <Body>This expansion is valid when noise is small enough that the system remains close to deterministic behavior most of the time. The expansion breaks down when noise-induced effects become comparable to deterministic dynamics—a regime we will characterize precisely.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the perturbation expansion for a stochastic system?</Front>
+    <Back>x(t) = x₀(t) + εx₁(t) + ε²x₂(t) + ... where x₀ is the deterministic solution, ε is the noise strength (σ), and higher-order terms capture increasingly fine corrections due to noise.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>When does perturbation theory for noise break down?</Front>
+    <Back>Perturbation theory breaks down when noise-induced effects become comparable to deterministic dynamics. This occurs when: (1) noise amplitude approaches characteristic system scales, (2) the system approaches a bifurcation point where deterministic stability weakens, or (3) barrier heights become comparable to noise intensity σ².</Back>
+  </FlashCard>
+
+  <H2>The Fokker-Planck Equation</H2>
+
+  <Body>Rather than tracking individual stochastic trajectories, we can describe the evolution of the probability density P(x,t). The Fokker-Planck equation (also called the forward Kolmogorov equation) governs this evolution:</Body>
+
+  <Code lang="plaintext">
+∂P/∂t = -∂/∂x[f(x)P] + (σ²/2)∂²P/∂x²
+
+where:
+- f(x) is the deterministic drift
+- σ is the noise intensity
+- The first term represents probability flux due to drift
+- The second term represents diffusion due to noise
+  </Code>
+
+  <Body>For a system with potential V(x) where f(x) = -dV/dx, the stationary distribution takes the elegant Boltzmann form:</Body>
+
+  <Code lang="python">
+def stationary_distribution(x, V, sigma):
+    """
+    Compute stationary Fokker-Planck distribution for gradient system.
+
+    For dx = -dV/dx dt + sigma*dW, the stationary distribution is:
+    P_st(x) = N * exp(-2V(x)/sigma^2)
+
+    Parameters:
+    -----------
+    x : array - Positions to evaluate
+    V : callable - Potential function V(x)
+    sigma : float - Noise intensity
+
+    Returns:
+    --------
+    P : array - Unnormalized probability density
+    """
+    # Boltzmann-like distribution with "temperature" = sigma^2/2
+    log_P = -2 * V(x) / sigma**2
+    # Subtract max for numerical stability before exponentiating
+    log_P = log_P - np.max(log_P)
+    P = np.exp(log_P)
+    return P
+
+# Example: Double-well potential
+def double_well(x, a=1, b=4):
+    """V(x) = x^4/4 - bx^2/2 + a"""
+    return x**4/4 - b*x**2/2 + a
+
+# Visualize how noise affects probability distribution
+x = np.linspace(-3, 3, 500)
+for sigma in [0.5, 1.0, 1.5]:
+    P = stationary_distribution(x, lambda x: double_well(x), sigma)
+    # P shows probability concentration at potential minima
+    # Lower sigma: sharper peaks at minima
+    # Higher sigma: broader distribution, more probability at barrier
+  </Code>
+
+  <FlashCard id="fc3">
+    <Front>What is the Fokker-Planck equation and what does it describe?</Front>
+    <Back>The Fokker-Planck equation ∂P/∂t = -∂/∂x[f(x)P] + (σ²/2)∂²P/∂x² describes the time evolution of probability density P(x,t) for a stochastic system. The first term accounts for deterministic drift, while the second term accounts for diffusive spreading due to noise.</Back>
+  </FlashCard>
+
+  <H2>Kramers' Escape Rate Theory</H2>
+
+  <Body>One of the most important applications of perturbation theory is computing transition rates between metastable states. Consider a particle in a double-well potential—in the absence of noise, it remains forever in whichever well it starts. With noise, it can spontaneously escape over the barrier.</Body>
+
+  <Body>Kramers (1940) derived the remarkable result that the escape rate from a metastable well follows an Arrhenius-like formula:</Body>
+
+  <Code lang="plaintext">
+r = (ω_a · ω_b)/(2π·γ) · exp(-ΔV/D)
+
+where:
+- ω_a = sqrt(V''(x_a)) is the curvature at the metastable minimum
+- ω_b = sqrt(|V''(x_b)|) is the curvature at the barrier top
+- γ is the friction coefficient (for overdamped systems, often absorbed)
+- ΔV = V(x_b) - V(x_a) is the barrier height
+- D = σ²/2 is the diffusion coefficient
+
+For the simplified overdamped case commonly used in neuroscience:
+r ≈ A · exp(-ΔV/D) ∝ exp(-2ΔV/σ²)
+  </Code>
+
+  <Body>The exponential dependence on ΔV/σ² is the hallmark of Kramers' theory. Small changes in barrier height or noise intensity lead to dramatic changes in escape rate—this is why noise-induced transitions are rare events that can nonetheless have profound effects on system behavior.</Body>
+
+  <Code lang="python">
+def kramers_rate(V_min, V_barrier, sigma, curvature_min=1.0, curvature_barrier=1.0):
+    """
+    Compute Kramers escape rate from a metastable well.
+
+    Parameters:
+    -----------
+    V_min : float - Potential at metastable minimum
+    V_barrier : float - Potential at barrier top
+    sigma : float - Noise intensity
+    curvature_min : float - |V''| at minimum (default 1.0)
+    curvature_barrier : float - |V''| at barrier (default 1.0)
+
+    Returns:
+    --------
+    rate : float - Escape rate (inverse mean first passage time)
+    """
+    delta_V = V_barrier - V_min
+    D = sigma**2 / 2  # Diffusion coefficient
+
+    # Prefactor from curvatures
+    omega_a = np.sqrt(curvature_min)
+    omega_b = np.sqrt(curvature_barrier)
+    prefactor = (omega_a * omega_b) / (2 * np.pi)
+
+    # Exponential factor (Arrhenius-like)
+    rate = prefactor * np.exp(-delta_V / D)
+
+    return rate
+
+# Example: Effect of noise on escape rate
+V_min, V_barrier = 0, 2.0  # Barrier height = 2
+for sigma in [0.5, 1.0, 1.5, 2.0]:
+    rate = kramers_rate(V_min, V_barrier, sigma)
+    mean_escape_time = 1/rate if rate > 0 else np.inf
+    print(f"σ = {sigma:.1f}: rate = {rate:.2e}, mean escape time = {mean_escape_time:.2e}")
+  </Code>
+
+  <FlashCard id="fc4">
+    <Front>What is Kramers' formula for escape rates?</Front>
+    <Back>Kramers' formula gives the rate of noise-induced escape from a metastable well: r ∝ exp(-ΔV/D) where ΔV is the barrier height and D = σ²/2 is the diffusion coefficient. The exponential dependence means escape rates are extremely sensitive to barrier height and noise intensity.</Back>
+  </FlashCard>
+
+  <H2>Coherence Resonance</H2>
+
+  <Body>Coherence resonance is a counterintuitive phenomenon where adding noise to an excitable system can make its output more regular, not less. In excitable systems like neurons near threshold, there exists an optimal noise level that produces the most regular firing pattern.</Body>
+
+  <Body>The mechanism involves two competing effects of noise:</Body>
+
+  <Code lang="plaintext">
+Low noise (σ → 0):
+- Firing is rare (exponentially suppressed by Kramers)
+- When spikes occur, they are well-separated
+- Interspike interval (ISI) distribution has large mean, moderate CV
+
+Intermediate noise (σ optimal):
+- Firing rate balanced with regularity
+- ISI distribution is narrow and regular
+- Coefficient of variation (CV = std/mean) is minimized
+
+High noise (σ → large):
+- Frequent firing, but timing is random
+- Noise dominates deterministic dynamics
+- ISI distribution broadens, CV increases
+  </Code>
+
+  <Body>We quantify regularity using the coefficient of variation (CV) of interspike intervals:</Body>
+
+  <Code lang="python">
+def compute_cv(spike_times):
+    """
+    Compute coefficient of variation of interspike intervals.
+
+    CV = std(ISI) / mean(ISI)
+
+    CV = 0 indicates perfectly regular firing
+    CV = 1 indicates Poisson-like firing (exponential ISI)
+    CV &gt; 1 indicates more irregular than Poisson (bursty)
+
+    Parameters:
+    -----------
+    spike_times : array - Times of spike occurrences
+
+    Returns:
+    --------
+    cv : float - Coefficient of variation
+    """
+    if len(spike_times) &lt; 2:
+        return np.nan
+
+    isi = np.diff(spike_times)  # Interspike intervals
+    cv = np.std(isi) / np.mean(isi)
+    return cv
+
+def coherence_resonance_demo(noise_levels, n_trials=20, T=1000):
+    """
+    Demonstrate coherence resonance in FitzHugh-Nagumo model.
+
+    Parameters:
+    -----------
+    noise_levels : array - Noise intensities to test
+    n_trials : int - Number of trials per noise level
+    T : float - Simulation time per trial
+
+    Returns:
+    --------
+    mean_cv : array - Mean CV for each noise level
+    """
+    # FHN parameters (excitable regime, below Hopf bifurcation)
+    a, b, c, I_ext = 0.7, 0.8, 3.0, 0.35
+
+    mean_cv = np.zeros(len(noise_levels))
+
+    for i, sigma in enumerate(noise_levels):
+        cvs = []
+        for trial in range(n_trials):
+            # Simulate and detect spikes
+            # ... (FHN integration with noise)
+            # spike_times = detect_spikes(v_trace)
+            # cvs.append(compute_cv(spike_times))
+            pass
+        mean_cv[i] = np.mean(cvs)
+
+    # Result: CV shows minimum at intermediate noise (coherence resonance)
+    return mean_cv
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What is coherence resonance?</Front>
+    <Back>Coherence resonance is a phenomenon where an optimal level of noise maximizes the regularity of firing in an excitable system. Too little noise causes rare, irregular firing; too much noise causes frequent but random firing. At optimal noise, the coefficient of variation (CV) of interspike intervals is minimized.</Back>
+  </FlashCard>
+
+  <H2>Stochastic Resonance</H2>
+
+  <Body>Closely related to coherence resonance, stochastic resonance describes how noise can enhance the detection of weak periodic signals. In a bistable or excitable system driven by a subthreshold periodic input, noise provides the "kick" needed to cross threshold in synchrony with the signal.</Body>
+
+  <Code lang="python">
+def stochastic_resonance_simulation(signal_amplitude, signal_frequency,
+                                     noise_levels, threshold=1.0):
+    """
+    Demonstrate stochastic resonance with a threshold detector.
+
+    A subthreshold sinusoidal signal cannot trigger threshold crossings alone.
+    Adding noise enables crossings, with optimal noise maximizing signal-to-noise.
+
+    Parameters:
+    -----------
+    signal_amplitude : float - Amplitude of sinusoidal input (must be &lt; threshold)
+    signal_frequency : float - Frequency of periodic signal
+    noise_levels : array - Range of noise intensities
+    threshold : float - Detection threshold
+
+    Returns:
+    --------
+    snr : array - Signal-to-noise ratio at each noise level
+    """
+    T = 100  # Simulation duration
+    dt = 0.01
+    t = np.arange(0, T, dt)
+
+    # Subthreshold periodic signal
+    signal = signal_amplitude * np.sin(2 * np.pi * signal_frequency * t)
+
+    snr = np.zeros(len(noise_levels))
+
+    for i, sigma in enumerate(noise_levels):
+        # Add noise to signal
+        x = signal + sigma * np.random.randn(len(t))
+
+        # Detect threshold crossings
+        crossings = np.where(np.diff(x &gt; threshold))[0]
+
+        # Compute power spectrum of crossing times
+        # SNR = power at signal frequency / average noise power
+        # ... (spectral analysis)
+        pass
+
+    # Result: SNR peaks at optimal noise level
+    return snr
+  </Code>
+
+  <Body>The key distinction between coherence resonance and stochastic resonance:</Body>
+
+  <Code lang="plaintext">
+Coherence Resonance:
+- NO external periodic signal
+- Optimal noise maximizes REGULARITY of intrinsic dynamics
+- Measured by minimizing CV of interspike intervals
+- System must be excitable (not oscillatory)
+
+Stochastic Resonance:
+- REQUIRES weak periodic signal
+- Optimal noise maximizes SIGNAL DETECTION
+- Measured by maximizing signal-to-noise ratio (SNR)
+- System must have threshold or bistability
+  </Code>
+
+  <FlashCard id="fc6">
+    <Front>What is stochastic resonance and how does it differ from coherence resonance?</Front>
+    <Back>Stochastic resonance occurs when noise enhances detection of a weak periodic signal in a threshold/bistable system. Unlike coherence resonance (which optimizes intrinsic regularity without external signals), stochastic resonance requires an external periodic input and optimizes signal-to-noise ratio (SNR) rather than interspike interval regularity.</Back>
+  </FlashCard>
+
+  <H2>Validity Limits of Perturbation Theory</H2>
+
+  <Body>Understanding when perturbation theory fails is as important as knowing how to apply it. The weak noise approximation breaks down in several identifiable regimes:</Body>
+
+  <Code lang="plaintext">
+Perturbation Theory VALID when:
+1. σ² &lt;&lt; ΔV (noise much weaker than barrier heights)
+2. σ &lt;&lt; characteristic length scales of f(x)
+3. System is far from bifurcation points
+4. Transition rates r &lt;&lt; 1/τ_relax (rare escape compared to relaxation)
+
+Perturbation Theory INVALID when:
+1. σ² ~ ΔV (noise comparable to barriers): frequent transitions
+2. Near bifurcations: deterministic stability weakens
+3. σ ~ system scale: noise dominates drift
+4. Nonequilibrium steady states with strong currents
+  </Code>
+
+  <Body>Near bifurcation points, critical slowing down means the system loses its ability to "resist" noise. The variance of fluctuations diverges as the bifurcation is approached, even for fixed noise intensity:</Body>
+
+  <Code lang="python">
+def critical_slowing_down_variance(distance_to_bifurcation, sigma):
+    """
+    Variance of fluctuations near a saddle-node bifurcation.
+
+    Near bifurcation, the effective restoring force weakens,
+    causing variance to grow as:
+
+    Var(x) ~ sigma^2 / (2 * lambda)
+
+    where lambda ~ |mu - mu_c| is distance to bifurcation.
+
+    Parameters:
+    -----------
+    distance_to_bifurcation : float - |mu - mu_c|
+    sigma : float - Noise intensity
+
+    Returns:
+    --------
+    variance : float - Expected variance of fluctuations
+    """
+    if distance_to_bifurcation &lt;= 0:
+        return np.inf  # At or past bifurcation
+
+    # Effective decay rate proportional to distance
+    lambda_eff = distance_to_bifurcation
+
+    # Variance from Ornstein-Uhlenbeck approximation
+    variance = sigma**2 / (2 * lambda_eff)
+
+    return variance
+  </Code>
+
+  <H2>Numerical Validation of Perturbative Predictions</H2>
+
+  <Body>A critical skill is validating perturbative predictions against direct numerical simulation. This serves both to verify the theory and to identify when it breaks down:</Body>
+
+  <Code lang="python">
+def validate_kramers_prediction(potential, sigma, x_init, n_trials=1000, dt=0.01):
+    """
+    Validate Kramers escape rate prediction against Monte Carlo simulation.
+
+    Parameters:
+    -----------
+    potential : callable - V(x), the potential function
+    sigma : float - Noise intensity
+    x_init : float - Starting position (in metastable well)
+    n_trials : int - Number of escape time samples
+    dt : float - Integration time step
+
+    Returns:
+    --------
+    simulated_rate : float - Rate from simulation (1/mean escape time)
+    predicted_rate : float - Kramers formula prediction
+    """
+    from scipy.misc import derivative
+
+    # Find barrier and compute Kramers prediction
+    # ... (numerical root finding for barrier location)
+    # predicted_rate = kramers_rate(...)
+
+    # Simulate escape times
+    escape_times = []
+
+    for trial in range(n_trials):
+        x = x_init
+        t = 0
+
+        # Drift from potential: f(x) = -dV/dx
+        def drift(x):
+            return -derivative(potential, x, dx=1e-6)
+
+        # Integrate until escape (cross barrier)
+        x_barrier = 0  # Assume barrier at x=0 for double-well
+        while x &lt; x_barrier:
+            x += drift(x) * dt + sigma * np.sqrt(dt) * np.random.randn()
+            t += dt
+
+        escape_times.append(t)
+
+    simulated_rate = 1.0 / np.mean(escape_times)
+
+    # Compare: ratio should be ~1 for weak noise
+    return simulated_rate, predicted_rate
+  </Code>
+
+  <H2>Knowledge Assessment</H2>
+
+  <H3>Conceptual Understanding</H3>
+
+  <SingleSelect id="q1">
+    <Prompt>In Kramers' escape rate formula r ∝ exp(-ΔV/D), what happens to the escape rate when you double the noise intensity σ?</Prompt>
+    <Options>
+      <Option>The rate doubles</Option>
+      <Option>The rate quadruples</Option>
+      <Option correct="true">The rate increases exponentially (by a factor of exp(ΔV/D) where D was σ²/2)</Option>
+      <Option>The rate decreases</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2">
+    <Prompt>A neuroscientist observes that adding a small amount of noise to an excitable neuron model makes its firing more regular (lower CV). This phenomenon is called:</Prompt>
+    <Options>
+      <Option>Stochastic resonance</Option>
+      <Option correct="true">Coherence resonance</Option>
+      <Option>Kramers escape</Option>
+      <Option>Hopf bifurcation</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3">
+    <Prompt>The Fokker-Planck equation describes the evolution of:</Prompt>
+    <Options>
+      <Option>Individual particle trajectories</Option>
+      <Option correct="true">Probability density over the state space</Option>
+      <Option>The potential energy landscape</Option>
+      <Option>The noise autocorrelation function</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following conditions indicate that perturbation theory for weak noise is likely to FAIL? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The system is near a bifurcation point</Option>
+      <Option correct="true">Noise intensity σ² is comparable to barrier height ΔV</Option>
+      <Option>The deterministic system has a stable fixed point</Option>
+      <Option correct="true">The system exhibits critical slowing down</Option>
+    </Options>
+  </MultiSelect>
+
+  <H3>Mathematical Foundations</H3>
+
+  <FillBlanks id="q5">
+    <Prompt>In perturbation theory, the solution is expanded as x(t) = x₀(t) + εx₁(t) + ε²x₂(t) + ..., where x₀(t) is the <Blank>deterministic</Blank> solution and ε represents the <Blank>noise intensity</Blank> (or σ). The expansion is valid when ε is <Blank>small</Blank> compared to characteristic system scales.</Prompt>
+    <Distractors>
+      <Distractor>stochastic</Distractor>
+      <Distractor>barrier height</Distractor>
+      <Distractor>large</Distractor>
+      <Distractor>eigenvalue</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <MatchPairs id="q6">
+    <Prompt>Match each concept to its correct mathematical expression or definition:</Prompt>
+    <Pairs>
+      <Pair><Left>Fokker-Planck equation</Left><Right>∂P/∂t = -∂(fP)/∂x + (σ²/2)∂²P/∂x²</Right></Pair>
+      <Pair><Left>Kramers rate</Left><Right>r ∝ exp(-ΔV/D)</Right></Pair>
+      <Pair><Left>Coefficient of variation</Left><Right>CV = std(ISI)/mean(ISI)</Right></Pair>
+      <Pair><Left>Diffusion coefficient</Left><Right>D = σ²/2</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>λ = lim(1/t)ln|δx(t)/δx(0)|</Distractor>
+      <Distractor>V(x) &gt; 0, dV/dt ≤ 0</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <SortQuiz id="q7">
+    <Prompt>Order the following noise levels from LOWEST to HIGHEST coefficient of variation (CV) of interspike intervals in an excitable system exhibiting coherence resonance:</Prompt>
+    <SortedItems>
+      <Item>Optimal noise (intermediate σ)</Item>
+      <Item>Low noise (σ → 0)</Item>
+      <Item>High noise (σ → large)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H3>Distinguishing Phenomena</H3>
+
+  <SingleSelect id="q8">
+    <Prompt>A researcher applies a weak 10 Hz sinusoidal current to a neuron and finds that adding intermediate noise improves the neuron's ability to fire in phase with this signal. This is an example of:</Prompt>
+    <Options>
+      <Option correct="true">Stochastic resonance</Option>
+      <Option>Coherence resonance</Option>
+      <Option>Kramers escape</Option>
+      <Option>Critical slowing down</Option>
+    </Options>
+  </SingleSelect>
+
+  <MatchPairs id="q9">
+    <Prompt>Match each noise-related phenomenon with its defining characteristic:</Prompt>
+    <Pairs>
+      <Pair><Left>Coherence resonance</Left><Right>Optimal noise minimizes CV without external signal</Right></Pair>
+      <Pair><Left>Stochastic resonance</Left><Right>Optimal noise maximizes SNR for weak periodic input</Right></Pair>
+      <Pair><Left>Kramers escape</Left><Right>Noise-induced transitions over energy barriers</Right></Pair>
+      <Pair><Left>Critical slowing down</Left><Right>Variance diverges as bifurcation is approached</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Positive Lyapunov exponent indicates chaos</Distractor>
+      <Distractor>Nullcline intersection determines fixed points</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H3>Computational Application</H3>
+
+  <MultiSelect id="q10">
+    <Prompt>When validating Kramers' formula numerically, which of the following should you check? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The simulated mean escape time matches 1/r from Kramers' formula</Option>
+      <Option correct="true">The escape time distribution is approximately exponential</Option>
+      <Option>The trajectory always follows the deterministic path</Option>
+      <Option correct="true">The agreement improves as noise intensity decreases (for fixed barrier)</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q11">
+    <Prompt>Order the steps for numerically validating perturbative predictions:</Prompt>
+    <SortedItems>
+      <Item>Identify the deterministic solution and stability properties</Item>
+      <Item>Compute the perturbative prediction (e.g., Kramers rate)</Item>
+      <Item>Run Monte Carlo simulations with the same parameters</Item>
+      <Item>Compare simulation statistics with theoretical predictions</Item>
+      <Item>Vary noise intensity to test validity limits</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H3>Deep Understanding</H3>
+
+  <Subjective id="q12">
+    <Prompt>Explain why perturbation theory breaks down near bifurcation points, even when noise intensity is held constant. In your answer, describe the mechanism of critical slowing down and its effect on the validity of the weak-noise approximation.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Explains that the effective restoring force (deterministic stability) weakens near bifurcations</Requirement>
+        <Indicators>restoring force, stability weakens, eigenvalue approaches zero, decay rate decreases</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes critical slowing down: relaxation time increases as bifurcation is approached</Requirement>
+        <Indicators>critical slowing down, relaxation time, diverges, τ increases, slower return</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Connects to variance: fluctuation variance grows as Var ~ σ²/λ where λ → 0</Requirement>
+        <Indicators>variance, fluctuations grow, σ²/λ, diverges, larger excursions</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Concludes that fixed noise can dominate weakened deterministic dynamics near bifurcation</Requirement>
+        <Indicators>noise dominates, perturbative assumption fails, not weak anymore, comparable</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="75" maxWords="250" />
+  </Subjective>
+
+  <Subjective id="q13">
+    <Prompt>A computational neuroscientist is modeling a neuron that appears to fire spontaneously with somewhat regular interspike intervals, even though the applied current is below the deterministic firing threshold. Propose an explanation based on the concepts from this lesson, and describe how you would test your hypothesis computationally.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Identifies that noise could be causing firing in an excitable (subthreshold) system</Requirement>
+        <Indicators>noise-induced firing, excitable, subthreshold, stochastic, Kramers escape</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Suggests coherence resonance as possible explanation for the regularity</Requirement>
+        <Indicators>coherence resonance, optimal noise, regular despite noise, CV minimum</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Proposes testing by varying noise intensity and measuring CV or firing statistics</Requirement>
+        <Indicators>vary noise, sweep σ, measure CV, ISI distribution, test prediction</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions comparing with deterministic model to confirm subthreshold regime</Requirement>
+        <Indicators>deterministic comparison, confirm subthreshold, no firing without noise</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>This lesson has developed the perturbation theory framework for analyzing noise effects on neuronal dynamics. Key takeaways include:</Body>
+
+  <Body>1. Perturbation expansion x = x₀ + εx₁ + ... provides systematic corrections when noise is weak. The Fokker-Planck equation governs probability density evolution, yielding Boltzmann-like stationary distributions for gradient systems.</Body>
+
+  <Body>2. Kramers' formula r ∝ exp(-ΔV/D) quantifies noise-induced escape rates with exponential sensitivity to barrier height and noise intensity. This underlies spontaneous transitions between metastable states.</Body>
+
+  <Body>3. Coherence resonance demonstrates that intermediate noise can optimize firing regularity in excitable systems, while stochastic resonance shows how noise enhances detection of weak periodic signals.</Body>
+
+  <Body>4. Perturbation theory has clear validity limits: it fails near bifurcations (critical slowing down), when noise approaches barrier heights, or when fluctuations dominate deterministic dynamics. Numerical validation is essential for identifying these regimes.</Body>
+
+  <Body>These concepts provide the foundation for understanding how real neurons—operating in inherently noisy environments—can exhibit reliable computation despite, and sometimes because of, stochastic fluctuations.</Body>
+
+</Lesson>

@@ -1,0 +1,781 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-04-02</Id>
+    <Title>Active Dendrites: Propagation and Amplification</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>active-dendrites</Tag>
+      <Tag>dendritic-spikes</Tag>
+      <Tag>cable-theory</Tag>
+      <Tag>backpropagation</Tag>
+      <Tag>signal-amplification</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Active Dendrites: Propagation and Amplification</H1>
+
+  <Body>In the previous lesson, we explored passive cable theory and discovered that dendrites attenuate electrical signals as they propagate toward the soma. However, real neurons possess voltage-gated ion channels distributed throughout their dendritic arbors, transforming dendrites from passive cables into active computational subunits capable of nonlinear signal processing.</Body>
+
+  <Body>This lesson extends our understanding of dendritic computation by incorporating active conductances into the cable equation. We will analyze how voltage-gated sodium and calcium channels enable dendritic spike initiation, support backpropagating action potentials, and amplify distal synaptic inputs. These active mechanisms have profound computational implications, enabling neurons to perform sophisticated operations such as coincidence detection and direction selectivity.</Body>
+
+  <H2>Learning Objectives</H2>
+  <Body>By the end of this lesson, you will be able to:</Body>
+  <Body>• Extend the passive cable equation to include active (voltage-dependent) conductances</Body>
+  <Body>• Analyze the conditions necessary for dendritic spike initiation and propagation</Body>
+  <Body>• Understand dendritic amplification mechanisms and their computational implications</Body>
+  <Body>• Implement active cable models numerically using operator splitting methods</Body>
+
+  <H2>Building on Passive Cable Theory</H2>
+  <Body>Recall from Lesson 4.1 that the passive cable equation describes voltage attenuation along a dendrite as:</Body>
+
+  <Code lang="python">
+# Passive cable equation (dimensionless form)
+# λ² ∂²V/∂x² = τ ∂V/∂t + V
+#
+# Where:
+# λ = space constant (electrotonic length)
+# τ = membrane time constant
+# V = membrane voltage deviation from rest
+</Code>
+
+  <Body>The key limitation of passive cables is signal attenuation: distal inputs experience severe voltage loss before reaching the soma. Evolution has solved this problem by placing voltage-gated channels in dendrites, enabling active signal propagation and amplification.</Body>
+
+  <H1>The Active Cable Equation</H1>
+
+  <H2>Incorporating Voltage-Gated Conductances</H2>
+  <Body>The active cable equation extends the passive formulation by adding voltage-dependent ionic currents. In its general form:</Body>
+
+  <Code lang="python">
+# Active Cable Equation:
+# λ² ∂²V/∂x² = τ ∂V/∂t + V + I_active(V, x, t)
+#
+# I_active represents voltage-gated currents:
+# I_active = Σ g_i(V, x) · (V - E_i)
+#
+# Where g_i(V, x) is the voltage-dependent conductance
+# and E_i is the reversal potential for ion type i
+</Code>
+
+  <Body>The critical difference from passive cables is that I_active depends on voltage itself, creating feedback loops that can either amplify or regenerate signals depending on local conditions.</Body>
+
+  <H2>Mathematical Formulation</H2>
+  <Body>For a cylindrical dendritic segment with active sodium and calcium channels, the full equation becomes:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def active_cable_rhs(V, m, h, x, dx, params):
+    """
+    Right-hand side of the active cable equation.
+
+    Parameters:
+    V : array - membrane voltage at each spatial point
+    m : array - Na+ activation variable
+    h : array - Na+ inactivation variable
+    x : array - spatial positions
+    dx : float - spatial discretization
+    params : dict - model parameters
+
+    Returns:
+    dV/dt, dm/dt, dh/dt at each spatial point
+    """
+    # Extract parameters
+    lambda_sq = params['lambda']**2  # Space constant squared
+    tau = params['tau']              # Time constant
+    g_Na = params['g_Na']            # Na+ conductance density
+    E_Na = params['E_Na']            # Na+ reversal potential
+    g_L = params['g_L']              # Leak conductance
+    E_L = params['E_L']              # Leak reversal
+
+    # Spatial second derivative (diffusion term)
+    d2V_dx2 = np.zeros_like(V)
+    d2V_dx2[1:-1] = (V[2:] - 2*V[1:-1] + V[:-2]) / dx**2
+
+    # Boundary conditions (sealed ends)
+    d2V_dx2[0] = (V[1] - V[0]) / dx**2
+    d2V_dx2[-1] = (V[-2] - V[-1]) / dx**2
+
+    # Active sodium current (Hodgkin-Huxley formalism)
+    I_Na = g_Na * m**3 * h * (V - E_Na)
+
+    # Leak current
+    I_L = g_L * (V - E_L)
+
+    # Cable equation with active currents
+    dVdt = (lambda_sq * d2V_dx2 - V - I_Na - I_L) / tau
+
+    # Gating variable kinetics
+    alpha_m = 0.1 * (V + 40) / (1 - np.exp(-(V + 40) / 10))
+    beta_m = 4 * np.exp(-(V + 65) / 18)
+    alpha_h = 0.07 * np.exp(-(V + 65) / 20)
+    beta_h = 1 / (1 + np.exp(-(V + 35) / 10))
+
+    dmdt = alpha_m * (1 - m) - beta_m * m
+    dhdt = alpha_h * (1 - h) - beta_h * h
+
+    return dVdt, dmdt, dhdt
+</Code>
+
+  <Body>This system couples the spatial diffusion of voltage (the cable equation component) with local nonlinear dynamics (the Hodgkin-Huxley gating variables). This coupling creates a reaction-diffusion system capable of supporting traveling waves.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the active cable equation?</Front>
+    <Back>An extension of the passive cable equation that includes voltage-gated ionic currents: λ²∂²V/∂x² = τ∂V/∂t + V + I_active(V, x, t), where I_active represents voltage-dependent conductances that enable signal amplification and regeneration.</Back>
+  </FlashCard>
+
+  <H1>Dendritic Sodium and Calcium Channels</H1>
+
+  <H2>Channel Distribution and Density</H2>
+  <Body>Dendrites contain various voltage-gated channels with non-uniform distributions. The two most important for active propagation are:</Body>
+
+  <Body>• Voltage-gated sodium channels (Nav): Enable fast dendritic spikes and support backpropagating action potentials. Density typically decreases from soma to distal dendrites in many neuron types.</Body>
+
+  <Body>• Voltage-gated calcium channels (Cav): Support slower, longer-lasting dendritic calcium spikes. Often concentrated in specific dendritic compartments (e.g., apical tuft of pyramidal neurons).</Body>
+
+  <Code lang="python">
+def channel_density_profile(x, params, channel_type='Na'):
+    """
+    Model spatially varying channel density along dendrite.
+
+    Parameters:
+    x : array - distance from soma (μm)
+    params : dict - density parameters
+    channel_type : str - 'Na' or 'Ca'
+
+    Returns:
+    g : array - conductance density at each position (mS/cm²)
+    """
+    if channel_type == 'Na':
+        # Exponential decay from soma
+        g_soma = params['g_Na_soma']
+        length_constant = params['Na_decay_length']
+        g = g_soma * np.exp(-x / length_constant)
+
+    elif channel_type == 'Ca':
+        # Concentrated in distal tuft
+        g_max = params['g_Ca_max']
+        x_peak = params['Ca_peak_location']
+        width = params['Ca_width']
+        g = g_max * np.exp(-((x - x_peak) / width)**2)
+
+    return g
+</Code>
+
+  <H2>Channel Kinetics</H2>
+  <Body>Dendritic sodium channels have faster kinetics than their somatic counterparts in some neuron types, potentially optimizing backpropagation fidelity. Calcium channels exhibit slower kinetics, producing broader spikes that can integrate over longer timescales.</Body>
+
+  <Code lang="python">
+def calcium_channel_kinetics(V):
+    """
+    L-type calcium channel gating (simplified).
+
+    Uses a single activation variable with voltage-dependent
+    steady-state and time constant.
+    """
+    # Steady-state activation (Boltzmann)
+    V_half = -20  # mV
+    k = 7         # slope factor
+    m_inf = 1 / (1 + np.exp(-(V - V_half) / k))
+
+    # Voltage-dependent time constant
+    tau_m = 1 + 10 / (1 + np.exp((V + 20) / 10))  # ms
+
+    return m_inf, tau_m
+</Code>
+
+  <FlashCard id="fc2">
+    <Front>How does sodium channel density typically vary along dendrites?</Front>
+    <Back>Sodium channel density typically decreases exponentially from the soma toward distal dendrites in many neuron types, though the specific distribution varies between cell types and can be activity-dependent.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc3">
+    <Front>What distinguishes dendritic calcium spikes from sodium spikes?</Front>
+    <Back>Calcium spikes are slower and longer-lasting than sodium spikes due to the slower kinetics of calcium channels. They integrate over longer timescales and are often concentrated in specific dendritic compartments like the apical tuft.</Back>
+  </FlashCard>
+
+  <H1>Dendritic Spike Initiation</H1>
+
+  <H2>Local Threshold Mechanisms</H2>
+  <Body>Dendritic spikes occur when local voltage exceeds a threshold determined by channel density and membrane properties. Unlike somatic action potentials, dendritic spikes often remain localized or propagate only partially toward the soma.</Body>
+
+  <Code lang="python">
+def simulate_dendritic_spike(params, stim_location, stim_amplitude):
+    """
+    Simulate dendritic spike initiation from local synaptic input.
+
+    Parameters:
+    params : dict - model parameters
+    stim_location : float - position of synaptic input (μm from soma)
+    stim_amplitude : float - input current amplitude (nA)
+
+    Returns:
+    t, V : time vector and voltage matrix (space × time)
+    """
+    # Spatial discretization
+    L = params['dendrite_length']  # Total length (μm)
+    dx = params['dx']              # Spatial step
+    x = np.arange(0, L + dx, dx)
+    N = len(x)
+
+    # Temporal discretization
+    T = params['T']                # Total time (ms)
+    dt = params['dt']              # Time step
+    t = np.arange(0, T + dt, dt)
+    M = len(t)
+
+    # Initialize voltage and gating variables
+    V = np.zeros((N, M))
+    V[:, 0] = params['V_rest']
+    m = np.zeros((N, M))
+    h = np.ones((N, M)) * 0.6
+
+    # Find stimulus location index
+    stim_idx = int(stim_location / dx)
+
+    # Time loop (forward Euler for simplicity)
+    for i in range(M - 1):
+        # Apply stimulus
+        I_stim = np.zeros(N)
+        if 5 &lt; t[i] &lt; 10:  # Stimulus window
+            I_stim[stim_idx] = stim_amplitude
+
+        # Compute derivatives
+        dVdt, dmdt, dhdt = active_cable_rhs(
+            V[:, i], m[:, i], h[:, i], x, dx, params
+        )
+
+        # Add stimulus current
+        dVdt += I_stim / params['C_m']
+
+        # Update variables
+        V[:, i+1] = V[:, i] + dt * dVdt
+        m[:, i+1] = m[:, i] + dt * dmdt
+        h[:, i+1] = h[:, i] + dt * dhdt
+
+    return t, x, V
+</Code>
+
+  <H2>Conditions for Spike Initiation</H2>
+  <Body>Dendritic spike initiation requires:</Body>
+  <Body>1. Sufficient local channel density to provide regenerative inward current</Body>
+  <Body>2. Synaptic input strong enough to depolarize the membrane past threshold</Body>
+  <Body>3. Temporal coincidence of multiple inputs (in the case of NMDA-dependent spikes)</Body>
+
+  <Body>The threshold for dendritic spikes is typically higher than for somatic action potentials due to lower channel densities and the electrical load from neighboring dendritic segments.</Body>
+
+  <SingleSelect id="q1">
+    <Prompt>Why is the threshold for dendritic spike initiation typically higher than for somatic action potentials?</Prompt>
+    <Options>
+      <Option>Dendritic membrane has higher resistance</Option>
+      <Option correct="true">Lower channel density and electrical load from neighboring segments</Option>
+      <Option>Dendrites have smaller diameter than the soma</Option>
+      <Option>Dendritic channels have slower kinetics</Option>
+    </Options>
+  </SingleSelect>
+
+  <H1>Backpropagating Action Potentials</H1>
+
+  <H2>Soma-to-Dendrite Propagation</H2>
+  <Body>When an action potential is initiated at the axon initial segment, it not only propagates down the axon but also invades the dendritic tree. This backpropagating action potential (bAP) provides a retrograde signal that can interact with incoming synaptic inputs.</Body>
+
+  <Code lang="python">
+def simulate_backpropagation(params):
+    """
+    Simulate backpropagating action potential from soma into dendrite.
+
+    The soma is treated as a boundary condition that fires an AP,
+    and we observe how it propagates into the dendritic tree.
+    """
+    # Setup spatial grid
+    L = params['dendrite_length']
+    dx = params['dx']
+    x = np.arange(0, L + dx, dx)
+    N = len(x)
+
+    # Channel density decreases with distance
+    g_Na = channel_density_profile(x, params, 'Na')
+
+    # Temporal setup
+    T = params['T']
+    dt = params['dt']
+    t = np.arange(0, T + dt, dt)
+    M = len(t)
+
+    # Initialize
+    V = np.zeros((N, M))
+    V[:, 0] = params['V_rest']
+    m = np.zeros((N, M))
+    h = np.ones((N, M)) * 0.6
+
+    # Somatic AP waveform (boundary condition at x=0)
+    t_AP = 2  # AP start time (ms)
+    for i, ti in enumerate(t):
+        if t_AP &lt; ti &lt; t_AP + 1:
+            V[0, i] = 30  # Peak of somatic AP
+        elif t_AP + 1 &lt; ti &lt; t_AP + 3:
+            V[0, i] = -70  # AHP
+
+    # Simulate propagation
+    for i in range(M - 1):
+        # Spatial derivative (excluding boundary at x=0)
+        d2V = np.zeros(N)
+        d2V[1:-1] = (V[2:, i] - 2*V[1:-1, i] + V[:-2, i]) / dx**2
+        d2V[-1] = (V[-2, i] - V[-1, i]) / dx**2  # Sealed end
+
+        # Active currents with position-dependent conductance
+        I_Na = g_Na * m[1:, i]**3 * h[1:, i] * (V[1:, i] - params['E_Na'])
+
+        # Update (excluding fixed boundary)
+        dVdt = (params['lambda']**2 * d2V[1:] - V[1:, i] - I_Na) / params['tau']
+        V[1:, i+1] = V[1:, i] + dt * dVdt
+
+        # Update gating variables
+        # ... (kinetics as before)
+
+    return t, x, V
+</Code>
+
+  <H2>Attenuation and Modulation</H2>
+  <Body>Backpropagating APs attenuate as they travel into the dendritic tree due to:</Body>
+  <Body>• Decreasing sodium channel density</Body>
+  <Body>• Increasing membrane load from branching</Body>
+  <Body>• A-type potassium channels that dampen propagation</Body>
+
+  <Body>However, this attenuation is actively regulated and can be modulated by neuromodulators, prior activity, and local synaptic inputs.</Body>
+
+  <FlashCard id="fc4">
+    <Front>What is a backpropagating action potential (bAP)?</Front>
+    <Back>A backpropagating action potential is an AP initiated at the axon initial segment that propagates retrogradely into the dendritic tree, providing a signal that can interact with incoming synaptic inputs and participate in synaptic plasticity mechanisms.</Back>
+  </FlashCard>
+
+  <MatchPairs id="q2">
+    <Prompt>Match each factor with its effect on backpropagating action potentials:</Prompt>
+    <Pairs>
+      <Pair><Left>Decreasing Na+ channel density</Left><Right>Causes amplitude attenuation</Right></Pair>
+      <Pair><Left>A-type K+ channels</Left><Right>Dampens propagation velocity</Right></Pair>
+      <Pair><Left>Dendritic branching</Left><Right>Increases electrical load</Right></Pair>
+      <Pair><Left>Neuromodulators</Left><Right>Can enhance or reduce bAP amplitude</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Accelerates propagation</Distractor>
+      <Distractor>Initiates forward propagation</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H1>Dendritic Amplification</H1>
+
+  <H2>Boosting Distal Synaptic Inputs</H2>
+  <Body>One of the most important functions of active dendrites is amplification of distal synaptic inputs. Without active conductances, inputs to distal dendrites would be severely attenuated before reaching the soma. Dendritic voltage-gated channels can boost these signals, partially compensating for passive attenuation.</Body>
+
+  <Code lang="python">
+def compare_passive_vs_active_integration(params, input_location):
+    """
+    Compare synaptic integration with and without active conductances.
+
+    Demonstrates dendritic amplification by showing the difference
+    in somatic voltage response to identical distal input.
+    """
+    # Simulate passive cable
+    params_passive = params.copy()
+    params_passive['g_Na'] = 0  # Disable active channels
+    t, x, V_passive = simulate_dendritic_spike(
+        params_passive, input_location, stim_amplitude=0.5
+    )
+
+    # Simulate active cable
+    t, x, V_active = simulate_dendritic_spike(
+        params, input_location, stim_amplitude=0.5
+    )
+
+    # Extract somatic responses
+    soma_idx = 0
+    V_soma_passive = V_passive[soma_idx, :]
+    V_soma_active = V_active[soma_idx, :]
+
+    # Calculate amplification factor
+    peak_passive = np.max(V_soma_passive) - params['V_rest']
+    peak_active = np.max(V_soma_active) - params['V_rest']
+    amplification = peak_active / peak_passive
+
+    return t, V_soma_passive, V_soma_active, amplification
+</Code>
+
+  <H2>Mechanisms of Amplification</H2>
+  <Body>Dendritic amplification occurs through several mechanisms:</Body>
+
+  <Body>1. Subthreshold persistent sodium currents: Activated near resting potential, these channels amplify small depolarizations.</Body>
+
+  <Body>2. NMDA receptor nonlinearity: The voltage-dependent Mg²⁺ block of NMDA receptors creates a regenerative mechanism when combined with local depolarization.</Body>
+
+  <Body>3. Calcium-mediated plateau potentials: L-type calcium channels can sustain prolonged depolarizations that boost synaptic signals.</Body>
+
+  <Code lang="python">
+def persistent_sodium_amplification(V, g_NaP, E_Na):
+    """
+    Compute persistent sodium current contribution.
+
+    Persistent Na+ channels activate at subthreshold voltages
+    and do not inactivate, providing sustained amplification.
+    """
+    # Steady-state activation (no inactivation)
+    V_half = -55  # mV (more negative than transient Na+)
+    k = 5         # Steeper voltage dependence
+    m_inf = 1 / (1 + np.exp(-(V - V_half) / k))
+
+    # Persistent sodium current
+    I_NaP = g_NaP * m_inf * (V - E_Na)
+
+    # Amplification factor (linearized around rest)
+    # dI/dV provides effective negative conductance
+    dI_dV = g_NaP * m_inf * (1 - m_inf) / k * (V - E_Na) + g_NaP * m_inf
+
+    return I_NaP, dI_dV
+</Code>
+
+  <SingleSelect id="q3">
+    <Prompt>Which mechanism does NOT contribute to dendritic amplification of synaptic inputs?</Prompt>
+    <Options>
+      <Option>Persistent sodium currents</Option>
+      <Option>NMDA receptor voltage-dependent Mg²⁺ block</Option>
+      <Option correct="true">AMPA receptor desensitization</Option>
+      <Option>L-type calcium channel plateau potentials</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4">
+    <Prompt>Which of the following are TRUE about dendritic amplification? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">It partially compensates for passive attenuation of distal inputs</Option>
+      <Option correct="true">Persistent sodium currents contribute by activating at subthreshold voltages</Option>
+      <Option>It completely eliminates distance-dependent attenuation</Option>
+      <Option correct="true">NMDA receptors contribute through voltage-dependent Mg²⁺ unblock</Option>
+    </Options>
+  </MultiSelect>
+
+  <H1>Computational Implications of Active Dendrites</H1>
+
+  <H2>Coincidence Detection</H2>
+  <Body>Active dendrites enable coincidence detection by requiring temporally correlated inputs to trigger dendritic spikes. The nonlinear threshold acts as an AND gate: inputs must arrive within a narrow time window to summate sufficiently for spike initiation.</Body>
+
+  <Code lang="python">
+def coincidence_detection_window(params, input_locations, delta_t_range):
+    """
+    Measure the temporal window for coincidence detection.
+
+    Parameters:
+    params : dict - model parameters
+    input_locations : list - positions of two inputs
+    delta_t_range : array - time differences to test
+
+    Returns:
+    delta_t_range, spike_probability - coincidence detection curve
+    """
+    spike_probability = []
+
+    for delta_t in delta_t_range:
+        # Simulate with two inputs separated by delta_t
+        # Input 1 at t=5ms, Input 2 at t=5+delta_t ms
+        V_max = simulate_two_inputs(
+            params,
+            input_locations,
+            timing=[5, 5 + delta_t]
+        )
+
+        # Check if dendritic spike occurred (threshold crossing)
+        spike = 1 if V_max &gt; params['spike_threshold'] else 0
+        spike_probability.append(spike)
+
+    return delta_t_range, np.array(spike_probability)
+</Code>
+
+  <Body>The width of the coincidence detection window depends on membrane time constant, local channel properties, and the spatial proximity of inputs. Typical windows range from 5-20 ms for NMDA-dependent dendritic spikes.</Body>
+
+  <H2>Direction Selectivity</H2>
+  <Body>Active dendrites can implement direction selectivity through asymmetric signal propagation. If synaptic inputs arrive sequentially along a dendrite, the order of arrival determines whether signals summate supralinearly (preferred direction) or sublinearly (null direction).</Body>
+
+  <Code lang="python">
+def direction_selectivity_index(V_preferred, V_null):
+    """
+    Calculate direction selectivity index (DSI).
+
+    DSI = (R_pref - R_null) / (R_pref + R_null)
+
+    DSI = 1: perfectly selective
+    DSI = 0: no selectivity
+    """
+    R_pref = np.max(V_preferred) - V_rest
+    R_null = np.max(V_null) - V_rest
+
+    DSI = (R_pref - R_null) / (R_pref + R_null)
+    return DSI
+</Code>
+
+  <FlashCard id="fc5">
+    <Front>How do active dendrites enable coincidence detection?</Front>
+    <Back>Active dendrites enable coincidence detection through their nonlinear spike threshold, which acts as an AND gate requiring temporally correlated inputs to arrive within a narrow window (5-20 ms) to summate sufficiently for dendritic spike initiation.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc6">
+    <Front>What is direction selectivity in the context of active dendrites?</Front>
+    <Back>Direction selectivity is the ability of dendrites to respond preferentially to stimuli moving in one direction. It arises from asymmetric signal propagation: sequential inputs in the preferred direction summate supralinearly, while inputs in the null direction summate sublinearly.</Back>
+  </FlashCard>
+
+  <SortQuiz id="q5">
+    <Prompt>Order the following events in the generation of a backpropagating action potential, from first to last:</Prompt>
+    <SortedItems>
+      <Item>Synaptic input depolarizes the soma</Item>
+      <Item>Action potential initiates at axon initial segment</Item>
+      <Item>AP actively invades proximal dendrites</Item>
+      <Item>bAP attenuates in distal dendrites</Item>
+      <Item>bAP interacts with local synaptic inputs</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H1>Numerical Methods: Operator Splitting</H1>
+
+  <H2>Reaction-Diffusion Framework</H2>
+  <Body>The active cable equation is a reaction-diffusion system where:</Body>
+  <Body>• Diffusion: Spatial spread of voltage along the cable (λ²∂²V/∂x²)</Body>
+  <Body>• Reaction: Local nonlinear dynamics from voltage-gated channels</Body>
+
+  <Body>Operator splitting separates these components, allowing efficient numerical solution using specialized methods for each part.</Body>
+
+  <Code lang="python">
+def operator_splitting_step(V, m, h, dx, dt, params):
+    """
+    Single time step using Strang splitting for reaction-diffusion.
+
+    Strang splitting: R(dt/2) -> D(dt) -> R(dt/2)
+
+    This achieves second-order accuracy in time while allowing
+    optimal solvers for each component.
+    """
+    # Step 1: Half-step of reaction (local dynamics)
+    V, m, h = reaction_step(V, m, h, dt/2, params)
+
+    # Step 2: Full step of diffusion (spatial spread)
+    V = diffusion_step(V, dx, dt, params)
+
+    # Step 3: Half-step of reaction
+    V, m, h = reaction_step(V, m, h, dt/2, params)
+
+    return V, m, h
+
+def reaction_step(V, m, h, dt, params):
+    """
+    Solve local (pointwise) Hodgkin-Huxley dynamics.
+    Uses Rush-Larsen method for gating variables.
+    """
+    # Ionic currents (no spatial coupling)
+    I_Na = params['g_Na'] * m**3 * h * (V - params['E_Na'])
+    I_L = params['g_L'] * (V - params['E_L'])
+
+    # Voltage update (forward Euler)
+    dVdt = -(I_Na + I_L) / params['C_m']
+    V_new = V + dt * dVdt
+
+    # Rush-Larsen for gating variables (exponential integrator)
+    alpha_m, beta_m = m_kinetics(V)
+    alpha_h, beta_h = h_kinetics(V)
+
+    m_inf = alpha_m / (alpha_m + beta_m)
+    tau_m = 1 / (alpha_m + beta_m)
+    h_inf = alpha_h / (alpha_h + beta_h)
+    tau_h = 1 / (alpha_h + beta_h)
+
+    m_new = m_inf + (m - m_inf) * np.exp(-dt / tau_m)
+    h_new = h_inf + (h - h_inf) * np.exp(-dt / tau_h)
+
+    return V_new, m_new, h_new
+
+def diffusion_step(V, dx, dt, params):
+    """
+    Solve diffusion equation using Crank-Nicolson.
+
+    Implicit method for stability with larger time steps.
+    """
+    N = len(V)
+    lambda_sq = params['lambda']**2
+    tau = params['tau']
+
+    # Crank-Nicolson coefficient
+    r = lambda_sq * dt / (2 * tau * dx**2)
+
+    # Build tridiagonal system: A * V_new = B * V_old
+    # A = I - r*D2, B = I + r*D2 (D2 is discrete Laplacian)
+
+    # Main diagonal
+    diag_A = np.ones(N) * (1 + 2*r)
+    diag_B = np.ones(N) * (1 - 2*r)
+
+    # Off-diagonals
+    off_A = np.ones(N-1) * (-r)
+    off_B = np.ones(N-1) * r
+
+    # Boundary conditions (sealed ends)
+    diag_A[0] = 1 + r
+    diag_A[-1] = 1 + r
+    diag_B[0] = 1 - r
+    diag_B[-1] = 1 - r
+
+    # Compute RHS: B * V_old
+    rhs = diag_B * V
+    rhs[:-1] += off_B * V[1:]
+    rhs[1:] += off_B * V[:-1]
+
+    # Solve tridiagonal system (Thomas algorithm)
+    V_new = solve_tridiagonal(off_A, diag_A, off_A, rhs)
+
+    return V_new
+</Code>
+
+  <H2>Advantages of Operator Splitting</H2>
+  <Body>1. Stability: Implicit methods for diffusion allow larger time steps</Body>
+  <Body>2. Accuracy: Rush-Larsen method for gating variables preserves exponential dynamics</Body>
+  <Body>3. Modularity: Reaction and diffusion components can be updated independently</Body>
+  <Body>4. Efficiency: Each subproblem uses its optimal solver</Body>
+
+  <FillBlanks id="q6">
+    <Prompt>
+      Operator splitting separates the active cable equation into two components: the <Blank>diffusion</Blank> component handles spatial voltage spread, while the <Blank>reaction</Blank> component handles local nonlinear channel dynamics. Strang splitting achieves <Blank>second-order</Blank> accuracy by applying R(dt/2) → D(dt) → R(dt/2).
+    </Prompt>
+    <Distractors>
+      <Distractor>convection</Distractor>
+      <Distractor>first-order</Distractor>
+      <Distractor>absorption</Distractor>
+      <Distractor>third-order</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H1>Experimental Validation</H1>
+
+  <H2>Dendritic Recordings</H2>
+  <Body>Active dendritic properties have been validated through direct electrophysiological recordings from dendrites using patch-clamp techniques. These experiments revealed:</Body>
+
+  <Body>• Dendritic sodium spikes with characteristic fast kinetics</Body>
+  <Body>• Calcium spikes with longer duration and distinct threshold</Body>
+  <Body>• Backpropagating AP amplitude decreasing with distance from soma</Body>
+  <Body>• Modulation of bAP amplitude by prior activity and neuromodulators</Body>
+
+  <H2>Calcium Imaging</H2>
+  <Body>Two-photon calcium imaging allows visualization of dendritic activity patterns with subcellular resolution. This technique has revealed:</Body>
+
+  <Body>• Localized calcium transients indicating dendritic spikes</Body>
+  <Body>• Spatial extent of bAP invasion into dendritic branches</Body>
+  <Body>• Correlation between local calcium signals and synaptic plasticity</Body>
+
+  <Code lang="python">
+def analyze_calcium_imaging_data(fluorescence, baseline_frames, params):
+    """
+    Process calcium imaging data to detect dendritic events.
+
+    Parameters:
+    fluorescence : array - raw fluorescence (ROIs × time)
+    baseline_frames : tuple - (start, end) frames for baseline
+    params : dict - analysis parameters
+
+    Returns:
+    dF_F : array - normalized fluorescence change
+    events : list - detected calcium transient times
+    """
+    # Calculate baseline fluorescence
+    F0 = np.mean(fluorescence[:, baseline_frames[0]:baseline_frames[1]], axis=1)
+
+    # Compute ΔF/F
+    dF_F = (fluorescence - F0[:, np.newaxis]) / F0[:, np.newaxis]
+
+    # Detect events (threshold crossing)
+    threshold = params['event_threshold']  # Typically 2-3 SD
+    events = []
+
+    for roi in range(dF_F.shape[0]):
+        # Find threshold crossings
+        above_threshold = dF_F[roi, :] &gt; threshold
+        event_onsets = np.where(np.diff(above_threshold.astype(int)) == 1)[0]
+        events.append(event_onsets)
+
+    return dF_F, events
+</Code>
+
+  <SingleSelect id="q7">
+    <Prompt>Which experimental technique provides the most direct measurement of dendritic membrane potential?</Prompt>
+    <Options>
+      <Option correct="true">Dendritic patch-clamp recording</Option>
+      <Option>Two-photon calcium imaging</Option>
+      <Option>Voltage-sensitive dye imaging</Option>
+      <Option>Extracellular recording</Option>
+    </Options>
+  </SingleSelect>
+
+  <H1>Summary</H1>
+
+  <Body>Active dendrites fundamentally transform neuronal computation by enabling nonlinear signal integration. Key takeaways from this lesson:</Body>
+
+  <Body>1. The active cable equation extends passive cable theory by incorporating voltage-gated conductances, creating a reaction-diffusion system.</Body>
+
+  <Body>2. Dendritic sodium and calcium channels have distinct distributions and kinetics, supporting different types of dendritic spikes.</Body>
+
+  <Body>3. Backpropagating action potentials provide retrograde signals that can interact with incoming synaptic inputs.</Body>
+
+  <Body>4. Dendritic amplification partially compensates for passive attenuation, allowing distal inputs to influence somatic firing.</Body>
+
+  <Body>5. Active dendrites enable sophisticated computations including coincidence detection and direction selectivity.</Body>
+
+  <Body>6. Operator splitting provides an efficient numerical framework for simulating these reaction-diffusion systems.</Body>
+
+  <FlashCard id="fc7">
+    <Front>What are the two main components in the operator splitting approach to solving the active cable equation?</Front>
+    <Back>The diffusion component (spatial spread of voltage, solved with implicit methods like Crank-Nicolson) and the reaction component (local nonlinear channel dynamics, solved with methods like Rush-Larsen for gating variables).</Back>
+  </FlashCard>
+
+  <H1>Assessment</H1>
+
+  <Subjective id="q8">
+    <Prompt>Explain how active dendrites expand the computational capabilities of neurons beyond what passive cable theory predicts. In your answer, discuss at least two specific computational functions enabled by active dendritic properties and explain the biophysical mechanisms that support them.</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Explains that active dendrites enable nonlinear signal integration through voltage-gated channels, contrasting with the linear attenuation of passive cables</Requirement>
+        <Indicators>nonlinear, voltage-gated, active conductances, beyond passive, threshold, regenerative</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes at least two computational functions (coincidence detection, direction selectivity, pattern separation, amplification) with mechanistic detail</Requirement>
+        <Indicators>coincidence detection, direction selectivity, AND gate, temporal window, asymmetric, amplification, calcium spike, NMDA</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains the biophysical mechanisms supporting these functions (channel types, distributions, kinetics)</Requirement>
+        <Indicators>sodium channels, calcium channels, channel density, kinetics, NMDA, Mg block, persistent current</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Provides concrete examples or relates to experimental evidence</Requirement>
+        <Indicators>pyramidal neurons, cortex, hippocampus, patch clamp, calcium imaging, experimental</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+  <Subjective id="q9">
+    <Prompt>Describe the operator splitting approach for numerically solving the active cable equation. Why is this method advantageous compared to solving the full system directly? Include discussion of the Strang splitting scheme and appropriate solvers for each component.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly explains that operator splitting separates diffusion (spatial) and reaction (local dynamics) components</Requirement>
+        <Indicators>operator splitting, diffusion, reaction, separate, spatial, local dynamics, cable, gating</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Describes the Strang splitting scheme (R-D-R with half steps) and its second-order accuracy</Requirement>
+        <Indicators>Strang, half step, second-order, R-D-R, dt/2, accuracy, splitting scheme</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses appropriate solvers: implicit methods for diffusion, Rush-Larsen for gating variables</Requirement>
+        <Indicators>Crank-Nicolson, implicit, Rush-Larsen, exponential integrator, tridiagonal, stability</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains advantages: stability, efficiency, modularity, larger time steps</Requirement>
+        <Indicators>stability, efficiency, modularity, larger time steps, optimal solver, independent</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="250" />
+  </Subjective>
+
+</Lesson>

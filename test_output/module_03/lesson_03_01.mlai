@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-03-01</Id>
+    <Title>Diffusion Processes: Ornstein-Uhlenbeck and Beyond</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>stochastic-processes</Tag>
+      <Tag>ornstein-uhlenbeck</Tag>
+      <Tag>diffusion</Tag>
+      <Tag>membrane-potential</Tag>
+      <Tag>computational-neuroscience</Tag>
+      <Tag>euler-maruyama</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Diffusion Processes: Ornstein-Uhlenbeck and Beyond</H1>
+
+  <Body>In the previous module, we studied the deterministic integrate-and-fire model with constant input current. While this captures essential features of neuronal integration, real neurons are subject to continuous stochastic fluctuations from synaptic bombardment, ion channel noise, and network activity. The Ornstein-Uhlenbeck (OU) process provides the canonical mathematical framework for modeling these continuous fluctuations, balancing mean reversion with diffusive noise to capture subthreshold membrane potential dynamics.</Body>
+
+  <Body>This lesson develops the mathematical foundations of diffusion processes, from the Wiener process (Brownian motion) to the OU process, with emphasis on analytical solutions, numerical implementation, and applications to computational neuroscience.</Body>
+
+  <H2>The Wiener Process: Mathematical Foundation</H2>
+
+  <Body>The Wiener process W(t), also called Brownian motion, is the fundamental building block for continuous-time stochastic processes. It was first rigorously defined by Norbert Wiener in 1923, providing the mathematical foundation for Einstein's 1905 theory of Brownian motion.</Body>
+
+  <H3>Definition and Properties</H3>
+
+  <Body>A standard Wiener process W(t) is a continuous-time stochastic process satisfying four key properties:</Body>
+
+  <Body>1. W(0) = 0 (starts at origin)</Body>
+  <Body>2. Independent increments: for any times 0 ≤ t₁ &lt; t₂ ≤ t₃ &lt; t₄, the increments W(t₂) - W(t₁) and W(t₄) - W(t₃) are independent</Body>
+  <Body>3. Gaussian increments: W(t) - W(s) ~ N(0, t - s) for t &gt; s</Body>
+  <Body>4. Continuous sample paths: W(t) is continuous in t almost surely</Body>
+
+  <Body>The increment dW over an infinitesimal time dt has variance dt, which we write symbolically as:</Body>
+
+  <Code lang="plaintext">
+E[dW] = 0
+E[(dW)²] = dt
+  </Code>
+
+  <Body>This scaling relationship—variance proportional to time—is the hallmark of diffusion processes. A critical point often confused: the Wiener process increment dW is not the same as Gaussian white noise ξ(t), which has infinite variance at each instant. Rather, dW = ξ(t)dt represents the integrated effect of white noise over infinitesimal time.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the variance of a Wiener process increment W(t) - W(s)?</Front>
+    <Back>Var[W(t) - W(s)] = t - s. The variance equals the time interval, reflecting the fundamental diffusion scaling where variance grows linearly with time.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc2">
+    <Front>What are the four defining properties of a standard Wiener process?</Front>
+    <Back>1) W(0) = 0, 2) Independent increments, 3) Gaussian increments with W(t) - W(s) ~ N(0, t-s), 4) Continuous sample paths almost surely.</Back>
+  </FlashCard>
+
+  <H2>The Ornstein-Uhlenbeck Process</H2>
+
+  <Body>The Ornstein-Uhlenbeck process extends the Wiener process by adding a mean-reverting drift term. Originally introduced by Uhlenbeck and Ornstein (1930) to model velocity of a Brownian particle subject to friction, it has become the standard model for membrane potential fluctuations in computational neuroscience.</Body>
+
+  <H3>Stochastic Differential Equation</H3>
+
+  <Body>The OU process V(t) satisfies the stochastic differential equation (SDE):</Body>
+
+  <Code lang="plaintext">
+dV = -(V - μ)/τ dt + σ dW
+  </Code>
+
+  <Body>where:</Body>
+  <Body>• μ is the mean (resting potential)</Body>
+  <Body>• τ is the time constant (membrane time constant)</Body>
+  <Body>• σ is the noise intensity (diffusion coefficient)</Body>
+  <Body>• dW is the Wiener process increment</Body>
+
+  <Body>The drift term -(V - μ)/τ provides mean reversion: when V &gt; μ, the drift is negative (pushing V down); when V &lt; μ, the drift is positive (pushing V up). The noise term σdW adds continuous random perturbations.</Body>
+
+  <H3>Physical Interpretation for Neural Systems</H3>
+
+  <Body>For a leaky integrate-and-fire neuron receiving fluctuating synaptic input, the subthreshold membrane potential follows an OU process where:</Body>
+
+  <Body>• μ represents the mean input level (determined by balance of excitation/inhibition)</Body>
+  <Body>• τ is the membrane time constant (typically 10-30 ms)</Body>
+  <Body>• σ reflects the amplitude of synaptic fluctuations</Body>
+
+  <FlashCard id="fc3">
+    <Front>In the OU process dV = -(V - μ)/τ dt + σ dW, what physical quantity does τ represent?</Front>
+    <Back>τ is the time constant controlling the rate of mean reversion. In neural contexts, it corresponds to the membrane time constant, typically 10-30 ms, determining how quickly the membrane potential returns toward its resting value.</Back>
+  </FlashCard>
+
+  <H3>Analytical Solution</H3>
+
+  <Body>The OU SDE can be solved exactly using the integrating factor method. For initial condition V(0) = V₀, the solution is:</Body>
+
+  <Code lang="plaintext">
+V(t) = μ + (V₀ - μ)exp(-t/τ) + σ ∫₀ᵗ exp(-(t-s)/τ) dW(s)
+  </Code>
+
+  <Body>The first two terms give the deterministic relaxation from V₀ toward μ. The stochastic integral represents accumulated noise, weighted by exponential decay.</Body>
+
+  <Body>From this solution, we can derive the moments:</Body>
+
+  <Code lang="plaintext">
+E[V(t)] = μ + (V₀ - μ)exp(-t/τ)
+
+Var[V(t)] = (σ²τ/2)[1 - exp(-2t/τ)]
+  </Code>
+
+  <Body>As t → ∞, the mean approaches μ and the variance approaches the stationary value σ²τ/2.</Body>
+
+  <SingleSelect id="q1">
+    <Prompt>For an OU process with time constant τ = 20 ms and initial condition V₀ ≠ μ, approximately how long does it take for the mean E[V(t)] to reach 95% of the way from V₀ to μ?</Prompt>
+    <Options>
+      <Option>20 ms</Option>
+      <Option>40 ms</Option>
+      <Option correct="true">60 ms</Option>
+      <Option>100 ms</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Stationary Distribution</H2>
+
+  <Body>At long times, the OU process reaches a stationary (equilibrium) distribution that is independent of initial conditions. This stationary distribution is Gaussian:</Body>
+
+  <Code lang="plaintext">
+p_∞(V) = (1/√(πσ²τ)) exp(-(V - μ)²/(σ²τ))
+  </Code>
+
+  <Body>This is a normal distribution N(μ, σ²τ/2) with:</Body>
+  <Body>• Mean: μ</Body>
+  <Body>• Variance: σ²τ/2</Body>
+
+  <Body>The stationary variance σ²τ/2 reflects a balance: larger noise intensity σ increases variance, while faster mean reversion (smaller τ) decreases variance by pulling trajectories back toward μ more quickly.</Body>
+
+  <H3>Derivation via Fokker-Planck Equation</H3>
+
+  <Body>The stationary distribution can also be derived from the Fokker-Planck equation. For the OU process, the probability density p(V,t) evolves according to:</Body>
+
+  <Code lang="plaintext">
+∂p/∂t = (1/τ)∂[(V - μ)p]/∂V + (σ²/2)∂²p/∂V²
+  </Code>
+
+  <Body>Setting ∂p/∂t = 0 and solving with normalization gives the Gaussian stationary distribution above.</Body>
+
+  <FlashCard id="fc4">
+    <Front>What is the stationary variance of an OU process with parameters τ (time constant) and σ (noise intensity)?</Front>
+    <Back>The stationary variance is σ²τ/2. This reflects the balance between noise (σ² increases variance) and mean reversion (1/τ decreases variance).</Back>
+  </FlashCard>
+
+  <MultiSelect id="q2">
+    <Prompt>Which of the following statements about the OU stationary distribution are correct?</Prompt>
+    <Options>
+      <Option correct="true">The stationary distribution is Gaussian</Option>
+      <Option correct="true">The stationary mean equals the drift parameter μ</Option>
+      <Option>The stationary variance is independent of the time constant τ</Option>
+      <Option correct="true">Larger noise intensity σ leads to larger stationary variance</Option>
+      <Option>The distribution depends on the initial condition V₀</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Autocorrelation Function</H2>
+
+  <Body>The autocorrelation function C(τ_lag) describes how the process correlates with itself at different time lags. For the stationary OU process:</Body>
+
+  <Code lang="plaintext">
+C(τ_lag) = E[(V(t) - μ)(V(t + τ_lag) - μ)] = (σ²τ/2) exp(-|τ_lag|/τ)
+  </Code>
+
+  <Body>Key features of this autocorrelation:</Body>
+  <Body>• At zero lag: C(0) = σ²τ/2 (the stationary variance)</Body>
+  <Body>• Exponential decay with time constant τ</Body>
+  <Body>• The correlation time equals the mean-reversion time constant</Body>
+
+  <Body>This exponential autocorrelation is a defining characteristic of the OU process and distinguishes it from white noise (delta-correlated) or processes with longer memory.</Body>
+
+  <SingleSelect id="q3">
+    <Prompt>For an OU process with τ = 10 ms, what is the autocorrelation at lag τ_lag = 10 ms relative to the zero-lag autocorrelation?</Prompt>
+    <Options>
+      <Option>0.50</Option>
+      <Option correct="true">0.37 (approximately 1/e)</Option>
+      <Option>0.25</Option>
+      <Option>0.10</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Numerical Integration: Euler-Maruyama Method</H2>
+
+  <Body>While the OU process has an analytical solution, numerical integration is essential for more complex stochastic systems and for generating sample trajectories. The Euler-Maruyama method is the standard first-order scheme for SDEs.</Body>
+
+  <H3>Algorithm</H3>
+
+  <Body>For the SDE dV = a(V)dt + b(V)dW with timestep Δt:</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def euler_maruyama_ou(mu, tau, sigma, V0, T, dt):
+    """
+    Simulate OU process using Euler-Maruyama method.
+
+    Parameters:
+    -----------
+    mu : float
+        Mean (resting potential)
+    tau : float
+        Time constant
+    sigma : float
+        Noise intensity
+    V0 : float
+        Initial condition
+    T : float
+        Total simulation time
+    dt : float
+        Timestep
+
+    Returns:
+    --------
+    t : ndarray
+        Time points
+    V : ndarray
+        Voltage trajectory
+    """
+    n_steps = int(T / dt)
+    t = np.linspace(0, T, n_steps + 1)
+    V = np.zeros(n_steps + 1)
+    V[0] = V0
+
+    # Precompute noise increments: dW ~ N(0, dt)
+    dW = np.sqrt(dt) * np.random.randn(n_steps)
+
+    for i in range(n_steps):
+        # Euler-Maruyama update
+        drift = -(V[i] - mu) / tau
+        diffusion = sigma
+        V[i+1] = V[i] + drift * dt + diffusion * dW[i]
+
+    return t, V
+  </Code>
+
+  <Body>Critical implementation details:</Body>
+  <Body>• The noise increment dW is drawn as N(0, Δt), implemented as √Δt × N(0,1)</Body>
+  <Body>• The timestep Δt must be much smaller than τ for accuracy (typically Δt &lt; τ/10)</Body>
+  <Body>• Unlike deterministic ODEs, using standard Runge-Kutta methods for SDEs is incorrect—they assume smooth functions</Body>
+
+  <FlashCard id="fc5">
+    <Front>In the Euler-Maruyama method, how should the Wiener increment dW be sampled for timestep Δt?</Front>
+    <Back>dW should be sampled from N(0, Δt), which is implemented as √Δt × Z where Z ~ N(0,1). This ensures the correct variance scaling: Var[dW] = Δt.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc6">
+    <Front>Why can't standard Runge-Kutta methods be used directly for stochastic differential equations?</Front>
+    <Back>Runge-Kutta methods assume the driving function is smooth and can be evaluated at intermediate points. The Wiener process dW is nowhere differentiable and has independent increments, violating these assumptions. Specialized stochastic integration schemes like Euler-Maruyama are required.</Back>
+  </FlashCard>
+
+  <FillBlanks id="q4">
+    <Prompt>In the Euler-Maruyama scheme, the noise increment dW is sampled from a <Blank>Gaussian</Blank> distribution with mean zero and variance equal to the <Blank>timestep</Blank> Δt.</Prompt>
+    <Distractors>
+      <Distractor>uniform</Distractor>
+      <Distractor>Poisson</Distractor>
+      <Distractor>noise intensity</Distractor>
+      <Distractor>time constant</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H3>Validation Against Analytical Results</H3>
+
+  <Body>A crucial step in any numerical implementation is validation. For the OU process, we can compare:</Body>
+
+  <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Parameters
+mu = -65.0      # mV (resting potential)
+tau = 20.0      # ms (membrane time constant)
+sigma = 3.0     # mV/√ms (noise intensity)
+T = 10000.0     # ms (total time for statistics)
+dt = 0.1        # ms (timestep)
+
+# Analytical predictions
+var_analytical = sigma**2 * tau / 2
+print(f"Analytical stationary variance: {var_analytical:.2f} mV²")
+
+# Simulate and compute numerical statistics
+t, V = euler_maruyama_ou(mu, tau, sigma, mu, T, dt)
+
+# Discard transient (first 5τ)
+V_stationary = V[t &gt; 5*tau]
+var_numerical = np.var(V_stationary)
+mean_numerical = np.mean(V_stationary)
+
+print(f"Numerical mean: {mean_numerical:.2f} mV (expected: {mu})")
+print(f"Numerical variance: {var_numerical:.2f} mV² (expected: {var_analytical:.2f})")
+  </Code>
+
+  <Body>For the parameters above, the analytical stationary variance is σ²τ/2 = 9 × 20/2 = 90 mV². Numerical results should match within statistical uncertainty.</Body>
+
+  <MatchPairs id="q5">
+    <Prompt>Match each quantity with its role in validating OU numerical simulations:</Prompt>
+    <Pairs>
+      <Pair><Left>σ²τ/2</Left><Right>Analytical stationary variance</Right></Pair>
+      <Pair><Left>μ</Left><Right>Expected long-time mean</Right></Pair>
+      <Pair><Left>5τ</Left><Right>Typical transient duration to discard</Right></Pair>
+      <Pair><Left>exp(-|τ_lag|/τ)</Left><Right>Autocorrelation decay shape</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Timestep requirement</Distractor>
+      <Distractor>Initial condition effect</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Application: Subthreshold Membrane Potential Fluctuations</H2>
+
+  <Body>The OU process provides an excellent model for subthreshold membrane potential dynamics in neurons receiving ongoing synaptic input. In vivo, cortical neurons are bombarded by thousands of synaptic inputs per second, creating continuous fluctuations.</Body>
+
+  <H3>Diffusion Approximation</H3>
+
+  <Body>When a neuron receives many small, independent synaptic inputs, the central limit theorem justifies approximating the total input as Gaussian. If each input causes a small, exponentially-decaying postsynaptic potential, the resulting dynamics are well-approximated by an OU process.</Body>
+
+  <Body>The parameters have clear biological interpretations:</Body>
+  <Body>• μ: balance of excitatory and inhibitory drive</Body>
+  <Body>• τ: membrane time constant (C_m/g_L)</Body>
+  <Body>• σ²: input variance, determined by synaptic rates and amplitudes</Body>
+
+  <H3>OU-Driven Integrate-and-Fire Model</H3>
+
+  <Body>Combining the OU process with a firing threshold creates a stochastic integrate-and-fire model:</Body>
+
+  <Code lang="python">
+def ou_if_simulation(mu, tau, sigma, V_reset, V_thresh, T, dt):
+    """
+    Simulate OU-driven integrate-and-fire neuron.
+
+    Returns spike times and subthreshold trajectory.
+    """
+    n_steps = int(T / dt)
+    t = np.linspace(0, T, n_steps + 1)
+    V = np.zeros(n_steps + 1)
+    V[0] = V_reset
+    spike_times = []
+
+    dW = np.sqrt(dt) * np.random.randn(n_steps)
+
+    for i in range(n_steps):
+        # Check for threshold crossing
+        if V[i] &gt;= V_thresh:
+            spike_times.append(t[i])
+            V[i] = V_reset
+
+        # OU dynamics
+        drift = -(V[i] - mu) / tau
+        V[i+1] = V[i] + drift * dt + sigma * dW[i]
+
+    return t, V, np.array(spike_times)
+
+# Example: subthreshold regime
+t, V, spikes = ou_if_simulation(
+    mu=-60, tau=20, sigma=2,
+    V_reset=-70, V_thresh=-50,
+    T=1000, dt=0.1
+)
+print(f"Firing rate: {len(spikes) / 1.0:.1f} Hz")
+  </Code>
+
+  <Body>This model captures how fluctuations can cause threshold crossings even when the mean input is below threshold—a phenomenon called noise-induced spiking or fluctuation-driven firing.</Body>
+
+  <SortQuiz id="q6">
+    <Prompt>Order these steps for implementing an OU-driven integrate-and-fire simulation:</Prompt>
+    <SortedItems>
+      <Item>Initialize voltage at reset value V_reset</Item>
+      <Item>Generate Gaussian noise increments dW for all timesteps</Item>
+      <Item>Check if voltage exceeds threshold V_thresh</Item>
+      <Item>Apply Euler-Maruyama update for OU dynamics</Item>
+      <Item>Record spike time and reset voltage if threshold crossed</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Parameter Estimation</H2>
+
+  <Body>Given experimental voltage traces, we often need to estimate the OU parameters (μ, τ, σ). Several methods are available:</Body>
+
+  <H3>Method of Moments</H3>
+
+  <Body>From a long stationary trajectory:</Body>
+  <Body>• μ̂ = sample mean</Body>
+  <Body>• From autocorrelation: fit exponential decay to estimate τ</Body>
+  <Body>• σ̂ = √(2 × sample variance / τ̂)</Body>
+
+  <Code lang="python">
+def estimate_ou_parameters(V, dt):
+    """
+    Estimate OU parameters from voltage trace using method of moments.
+    """
+    # Mean
+    mu_hat = np.mean(V)
+
+    # Autocorrelation for τ estimation
+    V_centered = V - mu_hat
+    max_lag = min(len(V) // 4, 1000)
+    autocorr = np.correlate(V_centered, V_centered, mode='full')
+    autocorr = autocorr[len(autocorr)//2:len(autocorr)//2 + max_lag]
+    autocorr = autocorr / autocorr[0]
+
+    # Fit exponential decay: log(C) = -lag/τ
+    lags = np.arange(max_lag) * dt
+    # Use first portion where autocorr &gt; 0.1
+    valid = autocorr &gt; 0.1
+    slope, _ = np.polyfit(lags[valid], np.log(autocorr[valid]), 1)
+    tau_hat = -1 / slope
+
+    # Noise intensity from variance
+    var_hat = np.var(V)
+    sigma_hat = np.sqrt(2 * var_hat / tau_hat)
+
+    return mu_hat, tau_hat, sigma_hat
+  </Code>
+
+  <SingleSelect id="q7">
+    <Prompt>When estimating the time constant τ from autocorrelation data, what transformation converts the exponential decay C(τ_lag) = A·exp(-τ_lag/τ) into a linear relationship?</Prompt>
+    <Options>
+      <Option>Square root transformation</Option>
+      <Option correct="true">Natural logarithm transformation</Option>
+      <Option>Reciprocal transformation</Option>
+      <Option>Power transformation</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Common Pitfalls and Misconceptions</H2>
+
+  <Body>Several conceptual and practical errors frequently arise when working with the OU process:</Body>
+
+  <Body>1. Confusing Wiener increments with white noise: The increment dW is the integral of white noise over dt, with variance dt. White noise ξ(t) itself has infinite variance at each instant and is defined only through its integral.</Body>
+
+  <Body>2. Using deterministic integration schemes: Standard Runge-Kutta methods assume smooth driving functions. Applying them to SDEs gives incorrect results. Always use stochastic schemes like Euler-Maruyama.</Body>
+
+  <Body>3. Assuming immediate stationarity: The OU process takes time O(τ) to reach stationarity. When computing statistics, discard the initial transient (typically 3-5τ).</Body>
+
+  <Body>4. Ignoring timestep effects: Numerical accuracy depends on Δt/τ. For reliable results, use Δt &lt; τ/10 and verify convergence by testing smaller timesteps.</Body>
+
+  <MultiSelect id="q8">
+    <Prompt>Which of the following are common mistakes when simulating or analyzing OU processes?</Prompt>
+    <Options>
+      <Option correct="true">Using Runge-Kutta 4 for the stochastic integration</Option>
+      <Option correct="true">Computing statistics without discarding initial transients</Option>
+      <Option>Sampling dW from N(0, dt)</Option>
+      <Option correct="true">Setting timestep Δt larger than τ/2</Option>
+      <Option>Validating numerical variance against σ²τ/2</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Summary</H2>
+
+  <Body>The Ornstein-Uhlenbeck process provides a mathematically tractable model for continuous stochastic fluctuations with mean reversion. Key results include:</Body>
+
+  <Body>• The SDE: dV = -(V - μ)/τ dt + σ dW</Body>
+  <Body>• Stationary distribution: N(μ, σ²τ/2)</Body>
+  <Body>• Autocorrelation: C(τ_lag) = (σ²τ/2)exp(-|τ_lag|/τ)</Body>
+  <Body>• Numerical integration via Euler-Maruyama with dW ~ N(0, Δt)</Body>
+
+  <Body>These tools form the foundation for modeling subthreshold membrane potential dynamics and understanding how noise affects neuronal computation.</Body>
+
+  <Subjective id="q9">
+    <Prompt>Explain why the Ornstein-Uhlenbeck process is well-suited for modeling subthreshold membrane potential fluctuations in neurons. In your answer, address: (1) the biological basis for the mean-reverting drift term, (2) the justification for Gaussian noise, and (3) what the model parameters correspond to physiologically.</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains the biological basis for mean reversion in terms of membrane leak conductance or passive membrane properties</Requirement>
+        <Indicators>leak, conductance, passive, membrane, exponential decay, resting potential, RC circuit</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Justifies Gaussian noise using central limit theorem or diffusion approximation for many small synaptic inputs</Requirement>
+        <Indicators>central limit, CLT, many inputs, diffusion approximation, sum, independent, synaptic</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Correctly identifies μ as mean input/resting potential</Requirement>
+        <Indicators>mu, mean, resting, equilibrium, balance, excitation, inhibition</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Correctly identifies τ as membrane time constant</Requirement>
+        <Indicators>tau, time constant, membrane, C/g, capacitance, conductance</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Correctly identifies σ as related to input fluctuation amplitude or synaptic variability</Requirement>
+        <Indicators>sigma, noise, fluctuation, amplitude, variance, synaptic, input</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="80" maxWords="300" />
+  </Subjective>
+
+</Lesson>

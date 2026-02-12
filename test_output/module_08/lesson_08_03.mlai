@@ -1,0 +1,830 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-08-03</Id>
+    <Title>Model Selection and Validation</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>model-selection</Tag>
+      <Tag>AIC</Tag>
+      <Tag>BIC</Tag>
+      <Tag>cross-validation</Tag>
+      <Tag>overfitting</Tag>
+      <Tag>residual-analysis</Tag>
+      <Tag>posterior-predictive-checks</Tag>
+      <Tag>computational-neuroscience</Tag>
+    </Tags>
+  </Meta>
+
+  <H1>Model Selection and Validation</H1>
+
+  <Body>In the previous lessons, we learned how to estimate parameters for neuronal models using maximum likelihood and Bayesian methods. But a fundamental question remains: given multiple candidate models—each with different levels of complexity—how do we choose the best one? This lesson addresses the critical challenge of model selection and validation, balancing goodness-of-fit with model complexity to achieve robust predictive performance.</Body>
+
+  <H2>The Bias-Variance Tradeoff</H2>
+
+  <Body>At the heart of model selection lies the bias-variance tradeoff. Consider predicting neuronal responses: a simple model (like the integrate-and-fire) may systematically miss important dynamics (high bias), while a complex model (like a detailed multi-compartment Hodgkin-Huxley model) may fit noise in the training data and generalize poorly (high variance).</Body>
+
+  <Body>The expected prediction error can be decomposed as:</Body>
+
+  <Code lang="plaintext">
+Expected Error = Bias² + Variance + Irreducible Noise
+  </Code>
+
+  <Body>Bias decreases with model complexity (more parameters capture true patterns), while variance increases (parameters become sensitive to particular data samples). The optimal model minimizes total error by finding the sweet spot between underfitting and overfitting.</Body>
+
+  <FlashCard id="fc1">
+    <Front>What is the bias-variance tradeoff?</Front>
+    <Back>The fundamental tension in model selection: simple models have high bias (systematic errors) but low variance, while complex models have low bias but high variance (sensitivity to training data). Optimal models balance both to minimize total prediction error.</Back>
+  </FlashCard>
+
+  <H2>Information Criteria for Model Selection</H2>
+
+  <Body>Information criteria provide principled approaches to model selection by penalizing model complexity. They estimate the out-of-sample prediction error using only in-sample data.</Body>
+
+  <H3>Akaike Information Criterion (AIC)</H3>
+
+  <Body>The AIC, proposed by Hirotugu Akaike in 1974, is derived from information theory and provides an asymptotically unbiased estimate of the expected Kullback-Leibler divergence between the true data-generating process and the fitted model:</Body>
+
+  <Code lang="plaintext">
+AIC = -2ℓ(θ̂) + 2k
+
+where:
+  ℓ(θ̂) = maximized log-likelihood
+  k = number of estimated parameters
+  </Code>
+
+  <Body>The first term (-2ℓ) measures goodness-of-fit; better fits yield larger log-likelihoods and smaller AIC. The second term (2k) penalizes complexity; more parameters increase AIC. We select the model with the smallest AIC.</Body>
+
+  <Code lang="python">
+import numpy as np
+from scipy.optimize import minimize
+
+def compute_aic(log_likelihood, num_params):
+    """
+    Compute the Akaike Information Criterion.
+
+    Parameters
+    ----------
+    log_likelihood : float
+        Maximized log-likelihood of the model
+    num_params : int
+        Number of estimated parameters (k)
+
+    Returns
+    -------
+    float
+        AIC value (lower is better)
+    """
+    return -2 * log_likelihood + 2 * num_params
+
+# Example: Comparing IF vs FHN models
+# IF model: 3 parameters (tau_m, V_thresh, V_reset)
+# FHN model: 5 parameters (a, b, c, d, I_ext)
+
+ll_if = -1250.3   # Log-likelihood for IF model
+ll_fhn = -1180.7  # Log-likelihood for FHN model
+
+aic_if = compute_aic(ll_if, num_params=3)
+aic_fhn = compute_aic(ll_fhn, num_params=5)
+
+print(f"AIC (IF model):  {aic_if:.1f}")
+print(f"AIC (FHN model): {aic_fhn:.1f}")
+print(f"Preferred model: {'IF' if aic_if &lt; aic_fhn else 'FHN'}")
+  </Code>
+
+  <FlashCard id="fc2">
+    <Front>What is the formula for AIC and what do its terms represent?</Front>
+    <Back>AIC = -2ℓ(θ̂) + 2k, where ℓ(θ̂) is the maximized log-likelihood (measuring fit) and k is the number of parameters (measuring complexity). The model with the lowest AIC balances fit and parsimony.</Back>
+  </FlashCard>
+
+  <H3>Bayesian Information Criterion (BIC)</H3>
+
+  <Body>The BIC, also known as the Schwarz criterion, places a stronger penalty on model complexity that scales with sample size:</Body>
+
+  <Code lang="plaintext">
+BIC = -2ℓ(θ̂) + k log(n)
+
+where:
+  ℓ(θ̂) = maximized log-likelihood
+  k = number of estimated parameters
+  n = sample size (number of observations)
+  </Code>
+
+  <Body>For large n, the BIC penalizes complexity more heavily than AIC (since log(n) &gt; 2 when n &gt; 7). BIC is asymptotically consistent: as n → ∞, it selects the true model with probability 1 (assuming the true model is among candidates). However, for finite samples, BIC may be overly parsimonious.</Body>
+
+  <Code lang="python">
+def compute_bic(log_likelihood, num_params, sample_size):
+    """
+    Compute the Bayesian Information Criterion.
+
+    Parameters
+    ----------
+    log_likelihood : float
+        Maximized log-likelihood of the model
+    num_params : int
+        Number of estimated parameters (k)
+    sample_size : int
+        Number of data points (n)
+
+    Returns
+    -------
+    float
+        BIC value (lower is better)
+    """
+    return -2 * log_likelihood + num_params * np.log(sample_size)
+
+# Example with n=500 spike observations
+n = 500
+bic_if = compute_bic(ll_if, num_params=3, sample_size=n)
+bic_fhn = compute_bic(ll_fhn, num_params=5, sample_size=n)
+
+print(f"BIC (IF model):  {bic_if:.1f}")
+print(f"BIC (FHN model): {bic_fhn:.1f}")
+print(f"Delta BIC: {abs(bic_if - bic_fhn):.1f}")
+  </Code>
+
+  <Body>The difference in BIC values (ΔBIC) provides a rough scale for evidence: ΔBIC &gt; 10 is considered very strong evidence favoring the model with lower BIC; ΔBIC between 6-10 is strong evidence; 2-6 is positive evidence; and &lt; 2 is weak evidence.</Body>
+
+  <FlashCard id="fc3">
+    <Front>How does BIC differ from AIC in penalizing model complexity?</Front>
+    <Back>BIC penalizes complexity by k·log(n) instead of AIC's 2k. For samples larger than 7 observations, BIC penalizes more heavily. BIC is asymptotically consistent (selects the true model as n→∞), while AIC tends to prefer more complex models.</Back>
+  </FlashCard>
+
+  <H3>Deviance Information Criterion (DIC)</H3>
+
+  <Body>For Bayesian analyses, the Deviance Information Criterion extends information criteria to posterior distributions:</Body>
+
+  <Code lang="plaintext">
+DIC = D̄ + pD
+
+where:
+  D̄ = E[D(θ)] = posterior mean deviance
+  D(θ) = -2ℓ(θ) = deviance
+  pD = D̄ - D(θ̄) = effective number of parameters
+  θ̄ = posterior mean of parameters
+  </Code>
+
+  <Body>The effective number of parameters pD accounts for shrinkage from priors: constrained parameters contribute less than unconstrained ones. DIC is particularly useful for hierarchical models where counting parameters is ambiguous.</Body>
+
+  <SingleSelect id="q1">
+    <Prompt>A researcher fits three neuronal models to 1000 spike observations. The log-likelihoods and parameter counts are: Model A (ℓ = -850, k = 4), Model B (ℓ = -820, k = 8), Model C (ℓ = -815, k = 12). Which model does BIC select?</Prompt>
+    <Options>
+      <Option correct="true">Model A (BIC ≈ 1727.6)</Option>
+      <Option>Model B (BIC ≈ 1695.3)</Option>
+      <Option>Model C (BIC ≈ 1712.9)</Option>
+      <Option>Cannot determine without knowing the prior</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Cross-Validation</H2>
+
+  <Body>Information criteria estimate out-of-sample performance indirectly. Cross-validation directly evaluates it by partitioning data into training and validation sets. This approach is particularly valuable when the sample size is small or when the asymptotic assumptions underlying AIC/BIC may not hold.</Body>
+
+  <H3>K-Fold Cross-Validation</H3>
+
+  <Body>In k-fold cross-validation, data is divided into k roughly equal subsets (folds). The model is trained on k-1 folds and validated on the held-out fold, rotating through all folds:</Body>
+
+  <Code lang="python">
+import numpy as np
+from sklearn.model_selection import KFold
+
+def k_fold_cross_validation(spike_times, model_class, k=5):
+    """
+    Perform k-fold cross-validation for spike train models.
+
+    Parameters
+    ----------
+    spike_times : array-like
+        Array of spike times or interspike intervals
+    model_class : class
+        Model class with fit() and score() methods
+    k : int
+        Number of folds
+
+    Returns
+    -------
+    float
+        Mean cross-validated log-likelihood
+    float
+        Standard error of cross-validated log-likelihood
+    """
+    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    cv_scores = []
+
+    for train_idx, val_idx in kf.split(spike_times):
+        # Split data
+        train_data = spike_times[train_idx]
+        val_data = spike_times[val_idx]
+
+        # Fit model on training data
+        model = model_class()
+        model.fit(train_data)
+
+        # Evaluate on validation data
+        score = model.log_likelihood(val_data)
+        cv_scores.append(score)
+
+    return np.mean(cv_scores), np.std(cv_scores) / np.sqrt(k)
+
+# Example usage
+# cv_mean, cv_se = k_fold_cross_validation(isi_data, ExponentialModel, k=5)
+# print(f"CV Log-likelihood: {cv_mean:.2f} ± {cv_se:.2f}")
+  </Code>
+
+  <H3>Leave-One-Out Cross-Validation (LOOCV)</H3>
+
+  <Body>LOOCV is a special case where k = n (sample size). Each observation is held out once while training on all others. LOOCV provides an almost unbiased estimate of prediction error but can be computationally expensive for large datasets.</Body>
+
+  <Code lang="python">
+def loocv_log_likelihood(spike_times, model_class):
+    """
+    Compute leave-one-out cross-validation log-likelihood.
+
+    For certain models (e.g., exponential family), efficient
+    formulas exist; otherwise, requires n model fits.
+    """
+    n = len(spike_times)
+    loo_scores = []
+
+    for i in range(n):
+        # Leave out observation i
+        train_data = np.delete(spike_times, i)
+        val_point = spike_times[i]
+
+        # Fit and evaluate
+        model = model_class()
+        model.fit(train_data)
+        score = model.log_likelihood(np.array([val_point]))
+        loo_scores.append(score)
+
+    return np.sum(loo_scores)  # Total LOO log-likelihood
+  </Code>
+
+  <Body>Importantly, LOOCV and AIC are asymptotically equivalent: as n → ∞, minimizing AIC corresponds to maximizing the LOOCV score. This connection provides theoretical justification for AIC's estimate of out-of-sample performance.</Body>
+
+  <FlashCard id="fc4">
+    <Front>What is the key advantage of cross-validation over information criteria?</Front>
+    <Back>Cross-validation directly measures out-of-sample prediction performance by actually testing on held-out data, rather than relying on asymptotic approximations. This makes it more reliable for small samples or when model assumptions may be violated.</Back>
+  </FlashCard>
+
+  <MultiSelect id="q2">
+    <Prompt>Which statements about cross-validation are correct? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">K-fold CV reduces variance in the error estimate compared to a single train/test split</Option>
+      <Option correct="true">LOOCV can be computationally expensive because it requires fitting the model n times</Option>
+      <Option>Higher k in k-fold CV always produces better model selection</Option>
+      <Option correct="true">Cross-validation directly estimates out-of-sample prediction error</Option>
+      <Option>K-fold CV requires data to be temporally independent</Option>
+    </Options>
+  </MultiSelect>
+
+  <H2>Residual Analysis</H2>
+
+  <Body>Even after selecting a model, we must verify that it adequately captures the data structure. Residual analysis examines the discrepancy between observed and predicted values to diagnose model inadequacies.</Body>
+
+  <H3>Time-Rescaling for Point Processes</H3>
+
+  <Body>For spike train models, the time-rescaling theorem provides a powerful diagnostic. If the conditional intensity function λ(t|H_t) correctly describes the spike train, then the rescaled interspike intervals:</Body>
+
+  <Code lang="plaintext">
+τᵢ = ∫_{tᵢ₋₁}^{tᵢ} λ(s|Hₛ) ds
+
+should be independent, exponentially distributed with rate 1.
+  </Code>
+
+  <Code lang="python">
+import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
+
+def time_rescaling_residuals(spike_times, intensity_function, dt=0.001):
+    """
+    Compute time-rescaled interspike intervals.
+
+    Parameters
+    ----------
+    spike_times : array
+        Observed spike times
+    intensity_function : callable
+        Conditional intensity λ(t|Hₜ)
+    dt : float
+        Integration time step
+
+    Returns
+    -------
+    array
+        Rescaled ISIs (should be Exp(1) if model is correct)
+    """
+    rescaled_isis = []
+
+    for i in range(1, len(spike_times)):
+        t_prev = spike_times[i-1]
+        t_curr = spike_times[i]
+
+        # Integrate intensity over ISI
+        t_grid = np.arange(t_prev, t_curr, dt)
+        intensities = np.array([intensity_function(t) for t in t_grid])
+        tau_i = np.trapz(intensities, t_grid)
+        rescaled_isis.append(tau_i)
+
+    return np.array(rescaled_isis)
+
+def ks_test_rescaled(rescaled_isis):
+    """
+    Kolmogorov-Smirnov test that rescaled ISIs are Exp(1).
+    """
+    stat, pvalue = stats.kstest(rescaled_isis, 'expon', args=(0, 1))
+    return stat, pvalue
+  </Code>
+
+  <H3>Checking for Autocorrelation</H3>
+
+  <Body>If the model is correctly specified, residuals should show no temporal structure. Significant autocorrelation indicates the model misses temporal dependencies.</Body>
+
+  <Code lang="python">
+from statsmodels.stats.diagnostic import acorr_ljungbox
+
+def check_residual_autocorrelation(residuals, lags=20):
+    """
+    Test for autocorrelation in residuals using Ljung-Box test.
+
+    Returns
+    -------
+    bool
+        True if significant autocorrelation detected (model inadequate)
+    """
+    result = acorr_ljungbox(residuals, lags=lags, return_df=True)
+
+    # Check if any p-value is below significance level
+    significant = (result['lb_pvalue'] &lt; 0.05).any()
+
+    if significant:
+        print("Warning: Significant autocorrelation in residuals")
+        print("Model may be missing temporal structure")
+
+    return significant, result
+  </Code>
+
+  <H3>Checking for Heteroscedasticity</H3>
+
+  <Body>Heteroscedasticity (non-constant variance) in residuals suggests the model's error structure is misspecified. For neuronal models, this might indicate state-dependent variability not captured by the model.</Body>
+
+  <Code lang="python">
+from scipy import stats
+
+def breusch_pagan_test(residuals, fitted_values):
+    """
+    Test for heteroscedasticity using a simplified Breusch-Pagan approach.
+    """
+    # Squared residuals regressed on fitted values
+    squared_resid = residuals**2
+
+    # Simple correlation test (approximation)
+    correlation, pvalue = stats.spearmanr(fitted_values, squared_resid)
+
+    if pvalue &lt; 0.05:
+        print(f"Heteroscedasticity detected (p={pvalue:.4f})")
+        print("Residual variance depends on fitted values")
+
+    return correlation, pvalue
+  </Code>
+
+  <FlashCard id="fc5">
+    <Front>What does the time-rescaling theorem tell us about well-specified point process models?</Front>
+    <Back>If the conditional intensity function correctly describes a point process, then the integrated intensities over interspike intervals (rescaled ISIs) should be independent and exponentially distributed with rate 1. Deviations indicate model misspecification.</Back>
+  </FlashCard>
+
+  <FillBlanks id="q3">
+    <Prompt>In residual analysis for spike train models, the <Blank>time-rescaling</Blank> theorem states that if the model is correct, the rescaled interspike intervals should follow an <Blank>exponential</Blank> distribution. Two common diagnostic tests are the Ljung-Box test for <Blank>autocorrelation</Blank> and tests for <Blank>heteroscedasticity</Blank> (non-constant variance).</Prompt>
+    <Distractors>
+      <Distractor>Gaussian</Distractor>
+      <Distractor>stationarity</Distractor>
+      <Distractor>normalization</Distractor>
+      <Distractor>independence</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <H2>Posterior Predictive Checks</H2>
+
+  <Body>For Bayesian models, posterior predictive checks assess model adequacy by comparing observed data to data simulated from the posterior predictive distribution:</Body>
+
+  <Code lang="plaintext">
+p(y_rep | y) = ∫ p(y_rep | θ) p(θ | y) dθ
+
+where:
+  y = observed data
+  y_rep = replicated data
+  p(θ | y) = posterior distribution
+  </Code>
+
+  <Body>If the model is adequate, y_rep should look statistically similar to y. We compare them using test statistics (discrepancy measures).</Body>
+
+  <Code lang="python">
+import numpy as np
+
+def posterior_predictive_check(observed_spikes, posterior_samples, model,
+                                test_statistics, n_rep=1000):
+    """
+    Perform posterior predictive check.
+
+    Parameters
+    ----------
+    observed_spikes : array
+        Observed spike train
+    posterior_samples : array (n_samples, n_params)
+        MCMC samples from posterior
+    model : callable
+        Generative model: model(params) -&gt; simulated spike train
+    test_statistics : list of callables
+        Functions computing summary statistics
+    n_rep : int
+        Number of replications
+
+    Returns
+    -------
+    dict
+        p-values for each test statistic
+    """
+    # Compute statistics for observed data
+    obs_stats = {stat.__name__: stat(observed_spikes)
+                 for stat in test_statistics}
+
+    # Sample parameters and generate replicated data
+    idx = np.random.choice(len(posterior_samples), n_rep)
+    param_samples = posterior_samples[idx]
+
+    rep_stats = {stat.__name__: [] for stat in test_statistics}
+
+    for params in param_samples:
+        y_rep = model(params)  # Simulate from model
+        for stat in test_statistics:
+            rep_stats[stat.__name__].append(stat(y_rep))
+
+    # Compute posterior predictive p-values
+    ppp_values = {}
+    for name, obs_val in obs_stats.items():
+        rep_vals = np.array(rep_stats[name])
+        # Two-sided p-value: proportion of reps more extreme than observed
+        ppp = np.mean(np.abs(rep_vals - np.mean(rep_vals)) &gt;=
+                      np.abs(obs_val - np.mean(rep_vals)))
+        ppp_values[name] = ppp
+
+    return ppp_values, obs_stats, rep_stats
+
+# Example test statistics for spike trains
+def mean_isi(spikes):
+    """Mean interspike interval."""
+    return np.mean(np.diff(spikes))
+
+def cv_isi(spikes):
+    """Coefficient of variation of ISIs."""
+    isis = np.diff(spikes)
+    return np.std(isis) / np.mean(isis)
+
+def fano_factor(spikes, bin_size=0.1, T=10.0):
+    """Fano factor (variance/mean of spike counts)."""
+    bins = np.arange(0, T, bin_size)
+    counts, _ = np.histogram(spikes, bins=bins)
+    return np.var(counts) / np.mean(counts) if np.mean(counts) &gt; 0 else np.nan
+  </Code>
+
+  <Body>A posterior predictive p-value (ppp) near 0.5 indicates the model reproduces the observed statistic well; values near 0 or 1 indicate discrepancy. Unlike classical p-values, ppp are not uniformly distributed under the null, so interpretation requires care.</Body>
+
+  <FlashCard id="fc6">
+    <Front>What is the posterior predictive distribution and how is it used for model validation?</Front>
+    <Back>The posterior predictive distribution p(y_rep|y) describes the distribution of future data given the observed data, integrating over parameter uncertainty. Model validation compares summary statistics of observed data to those of simulated data from this distribution—discrepancies indicate model inadequacy.</Back>
+  </FlashCard>
+
+  <MatchPairs id="q4">
+    <Prompt>Match each model validation technique with its primary purpose:</Prompt>
+    <Pairs>
+      <Pair><Left>AIC/BIC</Left><Right>Penalized model comparison</Right></Pair>
+      <Pair><Left>Cross-validation</Left><Right>Out-of-sample prediction assessment</Right></Pair>
+      <Pair><Left>Time-rescaling</Left><Right>Point process goodness-of-fit</Right></Pair>
+      <Pair><Left>Posterior predictive check</Left><Right>Bayesian model adequacy</Right></Pair>
+      <Pair><Left>Ljung-Box test</Left><Right>Residual autocorrelation detection</Right></Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Parameter estimation</Distractor>
+      <Distractor>Prior specification</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <H2>Goodness-of-Fit Tests</H2>
+
+  <Body>Formal statistical tests quantify evidence against the null hypothesis that the model is correctly specified.</Body>
+
+  <H3>Kolmogorov-Smirnov Test</H3>
+
+  <Body>The KS test compares the empirical cumulative distribution function (CDF) to the theoretical CDF. For time-rescaled ISIs, we test against the exponential distribution:</Body>
+
+  <Code lang="python">
+from scipy import stats
+
+def ks_goodness_of_fit(rescaled_isis):
+    """
+    KS test for rescaled ISIs against Exp(1) distribution.
+    """
+    n = len(rescaled_isis)
+
+    # Empirical CDF
+    rescaled_sorted = np.sort(rescaled_isis)
+    ecdf = np.arange(1, n+1) / n
+
+    # Theoretical CDF: Exp(1)
+    tcdf = 1 - np.exp(-rescaled_sorted)
+
+    # KS statistic: max absolute difference
+    ks_stat = np.max(np.abs(ecdf - tcdf))
+
+    # Critical value at alpha=0.05
+    critical_value = 1.36 / np.sqrt(n)
+
+    # Using scipy for exact p-value
+    stat, pvalue = stats.kstest(rescaled_isis, 'expon', args=(0, 1))
+
+    return {'ks_stat': stat, 'p_value': pvalue,
+            'critical_value': critical_value,
+            'reject_H0': stat &gt; critical_value}
+  </Code>
+
+  <H3>Chi-Square Test</H3>
+
+  <Body>The chi-square test compares observed frequencies in bins to expected frequencies under the model:</Body>
+
+  <Code lang="python">
+def chi_square_gof(rescaled_isis, n_bins=10):
+    """
+    Chi-square goodness-of-fit test.
+    """
+    n = len(rescaled_isis)
+
+    # Create bins with equal expected frequencies
+    quantiles = stats.expon.ppf(np.linspace(0, 1, n_bins+1)[:-1])
+    quantiles = np.append(quantiles, np.inf)
+
+    # Observed counts
+    observed, _ = np.histogram(rescaled_isis, bins=quantiles)
+
+    # Expected counts (equal under null)
+    expected = np.ones(n_bins) * n / n_bins
+
+    # Chi-square statistic
+    chi2_stat = np.sum((observed - expected)**2 / expected)
+
+    # Degrees of freedom = n_bins - 1 (no parameters estimated from data)
+    df = n_bins - 1
+    pvalue = 1 - stats.chi2.cdf(chi2_stat, df)
+
+    return {'chi2_stat': chi2_stat, 'df': df, 'p_value': pvalue,
+            'reject_H0': pvalue &lt; 0.05}
+  </Code>
+
+  <SingleSelect id="q5">
+    <Prompt>A researcher applies the time-rescaling theorem to evaluate a point process model and obtains a KS test p-value of 0.03. What is the most appropriate interpretation?</Prompt>
+    <Options>
+      <Option>The model perfectly describes the spike train</Option>
+      <Option correct="true">There is evidence that the model is misspecified</Option>
+      <Option>The model has too many parameters</Option>
+      <Option>Cross-validation would give the same result</Option>
+    </Options>
+  </SingleSelect>
+
+  <H2>Practical Model Selection: A Complete Workflow</H2>
+
+  <Body>Let's integrate these techniques into a comprehensive model selection workflow, comparing Integrate-and-Fire (IF), FitzHugh-Nagumo (FHN), and Hodgkin-Huxley (HH) models fitted to experimental spike train data.</Body>
+
+  <Code lang="python">
+import numpy as np
+from dataclasses import dataclass
+from typing import Dict, List, Callable
+
+@dataclass
+class ModelComparisonResult:
+    """Results from comprehensive model comparison."""
+    model_name: str
+    num_params: int
+    log_likelihood: float
+    aic: float
+    bic: float
+    cv_score: float
+    cv_se: float
+    ks_pvalue: float
+    ppp_values: Dict[str, float]
+
+def comprehensive_model_selection(spike_data: np.ndarray,
+                                  models: Dict[str, 'NeuronModel'],
+                                  n_folds: int = 5) -&gt; List[ModelComparisonResult]:
+    """
+    Comprehensive model selection workflow.
+
+    Parameters
+    ----------
+    spike_data : array
+        Observed spike times
+    models : dict
+        Dictionary mapping model names to model objects
+    n_folds : int
+        Number of cross-validation folds
+
+    Returns
+    -------
+    list
+        ModelComparisonResult for each model, sorted by AIC
+    """
+    n = len(spike_data)
+    results = []
+
+    for name, model in models.items():
+        # Fit model
+        model.fit(spike_data)
+        ll = model.log_likelihood(spike_data)
+        k = model.num_parameters
+
+        # Information criteria
+        aic = -2 * ll + 2 * k
+        bic = -2 * ll + k * np.log(n)
+
+        # Cross-validation
+        cv_mean, cv_se = k_fold_cross_validation(spike_data, model.__class__, k=n_folds)
+
+        # Residual analysis (time-rescaling)
+        rescaled = time_rescaling_residuals(spike_data, model.intensity)
+        _, ks_pvalue = ks_test_rescaled(rescaled)
+
+        # Posterior predictive checks (if Bayesian)
+        if hasattr(model, 'posterior_samples'):
+            ppp, _, _ = posterior_predictive_check(
+                spike_data,
+                model.posterior_samples,
+                model.simulate,
+                [mean_isi, cv_isi, fano_factor]
+            )
+        else:
+            ppp = {}
+
+        results.append(ModelComparisonResult(
+            model_name=name,
+            num_params=k,
+            log_likelihood=ll,
+            aic=aic,
+            bic=bic,
+            cv_score=cv_mean,
+            cv_se=cv_se,
+            ks_pvalue=ks_pvalue,
+            ppp_values=ppp
+        ))
+
+    # Sort by AIC
+    results.sort(key=lambda x: x.aic)
+    return results
+
+def print_comparison_table(results: List[ModelComparisonResult]):
+    """Print formatted comparison table."""
+    print(f"{'Model':&lt;10} {'k':&lt;4} {'LL':&lt;10} {'AIC':&lt;10} {'BIC':&lt;10} {'CV':&lt;12} {'KS p':&lt;8}")
+    print("-" * 70)
+
+    for r in results:
+        print(f"{r.model_name:&lt;10} {r.num_params:&lt;4} {r.log_likelihood:&lt;10.1f} "
+              f"{r.aic:&lt;10.1f} {r.bic:&lt;10.1f} {r.cv_score:&lt;6.1f}±{r.cv_se:&lt;4.1f} "
+              f"{r.ks_pvalue:&lt;8.3f}")
+  </Code>
+
+  <Body>The selection decision should consider multiple criteria:</Body>
+
+  <Code lang="plaintext">
+Decision Framework:
+1. If AIC and BIC agree → Select that model
+2. If AIC and BIC disagree:
+   - AIC favors prediction → Use AIC choice for forecasting
+   - BIC favors truth identification → Use BIC for mechanistic inference
+3. Check model adequacy:
+   - KS p-value &lt; 0.05 → Model misspecified, reconsider
+   - Significant residual autocorrelation → Missing dynamics
+4. Cross-validation provides tie-breaker
+5. Consider interpretability and computational cost
+  </Code>
+
+  <SortQuiz id="q6">
+    <Prompt>Arrange these model validation steps in the recommended order:</Prompt>
+    <SortedItems>
+      <Item>Fit competing models to training data</Item>
+      <Item>Compute information criteria (AIC/BIC) for each model</Item>
+      <Item>Perform cross-validation to estimate prediction error</Item>
+      <Item>Check model adequacy using residual analysis</Item>
+      <Item>Conduct posterior predictive checks (if Bayesian)</Item>
+      <Item>Select final model considering all evidence</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <H2>Computational Considerations</H2>
+
+  <Body>In practice, computational cost influences model selection strategy:</Body>
+
+  <Code lang="python">
+# Computational complexity comparison
+
+# Information criteria (fast):
+# - AIC/BIC: O(1) after model fitting
+# - Single model fit required
+
+# Cross-validation (moderate):
+# - K-fold: O(k × model_fit_time)
+# - LOOCV: O(n × model_fit_time) - expensive!
+
+# Posterior predictive checks (expensive):
+# - Requires MCMC samples: O(n_samples × n_params)
+# - Simulation for each sample: O(n_rep × simulation_time)
+
+# Practical guidelines:
+# 1. Start with AIC/BIC for initial screening
+# 2. Use k-fold CV (k=5 or 10) for serious comparison
+# 3. Reserve LOOCV for small datasets or final validation
+# 4. Use PPC for Bayesian models when interpretation matters
+  </Code>
+
+  <FlashCard id="fc7">
+    <Front>When should you prefer BIC over AIC for model selection?</Front>
+    <Back>Prefer BIC when (1) identifying the true data-generating mechanism matters more than prediction, (2) sample size is large (BIC is asymptotically consistent), and (3) you want to penalize overfitting more strongly. Prefer AIC when prediction accuracy is the primary goal.</Back>
+  </FlashCard>
+
+  <H2>Common Pitfalls and Best Practices</H2>
+
+  <Body>Several misconceptions commonly arise in model selection:</Body>
+
+  <Body>Pitfall 1: Assuming lower AIC/BIC always means better model. Information criteria only rank models relative to others in the comparison set. A model with the lowest AIC could still be badly misspecified—always check model adequacy separately.</Body>
+
+  <Body>Pitfall 2: Confusing in-sample fit with out-of-sample prediction. A model with high R² or likelihood on training data may perform poorly on new data. Always validate on held-out data or use proper cross-validation.</Body>
+
+  <Body>Pitfall 3: Neglecting temporal structure in cross-validation. For time series data like spike trains, random k-fold splits can violate temporal dependencies. Consider time-series CV approaches that respect temporal ordering.</Body>
+
+  <Body>Pitfall 4: Over-interpreting single validation results. Model selection has uncertainty. Report confidence intervals on CV scores and consider the stability of model rankings across different validation approaches.</Body>
+
+  <Code lang="python">
+# Time-series cross-validation for spike trains
+def time_series_cv(spike_times, model_class, n_splits=5, test_ratio=0.2):
+    """
+    Time-series cross-validation respecting temporal order.
+    """
+    T_total = spike_times[-1] - spike_times[0]
+    T_test = T_total * test_ratio
+    T_train_min = T_total * 0.3  # Minimum training duration
+
+    scores = []
+
+    for i in range(n_splits):
+        # Expanding window: train on [0, t], test on [t, t+T_test]
+        t_split = T_train_min + i * (T_total - T_train_min - T_test) / (n_splits - 1)
+
+        train_mask = spike_times &lt; t_split
+        test_mask = (spike_times &gt;= t_split) &amp; (spike_times &lt; t_split + T_test)
+
+        train_spikes = spike_times[train_mask]
+        test_spikes = spike_times[test_mask]
+
+        model = model_class()
+        model.fit(train_spikes)
+        score = model.log_likelihood(test_spikes)
+        scores.append(score)
+
+    return np.mean(scores), np.std(scores) / np.sqrt(n_splits)
+  </Code>
+
+  <Subjective id="q7">
+    <Prompt>A researcher fits three models to spike train data from a cortical neuron: (1) a simple Poisson model (3 parameters), (2) a history-dependent GLM (10 parameters), and (3) a nonlinear Hawkes process (25 parameters). The AIC ranks them 2 &lt; 3 &lt; 1 (GLM best), but residual analysis shows significant autocorrelation for all three models. What should the researcher conclude, and what steps would you recommend?</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Recognizes that significant residual autocorrelation indicates all models are inadequate despite AIC ranking</Requirement>
+        <Indicators>autocorrelation, misspecified, inadequate, all models fail, residual structure</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Recommends reconsidering model structure (e.g., longer history, different covariates, nonlinear terms)</Requirement>
+        <Indicators>longer history, more lags, covariates, nonlinear, model structure, reformulate</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Distinguishes between relative model comparison (AIC) and absolute model adequacy (residuals)</Requirement>
+        <Indicators>relative, absolute, AIC compares, residuals test adequacy, best among bad</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Suggests specific diagnostic steps (e.g., examine autocorrelation lags, check for missing covariates like stimulus)</Requirement>
+        <Indicators>lag, stimulus, covariate, specific, diagnostic, ACF, pattern</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="250" />
+  </Subjective>
+
+  <H2>Summary</H2>
+
+  <Body>Model selection is essential for choosing among competing neuronal models while avoiding overfitting. Key approaches include:</Body>
+
+  <Body>Information Criteria: AIC and BIC provide principled tradeoffs between fit and complexity. AIC is better for prediction; BIC for identifying the true model.</Body>
+
+  <Body>Cross-Validation: Directly estimates out-of-sample performance. Use k-fold for efficiency, LOOCV for small samples, and time-series CV for temporal data.</Body>
+
+  <Body>Residual Analysis: Checks model adequacy. The time-rescaling theorem is particularly powerful for point process models.</Body>
+
+  <Body>Posterior Predictive Checks: For Bayesian models, compare observed summary statistics to replicated data distributions.</Body>
+
+  <Body>No single criterion suffices; use multiple approaches and check model adequacy regardless of ranking. The best model balances accuracy, interpretability, and computational tractability for your scientific goals.</Body>
+
+</Lesson>
