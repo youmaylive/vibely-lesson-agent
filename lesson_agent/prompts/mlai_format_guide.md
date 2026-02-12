@@ -26,9 +26,11 @@ Each `.mlai` file is a valid XML document with a `<Lesson>` root element.
 
 1. `<Meta>` must be the first child of `<Lesson>`
 2. `<Meta>` must contain `<Id>`, `<Title>`, and `<Version>`
-3. Interactive components (questions) must have a unique `id` attribute
-4. Use `&lt;` and `&gt;` for literal < and > in text content
-5. Use `&amp;` for literal & in text content
+3. `<Id>` must start with a letter and contain ONLY letters, numbers, and hyphens (NO underscores). Example: `lesson-08-01`
+4. Interactive components (questions) must have a unique `id` attribute
+5. Use `&lt;` and `&gt;` for literal < and > in ALL text content, including inside `<Code>` blocks (they are NOT CDATA)
+6. Use `&amp;` for literal & in text content
+7. `<Body>` accepts plain text ONLY — no HTML tags like `<strong>`, `<em>`, `<b>`, `<i>`, etc.
 
 ## Available Components (40 total)
 

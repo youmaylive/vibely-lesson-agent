@@ -12,6 +12,7 @@ Flow:
 """
 
 import asyncio
+import copy
 import json
 from pathlib import Path
 
@@ -117,6 +118,9 @@ async def generate_lesson(
     """
     lesson_path = Path(lesson_spec_path)
     lesson_id = lesson_path.stem
+    # Convert underscores to hyphens for valid MLAI IDs
+    # (IDs must contain only letters, numbers, and hyphens)
+    mlai_id = lesson_id.replace("_", "-")
     # Resolve to absolute path relative to PROJECT_ROOT (the agent's cwd)
     # so both the agent and the Python validator see the same path.
     output_file = (PROJECT_ROOT / output_dir / f"{lesson_id}.mlai").resolve()
@@ -137,7 +141,7 @@ async def generate_lesson(
         lesson_spec_path=lesson_spec_path,
         curriculum_path=curriculum_path,
         output_file=output_file,
-        lesson_id=lesson_id,
+        lesson_id=mlai_id,
     )
 
     agent_ok, session_id = await _run_agent(
@@ -222,6 +226,7 @@ async def generate_all_lessons(
         curriculum = json.load(f)
 
     results: dict[str, list[str]] = {"success": [], "failed": [], "skipped": []}
+    output_dir_path = Path(output_dir)
 
     for module in curriculum["modules"]:
         module_id = module["module_id"]
@@ -240,7 +245,7 @@ async def generate_all_lessons(
                 results["skipped"].append(lesson_id)
                 continue
 
-            module_output_dir = Path(output_dir) / module_id
+            module_output_dir = output_dir_path / module_id
             module_output_dir.mkdir(parents=True, exist_ok=True)
 
             ok = await generate_lesson(
@@ -255,5 +260,22 @@ async def generate_all_lessons(
                 results["success"].append(lesson_id)
             else:
                 results["failed"].append(lesson_id)
+
+    # ------------------------------------------------------------------
+    # Write enriched curriculum.json to output with mlai_path fields
+    # ------------------------------------------------------------------
+    success_set = set(results["success"])
+    enriched = copy.deepcopy(curriculum)
+    for module in enriched["modules"]:
+        module_id = module["module_id"]
+        for lesson in module["lessons"]:
+            lesson_id = lesson["lesson_id"]
+            if lesson_id in success_set:
+                lesson["mlai_path"] = f"{module_id}/{lesson_id}.mlai"
+
+    output_curriculum = output_dir_path / "curriculum.json"
+    with open(output_curriculum, "w", encoding="utf-8") as f:
+        json.dump(enriched, f, indent=2, ensure_ascii=False)
+    print(f"\n📄 Curriculum written to {output_curriculum}")
 
     return results

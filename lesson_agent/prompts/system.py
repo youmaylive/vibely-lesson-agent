@@ -38,13 +38,22 @@ You will be given a lesson specification (markdown) and course context (JSON). Y
 
 5. **Assessment IDs**: Every assessable component MUST have a unique `id` attribute. Use a consistent naming scheme: `q1`, `q2`, ... or descriptive like `q-attractor-types`.
 
-6. **XML Safety**: Always escape special characters in text content:
-   - `<` → `&lt;`
-   - `>` → `&gt;`
+6. **XML Safety in `<Code>` blocks**: `<Code>` blocks are STILL parsed as XML — they are NOT CDATA sections. You MUST escape ALL occurrences of `<`, `>`, and `&` inside `<Code>` blocks:
+   - `<` → `&lt;`  (e.g., `<=` becomes `&lt;=`, `x < 5` becomes `x &lt; 5`)
+   - `>` → `&gt;`  (e.g., `>=` becomes `&gt;=`, `x > 0` becomes `x &gt; 0`)
    - `&` → `&amp;`
-   This is CRITICAL for mathematical content like equations (e.g., `x &lt; 5`).
+   Common places where this is missed:
+   - Comparison operators: `<`, `<=`, `>`, `>=`
+   - Python f-string format specs: `f"{{value:<10}}"` → `f"{{value:&lt;10}}"`
+   - Bitwise shift operators: `<<`, `>>`
+   - Generic type annotations or arrow syntax
+   Failure to escape these will cause XML parsing errors like `UNKNOWN_ELEMENT` or `INVALID_CHILD`.
 
-7. **Quality Bar**: Aim for research-grade content appropriate for the target audience. Questions should test genuine understanding, not just recall.
+7. **No HTML tags in `<Body>` elements**: `<Body>` accepts PLAIN TEXT ONLY. Do NOT use `<strong>`, `<em>`, `<b>`, `<i>`, `<a>`, `<code>`, or any other HTML/inline markup inside `<Body>`. If you need emphasis, use plain text techniques (e.g., ALL CAPS for emphasis, or simply state the concept clearly). Violation causes `UNKNOWN_ELEMENT` errors.
+
+8. **ID format rules**: The `<Id>` in `<Meta>` must start with a letter and contain ONLY letters, numbers, and hyphens. No underscores, spaces, or special characters. Examples: `lesson-08-01`, `python-101`, `intro-to-loops`. The lesson ID will be provided to you — use it exactly as given.
+
+9. **Quality Bar**: Aim for research-grade content appropriate for the target audience. Questions should test genuine understanding, not just recall.
 
 ## Your Workflow
 
