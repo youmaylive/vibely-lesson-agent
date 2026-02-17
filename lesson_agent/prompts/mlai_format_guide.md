@@ -17,7 +17,29 @@ Each `.mlai` file is a valid XML document with a `<Lesson>` root element.
     </Tags>
   </Meta>
 
-  <!-- Content sections and interactive components go here -->
+  <Section>
+    <H1>Introduction</H1>
+    <Body>Content explanation goes here...</Body>
+  </Section>
+
+  <Section>
+    <H2>Subtopic</H2>
+    <Body>More detailed content...</Body>
+    <Code lang="python">example_code()</Code>
+    <FlashCard id="fc1">
+      <Front>Key term?</Front>
+      <Back>Definition here.</Back>
+    </FlashCard>
+  </Section>
+
+  <!-- Quiz components can be placed directly under Lesson -->
+  <SingleSelect id="q1">
+    <Prompt>Question text?</Prompt>
+    <Options>
+      <Option correct="true">Correct answer</Option>
+      <Option>Wrong answer</Option>
+    </Options>
+  </SingleSelect>
 
 </Lesson>
 ```
@@ -27,10 +49,11 @@ Each `.mlai` file is a valid XML document with a `<Lesson>` root element.
 1. `<Meta>` must be the first child of `<Lesson>`
 2. `<Meta>` must contain `<Id>`, `<Title>`, and `<Version>`
 3. `<Id>` must start with a letter and contain ONLY letters, numbers, and hyphens (NO underscores). Example: `lesson-08-01`
-4. Interactive components (questions) must have a unique `id` attribute
-5. Use `&lt;` and `&gt;` for literal < and > in ALL text content, including inside `<Code>` blocks (they are NOT CDATA)
-6. Use `&amp;` for literal & in text content
-7. `<Body>` accepts plain text ONLY — no HTML tags like `<strong>`, `<em>`, `<b>`, `<i>`, etc.
+4. **All content elements (H1, H2, H3, Body, Code, FlashCard) MUST be wrapped in `<Section>` tags.** Quiz components (SingleSelect, MultiSelect, etc.) can be placed directly under `<Lesson>`.
+5. Interactive components (questions) must have a unique `id` attribute
+6. Use `&lt;` and `&gt;` for literal < and > in ALL text content, including inside `<Code>` blocks (they are NOT CDATA)
+7. Use `&amp;` for literal & in text content
+8. `<Body>` accepts plain text ONLY — no HTML tags like `<strong>`, `<em>`, `<b>`, `<i>`, etc.
 
 ## Available Components (40 total)
 
@@ -139,6 +162,21 @@ Tertiary heading for sub-subsections.
 - Accepts text content (required)
 ```xml
 <H3>String Concatenation</H3>
+```
+
+#### Section
+Container for grouping related content. **All content elements (H1, H2, H3, Body, Code, FlashCard) MUST be wrapped in Section tags.**
+- Children: H1, H2, H3, Body, Code, FlashCard
+```xml
+<Section>
+  <H1>Topic Title</H1>
+  <Body>Explanation text goes here...</Body>
+  <Code lang="python">example()</Code>
+  <FlashCard id="fc1">
+    <Front>Term?</Front>
+    <Back>Definition.</Back>
+  </FlashCard>
+</Section>
 ```
 
 #### Indicators
