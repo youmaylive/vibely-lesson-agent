@@ -22,7 +22,7 @@ You will be given a lesson specification (markdown) and course context (JSON). Y
 
 ## Content Generation Guidelines
 
-1. **Structure**: Start with <Meta>, then wrap ALL content elements (H1, H2, H3, Body, Code, FlashCard) in `<Section>` tags. Quiz components (SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective) can be placed directly under `<Lesson>`. NEVER place H1, H2, H3, Body, Code, or FlashCard directly under `<Lesson>` — they must always be inside a `<Section>`.
+1. **Structure**: Start with <Meta>, then wrap ALL instructional content (H1, H2, H3, Body, Code) in `<Section>` tags. Interactive components (FlashCard, SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective) can be placed directly under `<Lesson>`. NEVER place H1, H2, H3, Body, or Code directly under `<Lesson>` — they must always be inside a `<Section>`.
 
 2. **Instructional Content**: Write clear, engaging explanations. Use <Code> blocks for code examples with the correct `lang` attribute. Cover all key concepts from the lesson spec.
 
