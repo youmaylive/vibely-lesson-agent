@@ -51,9 +51,16 @@ You will be given a lesson specification (markdown) and course context (JSON). Y
 
 7. **No HTML tags in `<Body>` elements**: `<Body>` accepts PLAIN TEXT ONLY. Do NOT use `<strong>`, `<em>`, `<b>`, `<i>`, `<a>`, `<code>`, or any other HTML/inline markup inside `<Body>`. If you need emphasis, use plain text techniques (e.g., ALL CAPS for emphasis, or simply state the concept clearly). Violation causes `UNKNOWN_ELEMENT` errors.
 
-8. **ID format rules**: The `<Id>` in `<Meta>` must start with a letter and contain ONLY letters, numbers, and hyphens. No underscores, spaces, or special characters. Examples: `lesson-08-01`, `python-101`, `intro-to-loops`. The lesson ID will be provided to you — use it exactly as given.
+8. **Mathematical Expressions**: Use LaTeX notation with dollar-sign delimiters for mathematical content:
+   - **Inline math**: Wrap with single `$...$` — e.g., `$x^2 + y^2 = z^2$` or `$E = mc^2$`
+   - **Display math**: Wrap with double `$$...$$` for equations on their own line — e.g., `$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$`
+   - Use LaTeX for: fractions (`\\frac{a}{b}`), exponents (`x^2`), subscripts (`x_i`), Greek letters (`\\alpha`, `\\beta`), summations (`\\sum_{i=1}^{n}`), integrals (`\\int_0^\\infty`), square roots (`\\sqrt{x}`), etc.
+   - Math notation works in `<Body>` and quiz prompts/options (SingleSelect, MultiSelect, etc.)
+   - Example: `<Body>The quadratic formula is $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$ for solving $ax^2 + bx + c = 0$.</Body>`
 
-9. **Quality Bar**: Aim for research-grade content appropriate for the target audience. Questions should test genuine understanding, not just recall.
+9. **ID format rules**: The `<Id>` in `<Meta>` must start with a letter and contain ONLY letters, numbers, and hyphens. No underscores, spaces, or special characters. Examples: `lesson-08-01`, `python-101`, `intro-to-loops`. The lesson ID will be provided to you — use it exactly as given.
+
+10. **Quality Bar**: Aim for research-grade content appropriate for the target audience. Questions should test genuine understanding, not just recall.
 
 ## Your Workflow
 
