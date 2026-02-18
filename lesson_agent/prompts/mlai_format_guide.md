@@ -26,13 +26,14 @@ Each `.mlai` file is a valid XML document with a `<Lesson>` root element.
     <H2>Subtopic</H2>
     <Body>More detailed content...</Body>
     <Code lang="python">example_code()</Code>
-    <FlashCard id="fc1">
-      <Front>Key term?</Front>
-      <Back>Definition here.</Back>
-    </FlashCard>
   </Section>
 
-  <!-- Quiz components can be placed directly under Lesson -->
+  <!-- Interactive components (FlashCard, quizzes) can be placed directly under Lesson -->
+  <FlashCard id="fc1">
+    <Front>Key term?</Front>
+    <Back>Definition here.</Back>
+  </FlashCard>
+
   <SingleSelect id="q1">
     <Prompt>Question text?</Prompt>
     <Options>
@@ -49,7 +50,7 @@ Each `.mlai` file is a valid XML document with a `<Lesson>` root element.
 1. `<Meta>` must be the first child of `<Lesson>`
 2. `<Meta>` must contain `<Id>`, `<Title>`, and `<Version>`
 3. `<Id>` must start with a letter and contain ONLY letters, numbers, and hyphens (NO underscores). Example: `lesson-08-01`
-4. **All content elements (H1, H2, H3, Body, Code, FlashCard) MUST be wrapped in `<Section>` tags.** Quiz components (SingleSelect, MultiSelect, etc.) can be placed directly under `<Lesson>`.
+4. **All content elements (H1, H2, H3, Body, Code) MUST be wrapped in `<Section>` tags.** Interactive components (FlashCard, SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective) can be placed directly under `<Lesson>`.
 5. Interactive components (questions) must have a unique `id` attribute
 6. Use `&lt;` and `&gt;` for literal < and > in ALL text content, including inside `<Code>` blocks (they are NOT CDATA)
 7. Use `&amp;` for literal & in text content
@@ -165,17 +166,13 @@ Tertiary heading for sub-subsections.
 ```
 
 #### Section
-Container for grouping related content. **All content elements (H1, H2, H3, Body, Code, FlashCard) MUST be wrapped in Section tags.**
-- Children: H1, H2, H3, Body, Code, FlashCard
+Container for grouping related instructional content. **All content elements (H1, H2, H3, Body, Code) MUST be wrapped in Section tags.**
+- Children: H1, H2, H3, Body, Code
 ```xml
 <Section>
   <H1>Topic Title</H1>
   <Body>Explanation text goes here...</Body>
   <Code lang="python">example()</Code>
-  <FlashCard id="fc1">
-    <Front>Term?</Front>
-    <Back>Definition.</Back>
-  </FlashCard>
 </Section>
 ```
 
