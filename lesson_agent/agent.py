@@ -14,7 +14,6 @@ Flow:
 import asyncio
 import copy
 import json
-import re
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -40,23 +39,6 @@ from validator import validate_mlai_file
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def get_course_slug(curriculum_path: str) -> str:
-    """Extract a URL-safe course slug from curriculum.json."""
-    with open(curriculum_path, encoding="utf-8") as f:
-        curriculum = json.load(f)
-
-    # Get course name from curriculum
-    course_name = curriculum.get("course_name", "") or curriculum.get("title", "")
-
-    # Convert to slug: lowercase, replace spaces/special chars with hyphens
-    slug = course_name.lower()
-    slug = re.sub(r'[^a-z0-9]+', '-', slug)
-    slug = slug.strip('-')
-
-    # Limit length and return
-    return slug[:20] if slug else "course"
 
 
 def _agent_options(
@@ -137,12 +119,9 @@ async def generate_lesson(
     lesson_path = Path(lesson_spec_path)
     lesson_id = lesson_path.stem
 
-    # Get course slug from curriculum for globally unique IDs
-    course_slug = get_course_slug(curriculum_path)
+    # Convert underscores to hyphens for MLAI ID (IDs must use hyphens)
+    mlai_id = lesson_id.replace('_', '-')
 
-    # Create globally unique MLAI ID: course-slug-lesson-01-01
-    # (IDs must contain only letters, numbers, and hyphens)
-    mlai_id = f"{course_slug}-{lesson_id.replace('_', '-')}"
     # Resolve to absolute path relative to PROJECT_ROOT (the agent's cwd)
     # so both the agent and the Python validator see the same path.
     output_file = (PROJECT_ROOT / output_dir / f"{lesson_id}.mlai").resolve()
