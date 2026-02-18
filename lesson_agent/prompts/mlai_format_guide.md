@@ -54,7 +54,76 @@ Each `.mlai` file is a valid XML document with a `<Lesson>` root element.
 5. Interactive components (questions) must have a unique `id` attribute
 6. Use `&lt;` and `&gt;` for literal < and > in ALL text content, including inside `<Code>` blocks (they are NOT CDATA)
 7. Use `&amp;` for literal & in text content
-8. `<Body>` accepts plain text ONLY — no HTML tags like `<strong>`, `<em>`, `<b>`, `<i>`, etc.
+8. `<Body>` supports **Markdown formatting** and **LaTeX math** — no HTML tags
+
+## Rich Content Features
+
+### Markdown in Body
+
+`<Body>` elements support Markdown formatting:
+
+```xml
+<Body>
+This text includes **bold**, *italic*, and `inline code`.
+
+Here's a [link to documentation](https://example.com).
+
+Lists work too:
+- First item
+- Second item
+- Third item
+
+1. Numbered item one
+2. Numbered item two
+</Body>
+```
+
+### LaTeX Math Expressions
+
+Use `$...$` for inline math and `$$...$$` for display (block) math:
+
+```xml
+<Body>
+The quadratic formula is $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$.
+
+Greek letters like $\alpha$, $\beta$, and $\pi$ are supported.
+
+Display math appears centered on its own line:
+
+$$\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$
+</Body>
+```
+
+### Section Types (Icons)
+
+Add a `type` attribute to `<Section>` to display different icons:
+
+| Type | Icon | Use For |
+|------|------|---------|
+| `text` | Document | General explanatory content (default) |
+| `concept` | Lightbulb | Key concepts and important ideas |
+| `code` | Terminal | Code-focused sections |
+| `tip` | Info | Helpful hints and best practices |
+| `video` | Play button | Video content sections |
+| `example` | Demonstration | Practical examples |
+
+```xml
+<Section type="concept">
+  <H2>Key Concept</H2>
+  <Body>This section explains an important idea with a lightbulb icon.</Body>
+</Section>
+
+<Section type="tip">
+  <H2>Pro Tip</H2>
+  <Body>This is a helpful hint with an info icon.</Body>
+</Section>
+
+<Section type="code">
+  <H2>Implementation</H2>
+  <Body>Code-focused section with a terminal icon.</Body>
+  <Code lang="python">print("Hello!")</Code>
+</Section>
+```
 
 ## Available Components (40 total)
 
@@ -75,10 +144,24 @@ An inline blank in the prompt. Text content is the correct answer.
 ```
 
 #### Body
-Paragraph text content for explanations and descriptions.
+Paragraph text content for explanations and descriptions. Supports **Markdown formatting** and **LaTeX math**.
 - Accepts text content (required)
+- Markdown: `**bold**`, `*italic*`, `` `code` ``, `[links](url)`, lists (`-` or `1.`)
+- Math: `$inline$` for inline, `$$display$$` for block equations
 ```xml
 <Body>Python is a high-level programming language known for readable syntax and versatility.</Body>
+
+<!-- With markdown and math -->
+<Body>
+Variables store values in memory. Use **descriptive names** like `user_count`.
+
+Key points:
+- Variables are *references* to values
+- Names are case-sensitive
+- Use `snake_case` in Python
+
+The assignment operator creates a binding: $name \leftarrow value$
+</Body>
 ```
 
 #### Code
@@ -167,12 +250,24 @@ Tertiary heading for sub-subsections.
 
 #### Section
 Container for grouping related instructional content. **All content elements (H1, H2, H3, Body, Code) MUST be wrapped in Section tags.**
+- Attributes: `type` one of: text|concept|code|tip|video|example (optional, defaults to "text")
 - Children: H1, H2, H3, Body, Code
 ```xml
 <Section>
   <H1>Topic Title</H1>
   <Body>Explanation text goes here...</Body>
   <Code lang="python">example()</Code>
+</Section>
+
+<!-- With type for icon -->
+<Section type="concept">
+  <H2>Important Concept</H2>
+  <Body>This displays with a **lightbulb icon** and supports *markdown*.</Body>
+</Section>
+
+<Section type="tip">
+  <H2>Pro Tip</H2>
+  <Body>Use math like $E = mc^2$ inline or display: $$\sum_{i=1}^n i = \frac{n(n+1)}{2}$$</Body>
 </Section>
 ```
 
