@@ -26,7 +26,9 @@ Steps:
 
 The lesson should include:
 - Proper <Meta> block with lesson ID "{lesson_id}" and appropriate title/tags
-- Rich instructional content with sections, headings, body text, and code examples
+- Rich instructional content with sections (use `type` attribute: concept, code, tip, example)
+- Markdown formatting in Body text (**bold**, *italic*, `code`, lists)
+- LaTeX math expressions where appropriate ($inline$ and $$display$$)
 - At least 4 FlashCards for key concepts
 - At least 2 SingleSelect questions
 - At least 1 MultiSelect question
