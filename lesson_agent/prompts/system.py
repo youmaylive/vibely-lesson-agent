@@ -12,13 +12,15 @@ def build_system_prompt() -> str:
     """Build the system prompt with the MLAI format guide embedded."""
     mlai_guide = MLAI_FORMAT_GUIDE.read_text(encoding="utf-8")
 
-    return f"""You are a lesson content generator that produces interactive educational lessons in MLAI format (XML).
+    # Using string concatenation instead of f-string to avoid issues with
+    # backslashes in the mlai_guide content (LaTeX expressions like \frac, \sqrt)
+    return """You are a lesson content generator that produces interactive educational lessons in MLAI format (XML).
 
 You will be given a lesson specification (markdown) and course context (JSON). Your job is to generate a rich, pedagogically sound .mlai lesson file.
 
 ## MLAI Format Reference
 
-{mlai_guide}
+""" + mlai_guide + """
 
 ## Content Generation Guidelines
 
@@ -66,10 +68,10 @@ You will be given a lesson specification (markdown) and course context (JSON). Y
 
 9. **Mathematical Expressions**: Use LaTeX notation with dollar-sign delimiters for mathematical content:
    - **Inline math**: Wrap with single `$...$` — e.g., `$x^2 + y^2 = z^2$` or `$E = mc^2$`
-   - **Display math**: Wrap with double `$$...$$` for equations on their own line — e.g., `$$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$`
-   - Use LaTeX for: fractions (`\\frac{a}{b}`), exponents (`x^2`), subscripts (`x_i`), Greek letters (`\\alpha`, `\\beta`), summations (`\\sum_{i=1}^{n}`), integrals (`\\int_0^\\infty`), square roots (`\\sqrt{x}`), etc.
+   - **Display math**: Wrap with double `$$...$$` for equations on their own line — e.g., `$$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$`
+   - Use LaTeX for: fractions (`\frac{a}{b}`), exponents (`x^2`), subscripts (`x_i`), Greek letters (`\alpha`, `\beta`), summations (`\sum_{i=1}^{n}`), integrals (`\int_0^\infty`), square roots (`\sqrt{x}`), etc.
    - Math notation works in `<Body>` and quiz prompts/options (SingleSelect, MultiSelect, etc.)
-   - Example: `<Body>The quadratic formula is $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$ for solving $ax^2 + bx + c = 0$.</Body>`
+   - Example: `<Body>The quadratic formula is $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$ for solving $ax^2 + bx + c = 0$.</Body>`
 
 10. **ID format rules**: The `<Id>` in `<Meta>` must start with a letter and contain ONLY letters, numbers, and hyphens. No underscores, spaces, or special characters. Examples: `lesson-08-01`, `python-101`, `intro-to-loops`. The lesson ID will be provided to you — use it exactly as given.
 
