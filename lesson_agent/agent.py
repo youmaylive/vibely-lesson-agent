@@ -71,29 +71,34 @@ async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, st
     """
     success = False
     session_id = None
+    cost_usd = 0.0
 
-    async for message in query(prompt=prompt, options=options):
-        # Capture session ID from the init message
-        if hasattr(message, "subtype") and message.subtype == "init":
-            if hasattr(message, "session_id"):
-                session_id = message.session_id
+    try:
+        async for message in query(prompt=prompt, options=opts):
+            if hasattr(message, "subtype") and message.subtype == "init":
+                if hasattr(message, "session_id"):
+                    session_id = message.session_id
 
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    print(block.text)
-                elif hasattr(block, "name"):
-                    print(f"\n🔧 Tool: {block.name}")
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        print(block.text)
+                    elif hasattr(block, "name"):
+                        print(f"\n🔧 Tool: {block.name}")
 
-        elif isinstance(message, ResultMessage):
-            if message.subtype == "success":
-                success = True
-            else:
-                print(f"\n⚠️  Agent finished with status: {message.subtype}")
-            if hasattr(message, "total_cost_usd") and message.total_cost_usd:
-                print(f"💰 Cost: ${message.total_cost_usd:.4f}")
+            elif isinstance(message, ResultMessage):
+                if message.subtype == "success":
+                    success = True
+                else:
+                    print(f"\n⚠️  Agent finished with status: {message.subtype}")
+                if hasattr(message, "total_cost_usd") and message.total_cost_usd:
+                    cost_usd = message.total_cost_usd
+                    print(f"💰 Cost: ${cost_usd:.4f}")
 
-    return success, session_id
+    except Exception as exc:
+        print(f"\n❌ Agent error: {exc}")
+
+    return success, session_id, cost_usd
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +150,7 @@ async def generate_lesson(
         lesson_id=mlai_id,
     )
 
-    agent_ok, session_id = await _run_agent(
+    agent_ok, session_id, _cost = await _run_agent(
         prompt=gen_prompt,
         options=_agent_options(model=model, max_turns=max_turns),
     )
@@ -192,7 +197,7 @@ async def generate_lesson(
         )
 
         # Resume the same session so the agent has full context
-        fix_ok, session_id = await _run_agent(
+        fix_ok, session_id, _cost = await _run_agent(
             prompt=fix_prompt,
             options=_agent_options(
                 model=model,
@@ -278,5 +283,9 @@ async def generate_all_lessons(
     with open(output_curriculum, "w", encoding="utf-8") as f:
         json.dump(enriched, f, indent=2, ensure_ascii=False)
     print(f"\n📄 Curriculum written to {output_curriculum}")
+
+    # Emit usage summary marker (parsed by curriculum worker)
+    total_lessons = len(results["success"]) + len(results["failed"])
+    print(f"\n##USAGE:total_cost=0:input_tokens=0:output_tokens=0:api_calls={total_lessons}##")
 
     return results
