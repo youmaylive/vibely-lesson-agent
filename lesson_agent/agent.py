@@ -74,7 +74,7 @@ async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, st
     cost_usd = 0.0
 
     try:
-        async for message in query(prompt=prompt, options=opts):
+        async for message in query(prompt=prompt, options=options):
             if hasattr(message, "subtype") and message.subtype == "init":
                 if hasattr(message, "session_id"):
                     session_id = message.session_id
