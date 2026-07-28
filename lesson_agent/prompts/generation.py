@@ -21,8 +21,30 @@ def build_generation_prompt(
 Steps:
 1. Read the lesson spec: {lesson_spec_path}
 2. Read the curriculum for context: {curriculum_path}
-3. Generate a complete, high-quality .mlai lesson file
+3. Generate a complete, engaging .mlai lesson file (HUMAN voice — see system prompt)
 4. Write it to: {output_file}
+
+## ⚡ WRITING STYLE REMINDER (read before generating):
+
+Remember: you're writing for humans who get bored easily. The #1 complaint about AI-generated lessons is "sounds like ChatGPT." Beat that by:
+- **First sentence = hook.** A question, a surprising stat, a "what if" — NOT "In this lesson..."
+- **Be specific.** "Python's GIL releases every 5ms" > "Python has threading limitations"
+- **Sound like YOU have an opinion.** "This is the part most tutorials get wrong..." is engaging. "This concept is important" is not.
+
+### ❌ BAD opening (AI-ish):
+"In this lesson, we will explore the fundamentals of recursion. Recursion is a powerful programming technique that plays a crucial role in computer science."
+
+### ✅ GOOD opening (human):
+"Here's a weird trick: write a function that calls itself, and somehow it solves problems that would take hundreds of lines of loops. That's recursion — and once it clicks, you'll wonder how you ever coded without it."
+
+### ❌ BAD explanation:
+"It is important to note that hash tables provide O(1) average-case lookup time. Furthermore, they leverage a hash function to map keys to array indices."
+
+### ✅ GOOD explanation:
+"Hash tables are fast. Stupidly fast. While a sorted list needs to check ~20 items to find something in a million entries (binary search), a hash table gets there in one shot. How? It cheats — it converts your key into an array index directly."
+
+Now generate the lesson with THIS voice:
+
 
 ## CRITICAL: Document Structure Rules
 
