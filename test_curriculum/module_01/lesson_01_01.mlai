@@ -1,0 +1,704 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-01</Id>
+    <Title>Dynamical Systems Framework for Neuroscience</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>dynamical-systems</Tag>
+      <Tag>neuronal-modeling</Tag>
+      <Tag>attractors</Tag>
+      <Tag>state-space</Tag>
+    </Tags>
+  </Meta>
+
+  <Section type="concept">
+    <H1>Dynamical Systems Framework for Neuroscience</H1>
+    <Body>
+Why does a neuron's voltage always settle back to around -70 mV after you poke it? Why do some neurons fire rhythmically while others stay silent? The answer isn't just biochemistry — it's **geometry**. Neurons live in something called *state space*, where their behavior traces out curves called trajectories. Understanding these trajectories reveals not just what neurons do, but what they *must* do given the physics of their membranes.
+
+Here's the power move: instead of memorizing what happens in 47 different experimental conditions, you learn the **dynamical systems framework**. Once you see a neuron as a point moving through state space toward attractors, everything from resting potentials to seizure dynamics becomes predictable. Not just explainable — *mathematically inevitable*.
+
+This lesson builds the core mathematical machinery you'll use throughout computational neuroscience: state space, trajectories, attractors, and basins. By the end, you'll see why a resting neuron isn't "doing nothing" — it's being pulled toward a fixed point by the invisible hand of differential equations.
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H2>What Is a Dynamical System?</H2>
+    <Body>
+A **dynamical system** is any process where the current state determines how the state changes over time. Formally, we write:
+
+$$\frac{dx}{dt} = f(x, t)$$
+
+Here, $x$ is the **state** (could be voltage, could be a vector of voltages and ion channel states), $t$ is time, and $f$ is the rule that says "given where you are now, here's where you're headed."
+
+For a neuron, $x$ might be the membrane potential $V$. The simplest case looks like:
+
+$$\frac{dV}{dt} = -\frac{V - V_{rest}}{\tau}$$
+
+This says: if you're above resting potential ($V_{rest}$), your voltage drops. If you're below, it rises. The rate of change depends on $\tau$ (the membrane time constant). That's it — one equation, but it captures how millions of ion channels collectively push voltage toward equilibrium.
+
+The key insight: **neurons don't randomly fluctuate**. They follow deterministic rules (plus some noise, which we'll handle). If you know the state and the equation, you know the future.
+    </Body>
+  </Section>
+
+    <Svg>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#333333" text-anchor="middle">Dynamical System: Evolution in State Space</text>
+  
+  <!-- State Space (coordinate plane) -->
+  <rect x="50" y="80" width="350" height="350" fill="white" stroke="#666666" stroke-width="2"/>
+  <text x="225" y="450" font-family="Arial, sans-serif" font-size="16" fill="#333333" text-anchor="middle" font-weight="bold">State Space</text>
+  
+  <!-- Axes -->
+  <line x1="50" y1="255" x2="400" y2="255" stroke="#999999" stroke-width="1" stroke-dasharray="5,5"/>
+  <line x1="225" y1="80" x2="225" y2="430" stroke="#999999" stroke-width="1" stroke-dasharray="5,5"/>
+  
+  <!-- Trajectory curve -->
+  <path d="M 100 350 Q 150 300 200 250 T 320 180" fill="none" stroke="#4A90D9" stroke-width="3"/>
+  
+  <!-- State points on trajectory -->
+  <circle cx="100" cy="350" r="6" fill="#50C878"/>
+  <text x="75" y="370" font-family="Arial, sans-serif" font-size="14" fill="#50C878" font-weight="bold">x(t₀)</text>
+  
+  <circle cx="200" cy="250" r="6" fill="#FF6B6B"/>
+  <text x="210" y="245" font-family="Arial, sans-serif" font-size="14" fill="#FF6B6B" font-weight="bold">x(t)</text>
+  
+  <circle cx="320" cy="180" r="6" fill="#4A90D9"/>
+  <text x="330" y="175" font-family="Arial, sans-serif" font-size="14" fill="#4A90D9" font-weight="bold">x(t₁)</text>
+  
+  <!-- Tangent vector at x(t) -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#FF6B6B"/>
+    </marker>
+  </defs>
+  <line x1="200" y1="250" x2="260" y2="215" stroke="#FF6B6B" stroke-width="2.5" marker-end="url(#arrowhead)"/>
+  <text x="265" y="210" font-family="Arial, sans-serif" font-size="14" fill="#FF6B6B" font-weight="bold">dx/dt = f(x,t)</text>
+  
+  <!-- Trajectory label -->
+  <text x="280" y="270" font-family="Arial, sans-serif" font-size="15" fill="#4A90D9" font-weight="bold">Trajectory</text>
+  
+  <!-- Time evolution arrow below state space -->
+  <defs>
+    <marker id="timearrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333333"/>
+    </marker>
+  </defs>
+  <line x1="100" y1="465" x2="320" y2="465" stroke="#333333" stroke-width="2" marker-end="url(#timearrow)"/>
+  <text x="210" y="485" font-family="Arial, sans-serif" font-size="15" fill="#333333" font-weight="bold">Time t →</text>
+  
+  <!-- Right side: Differential Equation Box -->
+  <rect x="460" y="100" width="300" height="120" fill="#4A90D9" stroke="#333333" stroke-width="2" rx="5"/>
+  <text x="610" y="135" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle" font-weight="bold">Differential Equation</text>
+  <text x="610" y="170" font-family="Arial, sans-serif" font-size="24" fill="white" text-anchor="middle" font-weight="bold">dx/dt = f(x, t)</text>
+  <text x="610" y="200" font-family="Arial, sans-serif" font-size="14" fill="white" text-anchor="middle">Governs the flow</text>
+  
+  <!-- Arrow from equation to trajectory -->
+  <defs>
+    <marker id="bluearrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#4A90D9"/>
+    </marker>
+  </defs>
+  <line x1="460" y1="160" x2="410" y2="200" stroke="#4A90D9" stroke-width="2.5" marker-end="url(#bluearrow)"/>
+  
+  <!-- Explanation boxes -->
+  <rect x="460" y="250" width="300" height="70" fill="white" stroke="#666666" stroke-width="1.5" rx="3"/>
+  <text x="610" y="275" font-family="Arial, sans-serif" font-size="16" fill="#333333" text-anchor="middle" font-weight="bold">Current State x(t)</text>
+  <text x="610" y="300" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">determines rate of change dx/dt</text>
+  
+  <rect x="460" y="340" width="300" height="70" fill="white" stroke="#666666" stroke-width="1.5" rx="3"/>
+  <text x="610" y="365" font-family="Arial, sans-serif" font-size="16" fill="#333333" text-anchor="middle" font-weight="bold">Flow Direction</text>
+  <text x="610" y="390" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">Vector field f(x,t) points the way</text>
+  
+  <!-- Key concept arrow -->
+  <line x1="530" y1="250" x2="240" y2="240" stroke="#50C878" stroke-width="2" marker-end="url(#bluearrow)" stroke-dasharray="5,5"/>
+</svg>
+  </Svg>
+
+  <Section type="concept">
+    <H2>State Space and Trajectories</H2>
+    <Body>
+**State space** is the universe of all possible states your system can be in. For a single neuron model with just voltage, state space is the real line: every point corresponds to a possible voltage. For a more realistic model tracking voltage $V$ and some gating variable $n$, state space is the 2D plane where each point is a $(V, n)$ pair.
+
+A **trajectory** is the path your system traces through state space as time flows. Start at initial condition $x_0$, follow the differential equation, and you get a curve $x(t)$ that shows where you are at every moment.
+
+Think of it like this: if you're hiking in mountains (state space), your current position is the state. The slope of the terrain tells you which way to walk (the vector field $f(x, t)$). Your trajectory is the actual path you take. Where you end up depends on where you started and what the terrain looks like.
+
+For neurons, different initial voltages produce different trajectories, but — here's the magic — many trajectories converge to the same final destination. That's because of **attractors**.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-state-space">
+    <Front>What is state space in a dynamical system?</Front>
+    <Back>The universe of all possible states the system can occupy. Each point represents a complete specification of the system's configuration at an instant.</Back>
+  </FlashCard>
+
+  <FlashCard id="fc-trajectory">
+    <Front>What is a trajectory in a dynamical system?</Front>
+    <Back>The path a system traces through state space over time as it evolves according to its differential equation $dx/dt = f(x, t)$.</Back>
+  </FlashCard>
+
+  <Mermaid>
+graph LR
+    A[Initial State x0] -->|Evolve via dx/dt = f| B[State x1 at t1]
+    B --> C[State x2 at t2]
+    C --> D[...]
+    D --> E[Final State / Attractor]
+    style A fill:#e1f5ff
+    style E fill:#ffe1e1
+</Mermaid>
+
+  <Section type="concept">
+    <H2>Deterministic vs. Stochastic Dynamics</H2>
+    <Body>
+Real neurons are noisy. Ion channels open and close randomly. Synaptic inputs arrive unpredictably. Should we throw determinism out the window?
+
+Not yet. We distinguish two regimes:
+
+**Deterministic systems**: The equation $dx/dt = f(x, t)$ completely determines the future. Same initial condition always produces the same trajectory. This works when noise is negligible compared to the driving forces.
+
+**Stochastic systems**: Add a random term:
+
+$$dx = f(x, t) \, dt + \sigma \, dW(t)$$
+
+Now $dW(t)$ is a Wiener process (Brownian motion), and $\sigma$ controls noise intensity. Trajectories become *probabilistic* — you get a different path every time, even from the same starting point.
+
+When does noise matter? Compare the noise strength to the distance between attractors. If you're studying how a neuron settles to rest ($\sim$10 mV from threshold), and your noise is 0.1 mV, treat it as deterministic. If noise is 5 mV and threshold is only 15 mV away, you need stochastic analysis.
+
+For this lesson, we focus on deterministic foundations. Once you understand attractors without noise, adding stochasticity (Module 3) becomes a controlled extension.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-deterministic">
+    <Front>What defines a deterministic dynamical system?</Front>
+    <Back>A system where the governing equation $dx/dt = f(x, t)$ completely determines the future trajectory from any initial condition, with no random components.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Attractors: Where Trajectories End Up</H2>
+    <Body>
+Here's the most important concept in this lesson: most trajectories don't wander forever. They settle down to predictable long-term behaviors called **attractors**.
+
+An **attractor** is a set of states toward which nearby trajectories converge. Once you reach an attractor, you stay there (or move within it if it's more complex than a single point).
+
+Three types you'll see in neuroscience:
+
+1. **Fixed point attractor**: A single state. All nearby trajectories spiral in and stop. Example: resting potential $V_{rest}$. No matter where you start (within a range), voltage decays back to $V_{rest}$.
+
+2. **Limit cycle**: A closed loop in state space. Trajectories spiral onto the loop and keep circulating. Example: rhythmic spiking neurons. The voltage-gating variable trajectory traces an oval over and over.
+
+3. **Strange attractor**: A fractal structure with chaotic dynamics. Rare in single neurons, but shows up in some network models.
+
+For most single neuron models, fixed points dominate. Understanding them unlocks stability analysis, bifurcations, and why neurons have distinct "modes" (quiescent, tonic spiking, bursting).
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-attractor">
+    <Front>What is an attractor in a dynamical system?</Front>
+    <Back>A set of states toward which trajectories converge and remain once reached. Fixed points, limit cycles, and strange attractors are the three main types.</Back>
+  </FlashCard>
+
+  <Mermaid>
+graph TD
+    subgraph "Fixed Point Attractor"
+    A1[Initial state] -->|Trajectory| A2[Approaching fixed point]
+    A2 --> A3[Settles at equilibrium]
+    end
+    subgraph "Limit Cycle Attractor"
+    B1[Initial state] -->|Trajectory spirals| B2[Onto periodic orbit]
+    B2 -->|Repeats| B2
+    end
+    subgraph "Strange Attractor"
+    C1[Initial state] -->|Chaotic trajectory| C2[Bounded unpredictable motion]
+    C2 --> C2
+    end
+</Mermaid>
+
+  <Section type="concept">
+    <H2>Fixed Points and Attractive Basins</H2>
+    <Body>
+A **fixed point** (or equilibrium) is a state $x^*$ where $f(x^*, t) = 0$. The derivative vanishes, so if you're exactly at $x^*$, you stay there forever.
+
+But not all fixed points are attracting. Stability matters:
+
+- **Stable (attracting) fixed point**: Nearby trajectories converge toward it. Mathematically, the eigenvalues of the Jacobian $\frac{\partial f}{\partial x}$ evaluated at $x^*$ have negative real parts.
+
+- **Unstable fixed point**: Nearby trajectories flee away. Positive eigenvalues mean exponential divergence.
+
+The **attractive basin** (or basin of attraction) is the set of all initial conditions that eventually reach a particular attractor. Picture a landscape: attractors are valleys, basins are the drainage areas feeding into them. Initial conditions on a ridge might roll into different valleys depending on tiny perturbations.
+
+For the leaky integrator neuron model:
+
+$$\frac{dV}{dt} = -\frac{V - V_{rest}}{\tau}$$
+
+The fixed point is at $V^* = V_{rest}$ (since $dV/dt = 0$ there). Is it stable? The derivative $\frac{df}{dV} = -1/\tau &lt; 0$, so yes — exponential decay toward rest. The basin is the entire real line: every initial voltage eventually returns to $V_{rest}$.
+
+This is why your resting potential is robust. You can inject current, push voltage up or down, but once the stimulus ends, the system "remembers" where it belongs and goes back.
+    </Body>
+  </Section>
+
+  <Section type="example">
+    <H3>Worked Example: Finding the Fixed Point</H3>
+    <Body>
+Let's analyze the simplest neuronal model:
+
+$$\frac{dV}{dt} = -\frac{V - V_{rest}}{\tau}$$
+
+Assume $V_{rest} = -70$ mV and $\tau = 10$ ms.
+
+**Step 1**: Find the fixed point by setting $dV/dt = 0$:
+
+$$0 = -\frac{V^* - (-70)}{10}$$
+
+This gives $V^* = -70$ mV. The resting potential is the fixed point.
+
+**Step 2**: Check stability. Compute the derivative of the right-hand side with respect to $V$:
+
+$$\frac{\partial}{\partial V}\left(-\frac{V - V_{rest}}{\tau}\right) = -\frac{1}{\tau} = -\frac{1}{10} = -0.1$$
+
+Since this is negative, the fixed point is **stable**.
+
+**Step 3**: Solve the ODE analytically. Starting from $V(0) = V_0$:
+
+$$V(t) = V_{rest} + (V_0 - V_{rest}) e^{-t/\tau}$$
+
+If $V_0 = -50$ mV (depolarized start):
+
+$$V(t) = -70 + (-50 + 70) e^{-t/10} = -70 + 20 e^{-t/10}$$
+
+At $t = 0$: $V = -50$ mV. At $t = 10$ ms: $V \approx -70 + 20e^{-1} \approx -62.6$ mV. As $t \to \infty$, $V \to -70$ mV.
+
+Every trajectory decays exponentially toward the fixed point, proving it's a global attractor.
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Parameters
+V_rest = -70  # mV
+tau = 10      # ms
+V0 = -50      # initial voltage
+
+# Time vector
+t = np.linspace(0, 50, 500)
+
+# Analytical solution
+V = V_rest + (V0 - V_rest) * np.exp(-t / tau)
+
+# Plot trajectory
+plt.figure(figsize=(8, 5))
+plt.plot(t, V, label=f'V(t) from V0={V0} mV', linewidth=2)
+plt.axhline(V_rest, color='r', linestyle='--', label='Fixed point (V_rest)')
+plt.xlabel('Time (ms)')
+plt.ylabel('Voltage (mV)')
+plt.title('Trajectory Converging to Fixed Point Attractor')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+</Code>
+  </Section>
+
+  <Section type="concept">
+    <H2>Biological Interpretation: Resting Potential as an Attractor</H2>
+    <Body>
+Why do neurons have a stable resting potential? It's not magic — it's dynamical systems.
+
+At rest, the membrane has leak channels (mostly potassium) that create a conductance $g_L$. The driving force $(V - V_{rest})$ pushes voltage toward $V_{rest}$, which is the reversal potential weighted by channel permeabilities (Nernst-Goldman equation).
+
+The **resting state is a fixed point attractor**. If you depolarize the neuron (push $V$ up), leak channels pull it back down. If you hyperpolarize it (push $V$ down), the driving force flips and pulls it back up. The membrane time constant $\tau = C / g_L$ sets how fast this happens.
+
+This explains several phenomena:
+
+- **Robustness**: Small perturbations (synaptic noise, measurement artifacts) don't permanently change the resting voltage. The attractor pulls the system back.
+
+- **Threshold dynamics**: If you push $V$ far enough (above threshold), you might escape the basin of the resting attractor and enter a different dynamical regime (spiking). More on this in Lesson 1.2.
+
+- **Pathology**: If ion channel expression changes (disease, drugs), $V_{rest}$ shifts. The attractor moves, and the neuron's baseline behavior changes permanently until channels are restored.
+
+The geometric view — neuron as point in state space, rest as attractor — is not metaphor. It's the actual mathematical structure governing the biophysics.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-resting-potential">
+    <Front>Why is the neuronal resting potential stable?</Front>
+    <Back>It's a stable fixed point attractor. Leak currents create a restoring force proportional to deviation from rest, pulling voltage back exponentially with time constant $\tau = C/g_L$.</Back>
+  </FlashCard>
+
+    <Svg>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#333333" text-anchor="middle">Neuron Phase Portrait: Stable Fixed Point at Rest</text>
+  
+  <!-- Axes -->
+  <!-- Horizontal axis (V) -->
+  <line x1="100" y1="350" x2="700" y2="350" stroke="#333333" stroke-width="2"/>
+  <polygon points="700,350 690,345 690,355" fill="#333333"/>
+  <text x="710" y="355" font-family="Arial, sans-serif" font-size="16" fill="#333333">V (voltage)</text>
+  
+  <!-- Vertical axis (dV/dt) -->
+  <line x1="400" y1="420" x2="400" y2="80" stroke="#333333" stroke-width="2"/>
+  <polygon points="400,80 395,90 405,90" fill="#333333"/>
+  <text x="410" y="70" font-family="Arial, sans-serif" font-size="16" fill="#333333">dV/dt</text>
+  
+  <!-- Axis tick marks and labels -->
+  <line x1="250" y1="345" x2="250" y2="355" stroke="#333333" stroke-width="2"/>
+  <text x="250" y="375" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">low V</text>
+  
+  <line x1="550" y1="345" x2="550" y2="355" stroke="#333333" stroke-width="2"/>
+  <text x="550" y="375" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">high V</text>
+  
+  <line x1="395" y1="250" x2="405" y2="250" stroke="#333333" stroke-width="2"/>
+  <text x="370" y="255" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="end">dV/dt &gt; 0</text>
+  
+  <line x1="395" y1="430" x2="405" y2="430" stroke="#333333" stroke-width="2"/>
+  <text x="370" y="435" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="end">dV/dt &lt; 0</text>
+  
+  <!-- Stable fixed point at V_rest -->
+  <circle cx="400" cy="350" r="12" fill="#50C878" stroke="#333333" stroke-width="2"/>
+  <circle cx="400" cy="350" r="6" fill="#2d7a4d"/>
+  <text x="400" y="400" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#50C878" text-anchor="middle">V_rest</text>
+  <text x="400" y="418" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">(stable fixed point)</text>
+  
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" fill="#4A90D9">
+      <polygon points="0 0, 10 3, 0 6"/>
+    </marker>
+  </defs>
+  
+  <!-- Flow arrows from left (low voltage) -->
+  <path d="M 150 180 Q 250 180, 350 270" stroke="#4A90D9" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 200 220 Q 280 230, 350 300" stroke="#4A90D9" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 250 280 Q 310 290, 360 330" stroke="#4A90D9" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- Flow arrows from right (high voltage) -->
+  <path d="M 650 180 Q 550 180, 450 270" stroke="#4A90D9" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 600 220 Q 520 230, 450 300" stroke="#4A90D9" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 550 280 Q 490 290, 440 330" stroke="#4A90D9" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- Basin of attraction shading -->
+  <rect x="100" y="100" width="600" height="250" fill="#4A90D9" opacity="0.1"/>
+  <text x="400" y="130" font-family="Arial, sans-serif" font-size="15" fill="#4A90D9" font-weight="bold" text-anchor="middle">Basin of Attraction</text>
+  <text x="400" y="150" font-family="Arial, sans-serif" font-size="13" fill="#666666" text-anchor="middle">(all trajectories converge to V_rest)</text>
+  
+  <!-- Annotations -->
+  <text x="150" y="200" font-family="Arial, sans-serif" font-size="14" fill="#333333" font-weight="bold">V &lt; V_rest</text>
+  <text x="150" y="218" font-family="Arial, sans-serif" font-size="13" fill="#666666">voltage increases</text>
+  
+  <text x="600" y="200" font-family="Arial, sans-serif" font-size="14" fill="#333333" font-weight="bold" text-anchor="end">V &gt; V_rest</text>
+  <text x="600" y="218" font-family="Arial, sans-serif" font-size="13" fill="#666666" text-anchor="end">voltage decreases</text>
+  
+  <!-- Key insight box -->
+  <rect x="50" y="445" width="700" height="45" fill="white" stroke="#50C878" stroke-width="2" rx="5"/>
+  <text x="400" y="465" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" font-weight="bold">Key: At equilibrium (V_rest), dV/dt = 0. From any starting voltage,</text>
+  <text x="400" y="482" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">the system flows back to the stable resting potential.</text>
+</svg>
+  </Svg>
+
+  <Section type="code">
+    <H2>Phase Portraits: Visualizing the Flow</H2>
+    <Body>
+A **phase portrait** is a geometric tool for visualizing dynamical systems. For 1D systems, plot $V$ on the horizontal axis and $dV/dt$ on the vertical axis. The curve shows the "velocity" at each state.
+
+Key features:
+
+- **Fixed points**: Where the curve crosses $dV/dt = 0$ (horizontal axis).
+- **Flow direction**: If $dV/dt &gt; 0$, trajectories move right (voltage increases). If $dV/dt &lt; 0$, trajectories move left (voltage decreases).
+- **Stability**: At a stable fixed point, the curve crosses the axis with negative slope (approaching from above, departing below). Unstable fixed points have positive slope.
+
+For our leaky integrator:
+
+$$\frac{dV}{dt} = -\frac{V - V_{rest}}{\tau}$$
+
+This is a straight line with negative slope $-1/\tau$. It crosses zero at $V = V_{rest}$. Arrows on the plot point left for $V &gt; V_{rest}$ (negative $dV/dt$) and right for $V &lt; V_{rest}$ (positive $dV/dt$). The fixed point is clearly stable — everything flows toward it.
+
+For 2D systems (voltage + gating variable), phase portraits become 2D plane with vector fields. We'll explore those when we hit Hodgkin-Huxley models.
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Parameters
+V_rest = -70
+tau = 10
+
+# Voltage range
+V = np.linspace(-90, -50, 100)
+
+# Compute dV/dt at each voltage
+dV_dt = -(V - V_rest) / tau
+
+# Phase portrait
+plt.figure(figsize=(8, 5))
+plt.plot(V, dV_dt, linewidth=2, label='dV/dt vs V')
+plt.axhline(0, color='k', linestyle='-', linewidth=0.8)
+plt.axvline(V_rest, color='r', linestyle='--', linewidth=1.5, label=f'Fixed point V*={V_rest} mV')
+
+# Add flow arrows
+for V_point in [-85, -75, -65, -55]:
+    dV = -(V_point - V_rest) / tau
+    arrow_dir = np.sign(dV)
+    plt.arrow(V_point, -0.5, arrow_dir * 3, 0, head_width=0.3, head_length=1, fc='blue', ec='blue')
+
+plt.xlabel('Voltage V (mV)')
+plt.ylabel('dV/dt (mV/ms)')
+plt.title('Phase Portrait: 1D Leaky Integrator')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+</Code>
+  </Section>
+
+  <Section type="tip">
+    <H2>Initial Conditions and Basin Boundaries</H2>
+    <Body>
+Here's a subtlety that trips people up: **not all initial conditions lead to the same attractor** (when multiple attractors exist).
+
+In the simple leaky integrator, there's only one attractor, so every initial voltage ends up at $V_{rest}$. But add a spike threshold and reset (integrate-and-fire model), and suddenly you have two regimes:
+
+- **Subthreshold basin**: Initial $V &lt; V_{threshold}$ leads to rest.
+- **Suprathreshold basin**: Initial $V \geq V_{threshold}$ triggers a spike, then resets.
+
+The boundary between basins is called the **separatrix**. Small changes in initial conditions near a separatrix produce wildly different outcomes. This is why neurons are so sensitive to precise timing of synaptic inputs — a 1 mV difference can determine whether you fire or stay silent.
+
+In 2D systems, separatrices become curves in the phase plane. Understanding their geometry is key to predicting when neurons transition from quiescence to repetitive firing (bifurcations — coming up in Lesson 1.3).
+
+Takeaway: always check which attractor you're in. The same equation can produce totally different behavior depending on where you start.
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H2>Numerical Simulation: Verifying Analytical Predictions</H2>
+    <Body>
+Not all dynamical systems have closed-form solutions. When they don't, numerical integration saves the day.
+
+The simplest method is **Euler's method**: approximate $dx/dt$ as $\Delta x / \Delta t$, giving:
+
+$$x(t + \Delta t) = x(t) + f(x(t), t) \, \Delta t$$
+
+Start at $x_0$, iterate forward in time steps $\Delta t$. For the leaky integrator:
+
+$$V(t + \Delta t) = V(t) - \frac{V(t) - V_{rest}}{\tau} \Delta t$$
+
+This works if $\Delta t$ is small enough (typically $\Delta t \ll \tau$). For better accuracy, use Runge-Kutta methods (e.g., RK4) or adaptive solvers like `scipy.integrate.solve_ivp` in Python.
+
+Why bother when we have the analytical solution? Because:
+
+1. **Validation**: Numerics should match analytics. If they don't, you've made a mistake.
+2. **Extensions**: Add nonlinearities, inputs, noise — numerical methods still work when pencil-and-paper fails.
+3. **Intuition**: Watching trajectories evolve builds geometric understanding faster than staring at equations.
+
+The code example shows how to simulate from multiple initial conditions, confirming they all converge to the fixed point.
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+def euler_step(V, V_rest, tau, dt):
+    """Single Euler step for dV/dt = -(V - V_rest)/tau"""
+    dV_dt = -(V - V_rest) / tau
+    return V + dV_dt * dt
+
+# Parameters
+V_rest = -70
+tau = 10
+dt = 0.1  # time step (ms)
+T = 50    # total time (ms)
+n_steps = int(T / dt)
+
+# Multiple initial conditions
+V0_list = [-90, -80, -60, -50]
+time = np.arange(0, T, dt)
+
+plt.figure(figsize=(10, 6))
+
+for V0 in V0_list:
+    V_trajectory = np.zeros(n_steps)
+    V_trajectory[0] = V0
+
+    # Numerical integration
+    for i in range(1, n_steps):
+        V_trajectory[i] = euler_step(V_trajectory[i-1], V_rest, tau, dt)
+
+    plt.plot(time, V_trajectory, label=f'V0 = {V0} mV', linewidth=2)
+
+plt.axhline(V_rest, color='r', linestyle='--', linewidth=2, label='Attractor (V_rest)')
+plt.xlabel('Time (ms)')
+plt.ylabel('Voltage (mV)')
+plt.title('Trajectories from Different Initial Conditions Converge to Attractor')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+</Code>
+  </Section>
+
+  <Section type="concept">
+    <H2>Summary: The Dynamical Systems Lens</H2>
+    <Body>
+You've now learned to see neurons through the lens of dynamical systems:
+
+- **State space**: The universe of possible configurations. For a single voltage model, it's the real line. For multi-variable models, it's higher-dimensional.
+
+- **Trajectories**: Paths through state space governed by $dx/dt = f(x, t)$. The differential equation is the "physics" that determines where you go next.
+
+- **Attractors**: Long-term destinations. Fixed points (like resting potential), limit cycles (rhythmic spiking), or strange attractors (chaos).
+
+- **Basins**: Regions of initial conditions leading to each attractor. Boundaries between basins are sensitive — neurons exploit this for computation.
+
+- **Deterministic vs. stochastic**: When noise is small, treat dynamics as deterministic. When noise competes with driving forces, add stochastic terms.
+
+This framework isn't just elegant math — it's **predictive**. Once you identify attractors and basins, you know how the neuron responds to perturbations, inputs, and parameter changes. You can classify neurons by their phase portraits. You can predict transitions (bifurcations) when parameters shift.
+
+Next lesson: integrate-and-fire models, where threshold and reset turn continuous dynamics into discrete spiking. The attractor structure becomes richer — and the biology gets even more interesting.
+    </Body>
+  </Section>
+
+  <SingleSelect id="q-fixed-point-def">
+    <Prompt>What condition must a state $x^*$ satisfy to be a fixed point of the system $dx/dt = f(x, t)$?</Prompt>
+    <Options>
+      <Option correct="true">$f(x^*, t) = 0$</Option>
+      <Option>$x^* = 0$</Option>
+      <Option>$\frac{df}{dx}(x^*) &lt; 0$</Option>
+      <Option>$x^*$ is the initial condition</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q-stable-unstable">
+    <Prompt>For a 1D system $dx/dt = f(x)$, a fixed point $x^*$ is **stable** if:</Prompt>
+    <Options>
+      <Option correct="true">$\frac{df}{dx}(x^*) &lt; 0$</Option>
+      <Option>$\frac{df}{dx}(x^*) &gt; 0$</Option>
+      <Option>$f(x^*) &lt; 0$</Option>
+      <Option>$x^* &lt; 0$</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q-attractor-types">
+    <Prompt>Which of the following are types of attractors in dynamical systems? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Fixed point</Option>
+      <Option correct="true">Limit cycle</Option>
+      <Option correct="true">Strange attractor</Option>
+      <Option>Saddle point</Option>
+      <Option>Unstable equilibrium</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q-deterministic-properties">
+    <Prompt>Which statements are true about **deterministic** dynamical systems? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">The same initial condition always produces the same trajectory</Option>
+      <Option correct="true">The evolution is governed by $dx/dt = f(x, t)$ with no random terms</Option>
+      <Option>Trajectories are always unpredictable</Option>
+      <Option correct="true">Future states are completely determined by the current state and the equation</Option>
+      <Option>They cannot have stable fixed points</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q-timescale-order">
+    <Prompt>Order these events from **fastest** to **slowest** in a typical neuronal context:</Prompt>
+    <SortedItems>
+      <Item>Ion channel opening/closing (microseconds)</Item>
+      <Item>Action potential (1-2 ms)</Item>
+      <Item>Membrane time constant τ (10-20 ms)</Item>
+      <Item>Synaptic integration window (50-100 ms)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q-match-concepts">
+    <Prompt>Match each term to its correct definition:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>State space</Left>
+        <Right>Universe of all possible system configurations</Right>
+      </Pair>
+      <Pair>
+        <Left>Trajectory</Left>
+        <Right>Path traced through state space over time</Right>
+      </Pair>
+      <Pair>
+        <Left>Attractor</Left>
+        <Right>Set of states toward which trajectories converge</Right>
+      </Pair>
+      <Pair>
+        <Left>Basin of attraction</Left>
+        <Right>Region of initial conditions leading to a specific attractor</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>The speed of trajectory evolution</Distractor>
+      <Distractor>A type of differential equation solver</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q-leaky-integrator-blanks">
+    <Prompt>
+The leaky integrator model is governed by the equation $dV/dt = -(V - V_{rest})/\tau$, where $\tau$ is the membrane <Blank>time constant</Blank>. The fixed point of this system is located at $V^* = V_{rest}$, and it is classified as a <Blank>stable</Blank> fixed point because trajectories <Blank>converge</Blank> toward it from all initial conditions.
+    </Prompt>
+    <Distractors>
+      <Distractor>unstable</Distractor>
+      <Distractor>diverge</Distractor>
+      <Distractor>spatial constant</Distractor>
+      <Distractor>oscillate</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q-attractor-misconception">
+    <Prompt>
+A common misconception is that "all equilibrium points are attractors." Explain why this is incorrect, providing a specific example of an equilibrium that is NOT an attractor. Then discuss why this distinction matters for understanding neuronal behavior.
+    </Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Correctly explains that equilibria can be unstable (not attracting) when trajectories diverge away</Requirement>
+        <Indicators>unstable, diverge, repel, positive eigenvalue, saddle</Indicators>
+      </Criterion>
+      <Criterion points="2" required="true">
+        <Requirement>Provides a concrete mathematical or neuronal example (e.g., unstable fixed point, saddle point, or inverted pendulum analogy)</Requirement>
+        <Indicators>example, such as, saddle, unstable node, threshold</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Connects to neuronal behavior: threshold dynamics, bistability, or excitability</Requirement>
+        <Indicators>threshold, spike, bistable, excitable, transition</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Clear writing with correct mathematical terminology</Requirement>
+        <Indicators>fixed point, equilibrium, stability, trajectory</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="200" />
+  </Subjective>
+
+  <Subjective id="q-basin-sensitivity">
+    <Prompt>
+Initial condition sensitivity near basin boundaries is crucial for neuronal computation. Describe how the attractive basin concept explains why neurons can be so sensitive to the precise timing of synaptic inputs (on the millisecond scale), and why this might be computationally useful for the brain.
+    </Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that near basin boundaries (separatrices), small input differences determine which attractor the system reaches</Requirement>
+        <Indicators>separatrix, boundary, basin, small change, different attractor, threshold</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Connects to synaptic timing: precise timing determines whether input pushes neuron across threshold into spiking regime vs. staying at rest</Requirement>
+        <Indicators>timing, millisecond, synaptic, coincidence, integration window, threshold crossing</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Discusses computational advantage: sensitivity enables coincidence detection, temporal coding, or amplification of small differences</Requirement>
+        <Indicators>coincidence, temporal code, amplify, detect, discrimination, computation</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Clear explanation with logical flow</Requirement>
+        <Indicators>because, therefore, enables, allows</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="60" maxWords="250" />
+  </Subjective>
+
+</Lesson>

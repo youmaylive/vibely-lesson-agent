@@ -34,6 +34,7 @@ from prompts.system import build_system_prompt
 from prompts.generation import build_generation_prompt
 from prompts.fix import build_fix_prompt
 from validator import validate_mlai_file
+from svg_agent import resolve_svgs
 
 
 # ---------------------------------------------------------------------------
@@ -73,30 +74,48 @@ async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, st
     session_id = None
     cost_usd = 0.0
 
-    try:
-        async for message in query(prompt=prompt, options=options):
-            if hasattr(message, "subtype") and message.subtype == "init":
-                if hasattr(message, "session_id"):
-                    session_id = message.session_id
+    # Retry on transient TaskGroup/connection errors (Foundry can drop mid-session,
+    # especially during long tool-call sequences like image search/validate).
+    MAX_RETRIES = 3
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            async for message in query(prompt=prompt, options=options):
+                if hasattr(message, "subtype") and message.subtype == "init":
+                    if hasattr(message, "session_id"):
+                        session_id = message.session_id
 
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        print(block.text)
-                    elif hasattr(block, "name"):
-                        print(f"\n🔧 Tool: {block.name}")
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            print(block.text)
+                        elif hasattr(block, "name"):
+                            print(f"\n🔧 Tool: {block.name}")
 
-            elif isinstance(message, ResultMessage):
-                if message.subtype == "success":
-                    success = True
-                else:
-                    print(f"\n⚠️  Agent finished with status: {message.subtype}")
-                if hasattr(message, "total_cost_usd") and message.total_cost_usd:
-                    cost_usd = message.total_cost_usd
-                    print(f"💰 Cost: ${cost_usd:.4f}")
+                elif isinstance(message, ResultMessage):
+                    if message.subtype == "success":
+                        success = True
+                    else:
+                        print(f"\n⚠️  Agent finished with status: {message.subtype}")
+                    if hasattr(message, "total_cost_usd") and message.total_cost_usd:
+                        cost_usd = message.total_cost_usd
+                        print(f"💰 Cost: ${cost_usd:.4f}")
 
-    except Exception as exc:
-        print(f"\n❌ Agent error: {exc}")
+            # If we got here without exception, we're done
+            break
+
+        except Exception as exc:
+            print(f"\n⚠️  Agent error (attempt {attempt}/{MAX_RETRIES}): {exc}")
+            if attempt < MAX_RETRIES:
+                print(f"   Retrying in 3s...")
+                await asyncio.sleep(3)
+                # Fresh options (new MCP server) for the retry
+                options = _agent_options(
+                    model=options.model,
+                    max_turns=options.max_turns,
+                    session_id=session_id,
+                )
+            else:
+                print(f"\n❌ Agent failed after {MAX_RETRIES} attempts.")
 
     return success, session_id, cost_usd
 
@@ -158,6 +177,15 @@ async def generate_lesson(
     if not agent_ok:
         print("\n❌ Agent failed during generation phase.")
         return False
+
+    # ------------------------------------------------------------------
+    # Phase 1b: Resolve SVG placeholders → real <Svg><svg>...</svg></Svg>.
+    # The MLAI parser now natively supports the <Svg> component, so resolved
+    # SVGs validate cleanly (no stripping by the fix-agent).
+    # ------------------------------------------------------------------
+    if output_file.exists():
+        print("\n🎨 Resolving SVG placeholders...")
+        await resolve_svgs(output_file, model=model)
 
     # ------------------------------------------------------------------
     # Phase 2: External validation loop

@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-02</Id>
+    <Title>Integrate-and-Fire Models: Minimal Neuronal Dynamics</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>neuronal-dynamics</Tag>
+      <Tag>integrate-and-fire</Tag>
+      <Tag>spiking-models</Tag>
+      <Tag>rc-circuit</Tag>
+      <Tag>firing-rate</Tag>
+    </Tags>
+  </Meta>
+
+  <Section type="concept">
+    <H1>Integrate-and-Fire Models: Minimal Neuronal Dynamics</H1>
+    <Body>
+Here's something remarkable: you can capture the essence of how a neuron fires—the most complex electrical event in biology—with a model simpler than a high school physics circuit. The integrate-and-fire (IF) model strips away the elaborate ion channel choreography and keeps just two ideas: **neurons accumulate charge until they hit a threshold, then they reset.** That's it.
+
+Why does this work? Because for many computational questions—how often does a neuron fire? What input patterns drive responses?—the exact shape of the action potential doesn't matter. What matters is *when* spikes occur. The IF model gives you a minimal, mathematically tractable description that's powerful enough to build entire network theories on.
+
+This lesson shows you how to derive the IF model from first principles, solve it analytically, and understand why this 1907 idea (yes, over a century old) still dominates modern neuroscience.
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H2>The RC Circuit Foundation</H2>
+    <Body>
+Think of a neuron's membrane as a leaky bucket. Current flows in (from synapses or injected stimuli), but the membrane constantly leaks charge back out. This is **not** just an analogy—it's electrical engineering.
+
+The neuronal membrane has two key properties:
+- **Capacitance** $C$: stores charge, creating a voltage difference across the membrane
+- **Leak conductance** $g_L$: allows current to flow out, pulling voltage back toward rest
+
+From Kirchhoff's current law, the capacitor current plus leak current equals injected current:
+
+$$C \frac{dV}{dt} = -g_L(V - V_{\text{rest}}) + I(t)$$
+
+Let's decode this equation. The left side is charge accumulation rate. On the right:
+- $-g_L(V - V_{\text{rest}})$ is leak current (negative because it drains charge when $V &gt; V_{\text{rest}}$)
+- $I(t)$ is external input (synaptic current, electrode stimulation, etc.)
+
+This is the **leaky integrate-and-fire** equation before we add spiking. Right now, it's just a first-order linear ODE—continuous dynamics with no threshold.
+    </Body>
+  </Section>
+
+  <Section type="tip">
+    <H3>Why "Leaky" Integration Matters</H3>
+    <Body>
+Without the leak term, the neuron would be a *perfect integrator*—voltage would grow linearly with constant input forever. Real neurons leak. This means:
+1. **Temporal filtering**: brief inputs have less effect than sustained ones
+2. **Finite memory**: the neuron "forgets" old inputs exponentially
+3. **Stable resting state**: without input, voltage decays back to $V_{\text{rest}}$
+
+The leak is what makes neurons compute with *time constants*, not just total charge.
+    </Body>
+  </Section>
+
+    <Svg>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#333333" text-anchor="middle">RC Circuit Model of Neuronal Membrane</text>
+  
+  <!-- Circuit boundary box -->
+  <rect x="250" y="80" width="300" height="320" fill="none" stroke="#999999" stroke-width="2" stroke-dasharray="5,5"/>
+  <text x="400" y="100" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">Membrane Equivalent Circuit</text>
+  
+  <!-- Top wire -->
+  <line x1="300" y1="150" x2="500" y2="150" stroke="#333333" stroke-width="3"/>
+  
+  <!-- Bottom wire -->
+  <line x1="300" y1="350" x2="500" y2="350" stroke="#333333" stroke-width="3"/>
+  
+  <!-- Current source I(t) -->
+  <circle cx="300" cy="250" r="35" fill="white" stroke="#4A90D9" stroke-width="3"/>
+  <line x1="300" y1="150" x2="300" y2="215" stroke="#333333" stroke-width="3"/>
+  <line x1="300" y1="285" x2="300" y2="350" stroke="#333333" stroke-width="3"/>
+  <text x="300" y="255" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#4A90D9" text-anchor="middle">I(t)</text>
+  <text x="300" y="420" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" font-weight="bold">Current Source</text>
+  <text x="300" y="438" font-family="Arial, sans-serif" font-size="13" fill="#666666" text-anchor="middle">(injected current)</text>
+  
+  <!-- Capacitor C (membrane capacitance) -->
+  <line x1="380" y1="150" x2="380" y2="235" stroke="#333333" stroke-width="3"/>
+  <line x1="360" y1="235" x2="400" y2="235" stroke="#50C878" stroke-width="5"/>
+  <line x1="360" y1="245" x2="400" y2="245" stroke="#50C878" stroke-width="5"/>
+  <line x1="380" y1="245" x2="380" y2="350" stroke="#333333" stroke-width="3"/>
+  <text x="380" y="200" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#50C878" text-anchor="middle">C</text>
+  <text x="380" y="420" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" font-weight="bold">Membrane Capacitance</text>
+  <text x="380" y="438" font-family="Arial, sans-serif" font-size="13" fill="#666666" text-anchor="middle">(stores charge)</text>
+  
+  <!-- Resistor R (leak resistance) -->
+  <line x1="460" y1="150" x2="460" y2="220" stroke="#333333" stroke-width="3"/>
+  <!-- Zigzag resistor symbol -->
+  <path d="M 460 220 L 470 230 L 450 250 L 470 270 L 450 290 L 460 300" fill="none" stroke="#FF6B6B" stroke-width="3"/>
+  <line x1="460" y1="300" x2="460" y2="350" stroke="#333333" stroke-width="3"/>
+  <text x="460" y="265" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FF6B6B" text-anchor="middle">R</text>
+  <text x="460" y="420" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" font-weight="bold">Leak Resistance R = 1/g<tspan baseline-shift="sub" font-size="11">L</tspan></text>
+  <text x="460" y="438" font-family="Arial, sans-serif" font-size="13" fill="#666666" text-anchor="middle">(leak conductance)</text>
+  
+  <!-- Voltage labels across membrane -->
+  <line x1="520" y1="150" x2="560" y2="150" stroke="#333333" stroke-width="2"/>
+  <line x1="520" y1="350" x2="560" y2="350" stroke="#333333" stroke-width="2"/>
+  <line x1="540" y1="150" x2="540" y2="350" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)" marker-start="url(#arrowhead)"/>
+  <text x="580" y="255" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#4A90D9" text-anchor="middle">V</text>
+  <text x="650" y="240" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">(Membrane</text>
+  <text x="650" y="258" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">Potential)</text>
+  
+  <!-- Leak current arrow -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#FF6B6B"/>
+    </marker>
+    <marker id="arrowblue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#4A90D9"/>
+    </marker>
+  </defs>
+  <line x1="490" y1="260" x2="520" y2="260" stroke="#FF6B6B" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="505" y="280" font-family="Arial, sans-serif" font-size="12" fill="#FF6B6B" text-anchor="middle">I<tspan baseline-shift="sub" font-size="10">leak</tspan></text>
+  
+  <!-- V_rest reference -->
+  <rect x="60" y="330" width="140" height="50" fill="#E8F4F8" stroke="#4A90D9" stroke-width="2" rx="5"/>
+  <text x="130" y="352" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#4A90D9" text-anchor="middle">V<tspan baseline-shift="sub" font-size="13">rest</tspan></text>
+  <text x="130" y="372" font-family="Arial, sans-serif" font-size="12" fill="#666666" text-anchor="middle">(resting potential)</text>
+  <line x1="200" y1="355" x2="450" y2="300" stroke="#4A90D9" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrowblue)"/>
+  <text x="320" y="315" font-family="Arial, sans-serif" font-size="12" fill="#4A90D9" text-anchor="middle">leak toward V<tspan baseline-shift="sub" font-size="10">rest</tspan></text>
+  
+  <!-- Key equation -->
+  <rect x="600" y="320" width="180" height="70" fill="#FFF9E6" stroke="#FF9933" stroke-width="2" rx="5"/>
+  <text x="690" y="345" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333" text-anchor="middle">Key Equation:</text>
+  <text x="690" y="368" font-family="Arial, sans-serif" font-size="13" fill="#333333" text-anchor="middle">C dV/dt = I(t) - g<tspan baseline-shift="sub" font-size="11">L</tspan>(V - V<tspan baseline-shift="sub" font-size="11">rest</tspan>)</text>
+</svg>
+  </Svg>
+
+  <Section type="concept">
+    <H2>Dimensionless Form and the Membrane Time Constant</H2>
+    <Body>
+Let's make this equation cleaner. Define the **membrane time constant**:
+
+$$\tau = \frac{C}{g_L}$$
+
+This is the timescale over which the membrane voltage responds to changes. A large $\tau$ means sluggish dynamics (big capacitance or small leak). A small $\tau$ means rapid response.
+
+Dividing the RC equation by $g_L$ gives:
+
+$$\tau \frac{dV}{dt} = -(V - V_{\text{rest}}) + \frac{I(t)}{g_L}$$
+
+Or equivalently:
+
+$$\frac{dV}{dt} = -\frac{V - V_{\text{rest}}}{\tau} + \frac{I(t)}{C}$$
+
+This form makes the dynamics transparent: voltage **drifts toward rest** at rate $1/\tau$ and is **pushed upward** by input current scaled by capacitance. The competition between these forces determines whether the neuron reaches threshold.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-membrane-tau">
+    <Front>What does the membrane time constant $\tau = C/g_L$ represent?</Front>
+    <Back>The timescale over which membrane voltage responds to changes. It determines how quickly voltage decays back to rest without input, and how rapidly the neuron integrates incoming current.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Adding the Threshold: From Continuous to Discrete</H2>
+    <Body>
+Here's where the magic happens. The RC dynamics are *continuous*—smooth differential equations. But real neurons fire *discrete* action potentials. The IF model bridges this gap with a simple rule:
+
+**If** $V(t) \geq V_{\text{thre}}$, **then**:
+1. Record a spike at time $t$
+2. Reset voltage to $V_{\text{reset}}$ (often $V_{\text{reset}} = V_{\text{rest}}$)
+3. Continue integrating
+
+This is a **hybrid dynamical system**: continuous subthreshold dynamics punctuated by discrete threshold-crossing events. The model doesn't care *why* the threshold causes a spike—it just enforces the consequence: reset and start over.
+
+Mathematically, we write:
+
+$$\frac{dV}{dt} = -\frac{V - V_{\text{rest}}}{\tau} + \frac{I(t)}{C} \quad \text{with} \quad V(t^-) \geq V_{\text{thre}} \implies V(t^+) = V_{\text{reset}}$$
+
+The notation $t^-$ (just before threshold) and $t^+$ (just after reset) signals the discontinuity.
+    </Body>
+  </Section>
+
+  <Mermaid>
+graph TD
+    A[Subthreshold: Integrate current] -->|dV/dt = -V-Vrest/τ + I/C| B{V ≥ V_thre?}
+    B -->|No| A
+    B -->|Yes| C[Emit spike]
+    C --> D[Reset: V ← V_reset]
+    D --> A
+</Mermaid>
+
+  <FlashCard id="fc-threshold-reset">
+    <Front>What happens when the IF model voltage reaches threshold $V_{\text{thre}}$?</Front>
+    <Back>The model records a spike event, immediately resets the voltage to $V_{\text{reset}}$, and resumes continuous integration. This creates discrete firing from continuous dynamics.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Analytical Solution for Constant Input</H2>
+    <Body>
+When input is constant ($I(t) = I_0$), we can solve the ODE exactly. This is rare in neuroscience—treasure it.
+
+For $V(0) = V_{\text{reset}}$ and constant $I_0$, the solution is:
+
+$$V(t) = V_{\text{rest}} + \frac{I_0}{g_L} \left(1 - e^{-t/\tau}\right) + \left(V_{\text{reset}} - V_{\text{rest}}\right)e^{-t/\tau}$$
+
+Let's parse this:
+- **Steady-state**: as $t \to \infty$, voltage approaches $V_{\infty} = V_{\text{rest}} + I_0/g_L$
+- **Transient decay**: the exponential terms vanish at rate $1/\tau$
+- **If $V_{\infty} &lt; V_{\text{thre}}$**: voltage never reaches threshold → no spiking (subthreshold regime)
+- **If $V_{\infty} \geq V_{\text{thre}}$**: voltage crosses threshold at some finite time $T$ → periodic spiking
+
+The critical input for spiking is:
+
+$$I_{\text{rheo}} = g_L(V_{\text{thre}} - V_{\text{rest}})$$
+
+This is the **rheobase current**—the minimum DC input needed to eventually trigger a spike. Below rheobase, the neuron stays silent forever.
+    </Body>
+  </Section>
+
+  <Section type="example">
+    <H3>Deriving Time to First Spike</H3>
+    <Body>
+Suppose we inject a constant suprathreshold current $I_0 &gt; I_{\text{rheo}}$. How long until the first spike?
+
+Set $V(T) = V_{\text{thre}}$ and solve for $T$:
+
+$$V_{\text{thre}} = V_{\text{rest}} + \frac{I_0}{g_L}\left(1 - e^{-T/\tau}\right) + \left(V_{\text{reset}} - V_{\text{rest}}\right)e^{-T/\tau}$$
+
+Rearranging:
+
+$$\frac{I_0}{g_L}\left(1 - e^{-T/\tau}\right) = V_{\text{thre}} - V_{\text{rest}} - \left(V_{\text{reset}} - V_{\text{rest}}\right)e^{-T/\tau}$$
+
+If $V_{\text{reset}} = V_{\text{rest}}$, this simplifies beautifully:
+
+$$T = \tau \ln\left(\frac{I_0/g_L}{I_0/g_L - (V_{\text{thre}} - V_{\text{rest}})}\right)$$
+
+Or equivalently, using $I_{\text{rheo}} = g_L(V_{\text{thre}} - V_{\text{rest}})$:
+
+$$T = \tau \ln\left(\frac{I_0}{I_0 - I_{\text{rheo}}}\right)$$
+
+Notice what happens as $I_0 \to I_{\text{rheo}}$ from above: $T \to \infty$. Right at rheobase, the neuron takes forever to spike—it asymptotically approaches threshold but never quite gets there in finite time.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-rheobase">
+    <Front>What is the rheobase current $I_{\text{rheo}}$?</Front>
+    <Back>The minimum constant input current needed to eventually elicit a spike: $I_{\text{rheo}} = g_L(V_{\text{thre}} - V_{\text{rest}})$. Below this, the steady-state voltage stays subthreshold.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Firing Rate and Interspike Intervals</H2>
+    <Body>
+Once the neuron crosses threshold and resets, it starts integrating again. For constant suprathreshold input, this repeats periodically. The time between spikes is the **interspike interval (ISI)**, denoted $T$.
+
+The **firing rate** (or spike frequency) is simply:
+
+$$f = \frac{1}{T}$$
+
+Measured in spikes per second (Hz). For the IF model with constant input, we've already derived $T$ above, so the firing rate is:
+
+$$f = \frac{1}{\tau \ln\left(\frac{I_0}{I_0 - I_{\text{rheo}}}\right)}$$
+
+This is the famous **f-I curve** (frequency-current relationship) for the IF model. Key features:
+- **Threshold**: $f = 0$ for $I_0 &lt; I_{\text{rheo}}$
+- **Monotonic increase**: firing rate grows with input
+- **Divergence**: as $I_0 \to I_{\text{rheo}}^+$, firing rate approaches zero; as $I_0 \to \infty$, $f \propto 1/\tau$ (membrane time constant limits max rate)
+
+Real neurons show more complex f-I curves (nonlinear, saturating due to refractoriness), but the IF model captures the basic principle: stronger input → faster firing.
+    </Body>
+  </Section>
+
+  <Mermaid>
+graph LR
+    A[Constant Input I_0] --> B[Subthreshold Integration]
+    B --> C[Voltage reaches V_thre]
+    C --> D[Spike emitted]
+    D --> E[Reset to V_reset]
+    E --> B
+    D --> F[Interspike Interval T]
+    F --> G[Firing Rate f = 1/T]
+</Mermaid>
+
+  <Section type="code">
+    <H3>Numerical Implementation: Euler Integration with Threshold Detection</H3>
+    <Body>
+For time-varying inputs $I(t)$, we can't solve analytically. We need numerical integration. Here's the simplest approach using Euler's method with explicit threshold detection.
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Parameters (dimensionless units)
+tau = 10.0          # membrane time constant (ms)
+V_rest = -70.0      # resting potential (mV)
+V_thre = -50.0      # threshold (mV)
+V_reset = -70.0     # reset potential (mV)
+I_rheo = (V_thre - V_rest)  # rheobase current
+
+# Simulation parameters
+dt = 0.1            # time step (ms)
+T_total = 200.0     # total time (ms)
+time = np.arange(0, T_total, dt)
+
+# Constant suprathreshold input
+I_input = 1.5 * I_rheo * np.ones_like(time)
+
+# Initialize voltage and spike times
+V = np.zeros_like(time)
+V[0] = V_reset
+spike_times = []
+
+# Euler integration with threshold detection
+for i in range(1, len(time)):
+    dV_dt = -(V[i-1] - V_rest) / tau + I_input[i-1]
+    V[i] = V[i-1] + dV_dt * dt
+
+    # Check threshold crossing
+    if V[i] &gt;= V_thre:
+        spike_times.append(time[i])
+        V[i] = V_reset  # reset voltage
+
+# Plot results
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+
+ax1.plot(time, V, 'k', linewidth=1.5)
+ax1.axhline(V_thre, color='r', linestyle='--', label='Threshold')
+ax1.axhline(V_rest, color='b', linestyle=':', label='Rest')
+ax1.set_ylabel('Voltage (mV)')
+ax1.legend()
+ax1.set_title('Integrate-and-Fire Model: Voltage Trace')
+
+ax2.plot(time, I_input, 'g', linewidth=1.5)
+ax2.set_xlabel('Time (ms)')
+ax2.set_ylabel('Input Current')
+ax2.set_title('Injected Current')
+
+plt.tight_layout()
+plt.show()
+
+# Compute firing rate from spike times
+if len(spike_times) &gt; 1:
+    ISI = np.diff(spike_times)
+    firing_rate = 1000.0 / np.mean(ISI)  # convert to Hz
+    print(f"Mean firing rate: {firing_rate:.2f} Hz")
+    print(f"Mean ISI: {np.mean(ISI):.2f} ms")
+    </Code>
+  </Section>
+
+  <FlashCard id="fc-numerical-reset">
+    <Front>Why is explicit threshold detection crucial in numerical IF simulations?</Front>
+    <Back>Because Euler integration can overshoot the threshold. You must check if $V \geq V_{\text{thre}}$ after each step and immediately reset—otherwise voltage continues rising artificially, creating numerical artifacts.</Back>
+  </FlashCard>
+
+  <Section type="example">
+    <H2>Constructing the Frequency-Current (f-I) Curve</H2>
+    <Body>
+The f-I curve reveals how firing rate depends on input strength—a fundamental neural computation. Here's how to generate it from simulation or theory.
+
+**Analytical approach** (constant input):
+For each input level $I$, use:
+
+$$f(I) = \begin{cases} 0 &amp; \text{if } I &lt; I_{\text{rheo}} \\ \frac{1}{\tau \ln\left(\frac{I}{I - I_{\text{rheo}}}\right)} &amp; \text{if } I \geq I_{\text{rheo}} \end{cases}$$
+
+**Numerical approach**:
+1. Run simulation for fixed $I$ until transient settles (discard initial spikes)
+2. Count spikes in a steady-state window
+3. Compute mean ISI and take $f = 1/\text{ISI}$
+4. Repeat for range of $I$ values
+5. Plot $f$ vs. $I$
+
+**What to look for**:
+- **Discontinuity at rheobase**: firing rate jumps from 0 to finite value
+- **Near-linear regime**: for moderate suprathreshold input, $f$ grows approximately linearly
+- **Saturation**: at very high input, $f$ plateaus near $1/\tau$ (membrane time constant bottleneck)
+
+Real neurons deviate from this (refractoriness causes stronger saturation), but the IF model captures the qualitative shape.
+    </Body>
+  </Section>
+
+    <Svg>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333333" text-anchor="middle">f-I Curve: Integrate-and-Fire Model</text>
+  
+  <!-- Axes -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666666"/>
+    </marker>
+  </defs>
+  
+  <!-- X-axis -->
+  <line x1="100" y1="400" x2="750" y2="400" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="720" y="430" font-family="Arial, sans-serif" font-size="16" fill="#333333" font-weight="bold">I (current)</text>
+  
+  <!-- Y-axis -->
+  <line x1="100" y1="400" x2="100" y2="70" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="50" y="90" font-family="Arial, sans-serif" font-size="16" fill="#333333" font-weight="bold">f (Hz)</text>
+  
+  <!-- Rheobase vertical line (dashed) -->
+  <line x1="250" y1="400" x2="250" y2="270" stroke="#FF6B6B" stroke-width="2" stroke-dasharray="5,5"/>
+  
+  <!-- f-I Curve -->
+  <!-- Flat at zero before rheobase -->
+  <line x1="100" y1="400" x2="250" y2="400" stroke="#4A90D9" stroke-width="3"/>
+  
+  <!-- Discontinuous jump at rheobase (open circle at bottom, filled circle at top) -->
+  <circle cx="250" cy="400" r="5" fill="white" stroke="#4A90D9" stroke-width="3"/>
+  <circle cx="250" cy="270" r="5" fill="#4A90D9"/>
+  
+  <!-- Logarithmic rise after rheobase -->
+  <path d="M 250 270 Q 350 240, 450 190 Q 550 150, 650 120 Q 700 105, 730 100" fill="none" stroke="#4A90D9" stroke-width="3"/>
+  
+  <!-- Asymptotic saturation line (dashed) -->
+  <line x1="100" y1="95" x2="750" y2="95" stroke="#50C878" stroke-width="2" stroke-dasharray="8,4"/>
+  
+  <!-- Labels and annotations -->
+  
+  <!-- Rheobase label -->
+  <text x="250" y="420" font-family="Arial, sans-serif" font-size="14" fill="#FF6B6B" text-anchor="middle" font-weight="bold">I_rheo</text>
+  <text x="250" y="438" font-family="Arial, sans-serif" font-size="12" fill="#FF6B6B" text-anchor="middle">(rheobase)</text>
+  
+  <!-- Zero firing region -->
+  <text x="175" y="385" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" font-style="italic">f = 0</text>
+  <text x="175" y="370" font-family="Arial, sans-serif" font-size="12" fill="#666666" text-anchor="middle">(below threshold)</text>
+  
+  <!-- Discontinuous jump annotation -->
+  <text x="290" y="335" font-family="Arial, sans-serif" font-size="13" fill="#4A90D9" font-weight="bold">Discontinuous</text>
+  <text x="290" y="350" font-family="Arial, sans-serif" font-size="13" fill="#4A90D9" font-weight="bold">jump</text>
+  <line x1="270" y1="340" x2="255" y2="330" stroke="#4A90D9" stroke-width="1.5"/>
+  
+  <!-- Logarithmic rise region -->
+  <text x="450" y="230" font-family="Arial, sans-serif" font-size="14" fill="#4A90D9" font-weight="bold">Logarithmic rise</text>
+  <text x="450" y="248" font-family="Arial, sans-serif" font-size="12" fill="#666666">f increases with I</text>
+  
+  <!-- Saturation label -->
+  <text x="140" y="90" font-family="Arial, sans-serif" font-size="14" fill="#50C878" font-weight="bold">1/τ</text>
+  <text x="190" y="90" font-family="Arial, sans-serif" font-size="12" fill="#50C878">(asymptotic limit)</text>
+  
+  <!-- Saturation region annotation -->
+  <text x="650" y="140" font-family="Arial, sans-serif" font-size="13" fill="#50C878">Approaches</text>
+  <text x="650" y="155" font-family="Arial, sans-serif" font-size="13" fill="#50C878">saturation</text>
+  <line x1="650" y1="125" x2="680" y2="105" stroke="#50C878" stroke-width="1.5"/>
+  
+  <!-- Current axis markers -->
+  <line x1="100" y1="400" x2="100" y2="405" stroke="#666666" stroke-width="2"/>
+  <text x="100" y="420" font-family="Arial, sans-serif" font-size="12" fill="#666666" text-anchor="middle">0</text>
+  
+  <!-- Firing rate axis markers -->
+  <line x1="100" y1="400" x2="95" y2="400" stroke="#666666" stroke-width="2"/>
+  <text x="85" y="405" font-family="Arial, sans-serif" font-size="12" fill="#666666" text-anchor="end">0</text>
+  
+  <!-- Key insight box -->
+  <rect x="520" y="320" width="250" height="70" fill="white" stroke="#4A90D9" stroke-width="2" rx="5"/>
+  <text x="645" y="342" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" font-weight="bold">Key Features:</text>
+  <text x="645" y="360" font-family="Arial, sans-serif" font-size="12" fill="#333333" text-anchor="middle">• No firing below I_rheo</text>
+  <text x="645" y="375" font-family="Arial, sans-serif" font-size="12" fill="#333333" text-anchor="middle">• Sudden onset at threshold</text>
+  <text x="645" y="390" font-family="Arial, sans-serif" font-size="12" fill="#333333" text-anchor="middle">• Saturates at max rate 1/τ</text>
+</svg>
+  </Svg>
+
+  <FlashCard id="fc-fi-curve">
+    <Front>What does the f-I curve represent?</Front>
+    <Back>The relationship between input current strength and firing rate (spikes per second). It shows how neurons encode stimulus intensity into spike frequency—a key mechanism of rate coding.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Time-Varying Inputs and Computational Considerations</H2>
+    <Body>
+When input varies in time, $I = I(t)$, the IF model's behavior becomes richer—and we lose analytical tractability. Now spike timing depends on:
+- **Input magnitude**: stronger bursts trigger spikes faster
+- **Input duration**: brief pulses may not bring voltage to threshold
+- **Input timing**: when a pulse arrives relative to the last spike matters (membrane integrates recent history)
+
+This is where numerical simulation becomes essential. Key implementation tips:
+
+**1. Time step selection**: Choose $\Delta t \ll \tau$ (rule of thumb: $\Delta t \leq \tau/10$) to avoid numerical instability.
+
+**2. Threshold overshoot**: Euler integration can make $V$ jump *past* threshold. After reset, check if you need interpolation for precise spike times (for timing-critical applications).
+
+**3. Computational efficiency**: IF models are cheap to simulate (one ODE, one threshold check per step). You can easily run networks of thousands of neurons.
+
+**4. Stochastic input**: Adding noise to $I(t)$ (from synaptic fluctuations) makes spike trains irregular, matching biology better. We'll cover this in stochastic neuron models.
+    </Body>
+  </Section>
+
+  <Section type="tip">
+    <H2>Model Limitations: What IF Models Miss</H2>
+    <Body>
+The IF model's simplicity is its strength *and* weakness. Here's what it deliberately ignores:
+
+**No action potential shape**: The model emits delta-function spikes, not the ~1ms waveforms real neurons produce. For network-level questions, this is fine. For understanding ion channel biophysics, it's useless.
+
+**No refractoriness**: Real neurons have an absolute refractory period (~1-2ms) where they *cannot* fire, and a relative refractory period where threshold is elevated. IF models can fire arbitrarily fast if input is strong enough—biologically unrealistic.
+
+**No spike-frequency adaptation**: Many neurons slow their firing during sustained input (K⁺ channel activation, synaptic depression). Basic IF is memoryless between spikes.
+
+**No subthreshold resonance**: Some neurons prefer oscillatory inputs at specific frequencies due to active currents (Ih, IM). IF models have flat frequency response.
+
+**Solutions**: Extended models add these features—refractory IF, adaptive IF (AdEx), exponential IF. But the core integrate-and-fire principle remains: charge accumulation + threshold.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-if-limitations">
+    <Front>What are two major biological features the basic IF model omits?</Front>
+    <Back>1) Action potential shape (uses delta spikes), 2) Refractory period (can fire arbitrarily fast). Also missing: spike-frequency adaptation, subthreshold resonance, and detailed voltage-gated dynamics.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Summary: Why IF Models Endure</H2>
+    <Body>
+Over a century after its introduction, the integrate-and-fire model remains the workhorse of computational neuroscience. Why?
+
+**Mathematical tractability**: Closed-form solutions for steady-state, analytical firing rates, and tractable network dynamics.
+
+**Computational efficiency**: Minimal state variables (just $V$) and simple threshold logic make large-scale simulations feasible.
+
+**Conceptual clarity**: The model isolates the *essence* of spiking—integration vs. threshold—without the clutter of dozens of ion channels.
+
+**Extensibility**: Easy to add features incrementally (refractoriness, adaptation, noise) while keeping the core framework.
+
+You've now mastered:
+- The RC circuit foundation and membrane time constant
+- Threshold and reset mechanisms that create discrete spikes
+- Analytical solutions for constant input and firing rate derivation
+- Numerical implementation with proper threshold handling
+- The f-I curve and its biological interpretation
+- Model limitations and when to use more complex alternatives
+
+Next, we'll extend this to networks of IF neurons and explore how collective dynamics emerge from coupled threshold oscillators.
+    </Body>
+  </Section>
+
+  <SingleSelect id="q1-rc-equation">
+    <Prompt>In the RC circuit equation for the IF model, $C \frac{dV}{dt} = -g_L(V - V_{\text{rest}}) + I(t)$, what does the term $-g_L(V - V_{\text{rest}})$ represent?</Prompt>
+    <Options>
+      <Option correct="true">The leak current that pulls voltage back toward resting potential</Option>
+      <Option>The capacitive charging current from external input</Option>
+      <Option>The threshold-crossing mechanism that triggers spikes</Option>
+      <Option>The synaptic conductance change during activation</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2-membrane-tau">
+    <Prompt>A neuron has capacitance $C = 100$ pF and leak conductance $g_L = 10$ nS. What is its membrane time constant $\tau$?</Prompt>
+    <Options>
+      <Option>1 ms</Option>
+      <Option correct="true">10 ms</Option>
+      <Option>100 ms</Option>
+      <Option>1000 ms</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q3-rheobase">
+    <Prompt>For an IF neuron with $V_{\text{rest}} = -70$ mV, $V_{\text{thre}} = -50$ mV, and $g_L = 10$ nS, what is the rheobase current $I_{\text{rheo}}$?</Prompt>
+    <Options>
+      <Option>20 pA</Option>
+      <Option>50 pA</Option>
+      <Option correct="true">200 pA</Option>
+      <Option>500 pA</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q4-if-properties">
+    <Prompt>Which of the following statements about the integrate-and-fire model are true? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">It combines continuous subthreshold dynamics with discrete threshold-crossing events</Option>
+      <Option correct="true">For constant suprathreshold input, it produces periodic spiking with constant ISI</Option>
+      <Option>It accurately reproduces the detailed waveform of biological action potentials</Option>
+      <Option correct="true">Below rheobase current, voltage asymptotically approaches a subthreshold steady state</Option>
+      <Option>It includes a biologically realistic refractory period after each spike</Option>
+    </Options>
+  </MultiSelect>
+
+  <MultiSelect id="q5-fi-curve">
+    <Prompt>Which features characterize the f-I curve of the basic integrate-and-fire model? (Select all that apply)</Prompt>
+    <Options>
+      <Option correct="true">Firing rate is zero for input below rheobase</Option>
+      <Option correct="true">There is a discontinuous jump in firing rate at the rheobase threshold</Option>
+      <Option>Firing rate grows linearly with input for all suprathreshold currents</Option>
+      <Option correct="true">At very high input, firing rate saturates near $1/\tau$</Option>
+      <Option>The curve shows spike-frequency adaptation with sustained input</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q6-if-simulation-steps">
+    <Prompt>Arrange the following steps in the correct order for numerically simulating an IF neuron using Euler's method:</Prompt>
+    <SortedItems>
+      <Item>Initialize voltage to reset value $V_{\text{reset}}$</Item>
+      <Item>Compute $dV/dt$ using the RC circuit equation</Item>
+      <Item>Update voltage: $V_{n+1} = V_n + (dV/dt) \cdot \Delta t$</Item>
+      <Item>Check if $V_{n+1} \geq V_{\text{thre}}$</Item>
+      <Item>If threshold crossed, record spike time and reset $V$ to $V_{\text{reset}}$</Item>
+      <Item>Continue to next time step</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q7-if-parameters">
+    <Prompt>Match each IF model parameter to its biological or computational meaning:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>$\tau = C/g_L$</Left>
+        <Right>Membrane time constant (response timescale)</Right>
+      </Pair>
+      <Pair>
+        <Left>$V_{\text{thre}}$</Left>
+        <Right>Spike threshold potential</Right>
+      </Pair>
+      <Pair>
+        <Left>$I_{\text{rheo}}$</Left>
+        <Right>Minimum current for spiking</Right>
+      </Pair>
+      <Pair>
+        <Left>Interspike interval $T$</Left>
+        <Right>Time between consecutive spikes</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Action potential duration</Distractor>
+      <Distractor>Synaptic delay</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q8-if-equation">
+    <Prompt>
+The firing rate for constant input $I_0$ in the IF model is given by $f = \frac{1}{T}$, where $T$ is the <Blank>interspike interval</Blank>. For inputs above <Blank>rheobase</Blank>, the neuron fires periodically. The analytical expression involves the <Blank>logarithm</Blank> of a ratio involving input current and threshold voltage difference.
+    </Prompt>
+    <Distractors>
+      <Distractor>action potential</Distractor>
+      <Distractor>refractory period</Distractor>
+      <Distractor>exponential</Distractor>
+      <Distractor>capacitance</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q9-if-limitations">
+    <Prompt>Explain why the basic integrate-and-fire model cannot capture spike-frequency adaptation, and describe what biological mechanism causes this phenomenon in real neurons. How would you extend the IF model to include adaptation? (50-150 words)</Prompt>
+    <Rubric>
+      <Criterion points="3" required="true">
+        <Requirement>Explains that basic IF resets instantaneously with no memory between spikes, making it memoryless</Requirement>
+        <Indicators>memoryless, instantaneous reset, no history, stateless between spikes</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies biological mechanism: calcium-activated potassium channels, sodium channel inactivation, or synaptic depression</Requirement>
+        <Indicators>calcium, potassium, K+, Ca2+, channel inactivation, synaptic depression</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Proposes extension: add adaptation current or dynamic threshold that accumulates with spikes</Requirement>
+        <Indicators>adaptation current, dynamic threshold, adaptive, accumulate, spike-dependent</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions that adaptation causes firing rate to decrease during sustained input</Requirement>
+        <Indicators>decrease, slow down, reduce firing, sustained input, prolonged stimulation</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="150" />
+  </Subjective>
+
+  <Subjective id="q10-fi-curve-biology">
+    <Prompt>Why does the f-I curve of the basic IF model have a discontinuous jump at rheobase, and how does this compare to real neuronal f-I curves? What does this tell us about the model's assumptions? (50-150 words)</Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Explains that at rheobase, voltage exactly reaches threshold after infinite time, causing mathematical discontinuity from zero to finite firing rate</Requirement>
+        <Indicators>infinite time, asymptotically, mathematical discontinuity, exactly reaches, I=I_rheo</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Notes that real neurons have smoother f-I curves due to noise, channel stochasticity, or gradual threshold approach</Requirement>
+        <Indicators>smoother, gradual, noise, stochastic, real neurons, biological</Indicators>
+      </Criterion>
+      <Criterion points="3">
+        <Requirement>Discusses assumption: model assumes deterministic threshold and instantaneous reset with no variability</Requirement>
+        <Indicators>deterministic, instantaneous, no variability, sharp threshold, assumption</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="50" maxWords="150" />
+  </Subjective>
+
+</Lesson>

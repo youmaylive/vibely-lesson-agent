@@ -9,6 +9,8 @@ dist/
 build/
 *.whl
 
+playable_arena/
+
 # Virtual environments
 .venv/
 venv/

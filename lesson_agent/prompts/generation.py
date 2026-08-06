@@ -129,5 +129,25 @@ You MUST follow this exact structure pattern:
 - All assessment IDs must be unique
 - A final summary Section wrapping up key points
 
+## 🎨 VISUAL REQUIREMENTS (MANDATORY — 2-4 visuals per lesson):
+
+You MUST include visuals to keep learners engaged. Use a MIX of Mermaid + SVG:
+
+### Mermaid (for flows/processes/relationships):
+- Just write Mermaid diagram code directly — auto-renders
+- Use for: flowcharts, sequence diagrams, timelines, state machines, comparisons
+
+### SVG placeholders (for custom labeled diagrams):
+- Write: `<Svg concept="specific concept to illustrate" context="surrounding lesson context" />`
+- A post-processor will generate a real, labeled educational SVG from this
+- Use for: architectures, scientific diagrams, labeled illustrations, anything Mermaid can't do
+- Be SPECIFIC in the concept field (include key terms to label)
+- **Include 3-4 `<Svg>` placeholders per lesson** — one for each distinct major concept/process/structure the lesson teaches (not repeats).
+
+### Target per lesson:
+- **3-4 `<Svg>` placeholders** (distinct concepts)
+- At least 1-2 Mermaid diagrams
+- Place both DIRECTLY under `<Lesson>` (NOT inside Section)
+
 Make the content genuinely educational and research-grade.
 Once you have written the file, confirm that you are done."""

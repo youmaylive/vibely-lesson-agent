@@ -1,0 +1,798 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Lesson>
+  <Meta>
+    <Id>lesson-01-04</Id>
+    <Title>FitzHugh-Nagumo Model: Reduced Excitable Dynamics</Title>
+    <Version>1</Version>
+    <Tags>
+      <Tag>neuronal-dynamics</Tag>
+      <Tag>phase-plane-analysis</Tag>
+      <Tag>excitability</Tag>
+      <Tag>bifurcations</Tag>
+      <Tag>nullclines</Tag>
+    </Tags>
+  </Meta>
+
+  <Section type="concept">
+    <H1>FitzHugh-Nagumo Model: Reduced Excitable Dynamics</H1>
+    <Body>
+Here's the problem with the Hodgkin-Huxley model: it's brilliant, it's biophysically accurate, and it has **four dimensions**. Four coupled differential equations means you can't visualize what's happening. You can't sketch the dynamics on paper. You can't *see* why a neuron fires.
+
+Richard FitzHugh and Jinichi Nagumo asked: what if we threw away most of the variables but kept the *essence* of excitability? What's the minimal system that still captures all-or-none spiking?
+
+The answer: **two variables**. One fast (voltage-like), one slow (recovery-like). The FitzHugh-Nagumo model strips neuronal dynamics down to a system you can draw, analyze, and understand geometrically — without losing the fundamental behavior that makes neurons neurons.
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H2>The FitzHugh-Nagumo Equations</H2>
+    <Body>
+The FHN model describes neuronal excitability with two coupled ordinary differential equations:
+
+$$\frac{dv}{dt} = K[-v(v - \alpha)(v - 1) - w] + I$$
+
+$$\frac{dw}{dt} = b(v - cw)$$
+
+Here's what each variable represents:
+- $v$ is the **fast variable** — think voltage (but rescaled to $[0,1]$ instead of millivolts)
+- $w$ is the **recovery variable** — a single lumped variable that combines the inactivation of sodium channels ($h$ in HH) and activation of potassium channels ($n$ in HH)
+- $I$ is the **external input current** (stimulus)
+
+The parameters control the shape and timescales:
+- $K$ sets the overall **speed** of the fast dynamics
+- $\alpha$ controls the **threshold** (typically $\alpha \approx 0.1$)
+- $b$ sets the **timescale separation** between $v$ and $w$ (small $b$ means slow recovery)
+- $c$ determines how strongly $w$ depends on itself vs. on $v$
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H3>Why This Works: Variable Reduction Logic</H3>
+    <Body>
+The Hodgkin-Huxley model has four variables: $V$, $m$, $h$, and $n$. But notice something:
+- $m$ (sodium activation) is *very fast* — it essentially tracks $V$ instantaneously
+- $h$ (sodium inactivation) and $n$ (potassium activation) move on similar, *slower* timescales
+
+FitzHugh's insight: treat $m$ as a function of $V$ (no separate equation), and **combine** $h$ and $n$ into a single "recovery" variable. You lose quantitative accuracy, but you gain geometric clarity. The trade-off is worth it when you want to *understand* rather than just *simulate*.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-fhn-variables">
+    <Front>What do the two variables $v$ and $w$ represent in the FitzHugh-Nagumo model?</Front>
+    <Back>$v$ is the fast variable (voltage-like), and $w$ is the recovery variable (combines sodium inactivation and potassium activation from HH model).</Back>
+  </FlashCard>
+
+  <Mermaid>
+graph LR
+    HH["Hodgkin-Huxley
+4D: V, m, h, n"] --> |"m instantaneous
+(fast)"| FHN1["FHN fast variable
+v ~ V"]
+    HH --> |"h, n combined
+(slow)"| FHN2["FHN recovery variable
+w ~ h + n"]
+    FHN1 --> FHN["FitzHugh-Nagumo
+2D: v, w"]
+    FHN2 --> FHN
+</Mermaid>
+
+  <Section type="concept">
+    <H2>Nullcline Analysis: The Geometry of Excitability</H2>
+    <Body>
+Here's where two dimensions become powerful. You can **draw** the system.
+
+A **nullcline** is the set of points where one derivative is zero. Find them by setting $\frac{dv}{dt} = 0$ and $\frac{dw}{dt} = 0$:
+
+**$v$-nullcline** (where $\frac{dv}{dt} = 0$):
+$$w = -v(v - \alpha)(v - 1)$$
+
+This is a **cubic curve**. It has three pieces:
+- Left branch (negative slope, stable for $v$)
+- Middle branch (positive slope, unstable for $v$)
+- Right branch (negative slope, stable for $v$)
+
+The middle branch is the key: it's where $v$ wants to *run away* from small perturbations.
+
+**$w$-nullcline** (where $\frac{dw}{dt} = 0$):
+$$w = \frac{v}{c}$$
+
+This is a **straight line** through the origin with slope $1/c$.
+
+The system's fixed point sits at the **intersection** of these two curves. But more important than the fixed point itself is the *shape* of the cubic nullcline — it's what creates excitability.
+    </Body>
+  </Section>
+
+  <FlashCard id="fc-nullcline-definition">
+    <Front>What is a nullcline in the context of a 2D dynamical system?</Front>
+    <Back>A nullcline is the set of points where one derivative equals zero. The $v$-nullcline is where $dv/dt = 0$, and the $w$-nullcline is where $dw/dt = 0$.</Back>
+  </FlashCard>
+
+    <Svg>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333333" text-anchor="middle">FitzHugh-Nagumo Phase Plane</text>
+  
+  <!-- Axes -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333333"/>
+    </marker>
+  </defs>
+  
+  <!-- Horizontal axis (v) -->
+  <line x1="80" y1="380" x2="720" y2="380" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="730" y="385" font-family="Arial, sans-serif" font-size="16" fill="#333333">v</text>
+  <text x="400" y="410" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">(membrane potential)</text>
+  
+  <!-- Vertical axis (w) -->
+  <line x1="80" y1="380" x2="80" y2="60" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="70" y="50" font-family="Arial, sans-serif" font-size="16" fill="#333333">w</text>
+  <text x="40" y="250" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle" transform="rotate(-90 40 250)">(recovery)</text>
+  
+  <!-- Cubic v-nullcline (N-shaped curve) -->
+  <path d="M 120 330 Q 180 320, 240 180 Q 270 100, 300 120 Q 330 140, 380 220 Q 430 300, 500 280 Q 570 260, 640 220" 
+        fill="none" stroke="#4A90D9" stroke-width="3"/>
+  
+  <!-- v-nullcline label -->
+  <text x="660" y="215" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#4A90D9">v-nullcline</text>
+  <text x="660" y="232" font-family="Arial, sans-serif" font-size="13" fill="#4A90D9">(dv/dt = 0)</text>
+  
+  <!-- Branch labels for v-nullcline -->
+  <text x="150" y="300" font-family="Arial, sans-serif" font-size="14" fill="#4A90D9" font-style="italic">left branch</text>
+  <text x="280" y="110" font-family="Arial, sans-serif" font-size="14" fill="#4A90D9" font-style="italic">middle branch</text>
+  <text x="580" y="240" font-family="Arial, sans-serif" font-size="14" fill="#4A90D9" font-style="italic">right branch</text>
+  
+  <!-- Linear w-nullcline -->
+  <line x1="100" y1="350" x2="680" y2="130" stroke="#50C878" stroke-width="3"/>
+  
+  <!-- w-nullcline label -->
+  <text x="600" y="150" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#50C878">w-nullcline</text>
+  <text x="600" y="167" font-family="Arial, sans-serif" font-size="13" fill="#50C878">(dw/dt = 0)</text>
+  
+  <!-- Fixed point (intersection) -->
+  <circle cx="380" cy="240" r="7" fill="#FF6B6B" stroke="#333333" stroke-width="2"/>
+  <text x="380" y="270" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#FF6B6B" text-anchor="middle">Stable fixed point</text>
+  <text x="380" y="287" font-family="Arial, sans-serif" font-size="13" fill="#666666" text-anchor="middle">(resting state)</text>
+  
+  <!-- Vector field arrows showing flow -->
+  <!-- Region 1: Left of v-nullcline, below w-nullcline -->
+  <line x1="170" y1="360" x2="190" y2="350" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 2: Between nullclines, upper left -->
+  <line x1="220" y1="250" x2="240" y2="260" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 3: Right of intersection, above w-nullcline -->
+  <line x1="530" y1="200" x2="510" y2="210" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 4: Right side, below w-nullcline -->
+  <line x1="600" y1="300" x2="580" y2="290" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 5: Below fixed point -->
+  <line x1="350" y1="330" x2="370" y2="320" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 6: Above fixed point -->
+  <line x1="420" y1="180" x2="400" y2="190" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 7: Left upper -->
+  <line x1="260" y1="140" x2="280" y2="150" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Region 8: Middle upper -->
+  <line x1="340" y1="150" x2="350" y2="165" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Legend for vector field -->
+  <text x="120" y="450" font-family="Arial, sans-serif" font-size="14" fill="#666666">Vector field arrows show flow direction:</text>
+  <line x1="410" y1="445" x2="430" y2="445" stroke="#666666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="440" y="450" font-family="Arial, sans-serif" font-size="14" fill="#666666">(dv/dt, dw/dt)</text>
+</svg>
+  </Svg>
+
+  <Section type="example">
+    <H2>Reading the Phase Plane</H2>
+    <Body>
+Once you've plotted the nullclines, you can predict how **any** initial condition will evolve:
+
+1. **Above the $v$-nullcline**: $\frac{dv}{dt} &lt; 0$, so $v$ *decreases* (trajectories move left)
+2. **Below the $v$-nullcline**: $\frac{dv}{dt} &gt; 0$, so $v$ *increases* (trajectories move right)
+3. **Above the $w$-nullcline**: $\frac{dw}{dt} &gt; 0$, so $w$ *increases* (trajectories move up)
+4. **Below the $w$-nullcline**: $\frac{dw}{dt} &lt; 0$, so $w$ *decreases* (trajectories move down)
+
+These rules let you sketch trajectories without solving anything. Start at a point, check which quadrant you're in relative to each nullcline, and draw an arrow in the corresponding direction.
+
+The magic happens when you start near the fixed point but *just to the right* of the middle branch of the cubic. The trajectory gets swept around the entire phase plane before returning — that's an **action potential**.
+    </Body>
+  </Section>
+
+  <Section type="code">
+    <H3>Nullcline Computation Example</H3>
+    <Body>
+Here's how to compute and plot the nullclines in Python:
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# FHN parameters
+alpha = 0.1
+c = 3.0
+K = 1.0
+
+# Create grid for phase plane
+v = np.linspace(-0.5, 1.5, 200)
+
+# v-nullcline: w = -v(v - alpha)(v - 1)
+w_v_nullcline = -v * (v - alpha) * (v - 1)
+
+# w-nullcline: w = v/c
+w_w_nullcline = v / c
+
+# Plot nullclines
+plt.figure(figsize=(8, 6))
+plt.plot(v, w_v_nullcline, 'b-', linewidth=2, label='v-nullcline (cubic)')
+plt.plot(v, w_w_nullcline, 'r-', linewidth=2, label='w-nullcline (linear)')
+
+# Find fixed point (approximate intersection)
+# For accurate calculation, solve: -v(v-alpha)(v-1) = v/c
+idx = np.argmin(np.abs(w_v_nullcline - w_w_nullcline))
+v_fp = v[idx]
+w_fp = v_fp / c
+
+plt.plot(v_fp, w_fp, 'ko', markersize=10, label=f'Fixed point ({v_fp:.3f}, {w_fp:.3f})')
+plt.xlabel('v (voltage)', fontsize=12)
+plt.ylabel('w (recovery)', fontsize=12)
+plt.title('FHN Nullclines', fontsize=14)
+plt.legend()
+plt.grid(alpha=0.3)
+plt.show()
+    </Code>
+  </Section>
+
+  <FlashCard id="fc-cubic-branches">
+    <Front>Why is the middle branch of the cubic $v$-nullcline unstable?</Front>
+    <Back>On the middle branch, the slope is positive, meaning small increases in $v$ lead to further increases in $\frac{dv}{dt}$, creating a runaway effect that pushes trajectories away.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Fixed Point Stability: Linearization and Eigenvalues</H2>
+    <Body>
+You can't just eyeball stability from a picture. You need eigenvalues.
+
+At a fixed point $(v^*, w^*)$, linearize the system by computing the **Jacobian matrix**:
+
+$$J = \begin{pmatrix} \frac{\partial f_v}{\partial v} &amp; \frac{\partial f_v}{\partial w} \\ \frac{\partial f_w}{\partial v} &amp; \frac{\partial f_w}{\partial w} \end{pmatrix}$$
+
+For the FHN model:
+
+$$J = \begin{pmatrix} K[-3(v^*)^2 + 2(\alpha+1)v^* - \alpha] &amp; -K \\ b &amp; -bc \end{pmatrix}$$
+
+The eigenvalues $\lambda$ of $J$ determine stability:
+- Both $\text{Re}(\lambda) &lt; 0$ → **stable fixed point** (excitable regime)
+- Either $\text{Re}(\lambda) &gt; 0$ → **unstable fixed point** (may lead to limit cycle)
+- Complex eigenvalues with $\text{Re}(\lambda) = 0$ → **Hopf bifurcation** (oscillations emerge)
+
+In the excitable regime, the fixed point is stable, but trajectories that get pushed far enough exhibit a large excursion before returning. In the oscillatory regime, the fixed point is unstable and all nearby trajectories spiral outward into a limit cycle.
+    </Body>
+  </Section>
+
+  <Section type="code">
+    <H3>Eigenvalue Calculation at Fixed Point</H3>
+    <Body>
+Once you've located the fixed point, compute its stability:
+    </Body>
+    <Code lang="python">
+import numpy as np
+
+# FHN parameters
+K = 1.0
+alpha = 0.1
+b = 0.01  # small b = slow recovery = excitable
+c = 3.0
+
+# Fixed point (solve numerically or use intersection from nullclines)
+v_star = 0.0  # example value near rest
+w_star = v_star / c
+
+# Jacobian components at fixed point
+df_v_dv = K * (-3*v_star**2 + 2*(alpha + 1)*v_star - alpha)
+df_v_dw = -K
+df_w_dv = b
+df_w_dw = -b * c
+
+# Construct Jacobian
+J = np.array([[df_v_dv, df_v_dw],
+              [df_w_dv, df_w_dw]])
+
+# Compute eigenvalues
+eigenvalues = np.linalg.eigvals(J)
+
+print(f"Eigenvalues: {eigenvalues}")
+print(f"Real parts: {eigenvalues.real}")
+
+if np.all(eigenvalues.real &lt; 0):
+    print("Fixed point is STABLE (excitable regime)")
+elif np.any(eigenvalues.real &gt; 0):
+    print("Fixed point is UNSTABLE (may oscillate)")
+else:
+    print("On the edge of a Hopf bifurcation")
+    </Code>
+  </Section>
+
+  <FlashCard id="fc-eigenvalue-stability">
+    <Front>How do eigenvalues of the Jacobian determine fixed point stability?</Front>
+    <Back>If all eigenvalues have negative real parts, the fixed point is stable. If any eigenvalue has positive real part, the fixed point is unstable. Complex eigenvalues indicate oscillatory approach or departure.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Excitability: The All-or-None Response</H2>
+    <Body>
+An **excitable system** sits near a stable fixed point, but responds dramatically to perturbations that cross a threshold. This is the computational essence of a neuron.
+
+In the FHN model, excitability emerges from the geometry:
+- **Subthreshold stimulus**: Push $v$ a little to the right, but not past the left knee of the cubic. The trajectory curves back to rest quickly. Response is proportional to input.
+- **Suprathreshold stimulus**: Push $v$ past the threshold (the left knee). Now you're on the wrong side of the unstable middle branch. The trajectory gets *pulled all the way around* — a huge response to a barely-larger input.
+
+This is what neurons do. A 9 mV depolarization might do nothing. A 10 mV depolarization triggers a 100 mV action potential. The difference? Which side of the separatrix you land on.
+
+Key requirement for excitability:
+1. Fixed point is **stable** (eigenvalues have negative real parts)
+2. But the cubic nullcline shape creates a **large-excursion pathway** for suprathreshold inputs
+    </Body>
+  </Section>
+
+  <Mermaid>
+graph TD
+    Rest["Resting state
+(stable fixed point)"]
+    Sub["Subthreshold stimulus
+(small v increase)"]
+    Supra["Suprathreshold stimulus
+(v crosses threshold)"]
+    Return["Small deflection
+returns to rest"]
+    AP["Large excursion
+(action potential)"]
+
+    Rest --> Sub
+    Rest --> Supra
+    Sub --> Return
+    Supra --> AP
+    Return --> Rest
+    AP --> Rest
+
+    style Supra fill:#ff6b6b
+    style AP fill:#ff6b6b
+    style Sub fill:#4ecdc4
+    style Return fill:#4ecdc4
+</Mermaid>
+
+  <Section type="example">
+    <H2>Simulating an Excitable Response</H2>
+    <Body>
+Watch what happens when you simulate the FHN equations with a brief current pulse:
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+
+# FHN parameters (excitable regime)
+K = 1.0
+alpha = 0.1
+b = 0.01  # slow recovery
+c = 3.0
+I_base = 0.0  # no input current
+
+def fhn_dynamics(state, t, I):
+    v, w = state
+    dvdt = K * (-v * (v - alpha) * (v - 1) - w) + I
+    dwdt = b * (v - c * w)
+    return [dvdt, dwdt]
+
+# Time vector
+t = np.linspace(0, 200, 2000)
+
+# Create stimulus: brief pulse at t=20
+I_stim = np.zeros_like(t)
+I_stim[(t &gt; 20) &amp; (t &lt; 25)] = 0.15  # suprathreshold
+
+# Initial condition (at rest)
+v0, w0 = 0.0, 0.0
+
+# Simulate with time-dependent input
+v_trace = []
+w_trace = []
+state = [v0, w0]
+
+for i in range(len(t)-1):
+    t_span = [t[i], t[i+1]]
+    sol = odeint(fhn_dynamics, state, t_span, args=(I_stim[i],))
+    state = sol[-1]
+    v_trace.append(state[0])
+    w_trace.append(state[1])
+
+# Plot voltage trace
+plt.figure(figsize=(10, 4))
+plt.plot(t[:-1], v_trace, 'b-', linewidth=2)
+plt.axvspan(20, 25, alpha=0.2, color='red', label='Stimulus')
+plt.xlabel('Time', fontsize=12)
+plt.ylabel('v (voltage)', fontsize=12)
+plt.title('FHN Excitable Response to Brief Pulse', fontsize=14)
+plt.legend()
+plt.grid(alpha=0.3)
+plt.show()
+    </Code>
+  </Section>
+
+  <FlashCard id="fc-threshold">
+    <Front>What determines the threshold in an excitable system like FHN?</Front>
+    <Back>The threshold is determined by the separatrix — the boundary between trajectories that return quickly to rest (subthreshold) and those that make a large excursion (suprathreshold). Geometrically, it's near the left knee of the cubic nullcline.</Back>
+  </FlashCard>
+
+  <Section type="concept">
+    <H2>Hopf Bifurcation: Transition to Oscillations</H2>
+    <Body>
+What happens if you keep increasing the input current $I$? At some critical value $I_c$, the system undergoes a **Hopf bifurcation**:
+
+- **Before** ($I &lt; I_c$): Fixed point is stable → excitable regime
+- **At** ($I = I_c$): Eigenvalues cross imaginary axis ($\text{Re}(\lambda) = 0$) → birth of oscillations
+- **After** ($I &gt; I_c$): Fixed point is unstable, limit cycle appears → autonomous oscillations
+
+In biological terms:
+- Excitable regime = neuron needs input to spike
+- Oscillatory regime = neuron fires spontaneously (pacemaker activity)
+
+You can also trigger the bifurcation by changing $b$ (recovery timescale) or other parameters. The geometric signature: the linear $w$-nullcline shifts until it intersects the cubic on its middle (unstable) branch instead of the stable left branch.
+    </Body>
+  </Section>
+
+    <Svg>
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="500" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial, sans-serif" font-size="22" font-weight="bold" text-anchor="middle" fill="#333333">Hopf Bifurcation: Transition from Excitable to Oscillatory Behavior</text>
+  
+  <!-- Panel 1: Excitable Regime -->
+  <g id="panel1">
+    <rect x="20" y="70" width="240" height="380" fill="white" stroke="#666666" stroke-width="2" rx="5"/>
+    <text x="140" y="95" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">Excitable Regime</text>
+    <text x="140" y="115" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">(Low Current)</text>
+    
+    <!-- Coordinate system -->
+    <line x1="60" y1="350" x2="220" y2="350" stroke="#999999" stroke-width="1"/>
+    <line x1="140" y1="150" x2="140" y2="370" stroke="#999999" stroke-width="1"/>
+    <text x="225" y="355" font-family="Arial, sans-serif" font-size="12" fill="#999999">x</text>
+    <text x="145" y="145" font-family="Arial, sans-serif" font-size="12" fill="#999999">y</text>
+    
+    <!-- Stable fixed point -->
+    <circle cx="140" cy="280" r="8" fill="#50C878" stroke="#333333" stroke-width="2"/>
+    <text x="140" y="320" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#50C878" font-weight="bold">Stable Fixed Point</text>
+    
+    <!-- Trajectory spiraling in -->
+    <path d="M 190 200 Q 200 240 180 260 Q 160 280 140 280" fill="none" stroke="#4A90D9" stroke-width="2.5"/>
+    <polygon points="140,280 145,275 145,282" fill="#4A90D9"/>
+    
+    <!-- Another trajectory -->
+    <path d="M 100 210 Q 80 250 100 270 Q 120 280 140 280" fill="none" stroke="#4A90D9" stroke-width="2.5"/>
+    <polygon points="140,280 135,275 135,282" fill="#4A90D9"/>
+    
+    <text x="140" y="400" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#4A90D9">Trajectories return</text>
+    <text x="140" y="418" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#4A90D9">to fixed point</text>
+  </g>
+  
+  <!-- Panel 2: Critical Point -->
+  <g id="panel2">
+    <rect x="280" y="70" width="240" height="380" fill="white" stroke="#666666" stroke-width="2" rx="5"/>
+    <text x="400" y="95" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">Critical Point</text>
+    <text x="400" y="115" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">(Hopf Bifurcation)</text>
+    
+    <!-- Coordinate system -->
+    <line x1="320" y1="350" x2="480" y2="350" stroke="#999999" stroke-width="1"/>
+    <line x1="400" y1="150" x2="400" y2="370" stroke="#999999" stroke-width="1"/>
+    <text x="485" y="355" font-family="Arial, sans-serif" font-size="12" fill="#999999">x</text>
+    <text x="405" y="145" font-family="Arial, sans-serif" font-size="12" fill="#999999">y</text>
+    
+    <!-- Marginal fixed point -->
+    <circle cx="400" cy="280" r="8" fill="#FFB84D" stroke="#333333" stroke-width="2"/>
+    <text x="400" y="320" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#FF6B6B" font-weight="bold">λ = ±iω</text>
+    
+    <!-- Eigenvalue box -->
+    <rect x="330" y="335" width="140" height="50" fill="#FFF8DC" stroke="#FFB84D" stroke-width="2" rx="3"/>
+    <text x="400" y="355" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#333333">Eigenvalues on</text>
+    <text x="400" y="373" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#333333">imaginary axis</text>
+    
+    <!-- Circular trajectory -->
+    <circle cx="400" cy="280" r="40" fill="none" stroke="#FF6B6B" stroke-width="2.5" stroke-dasharray="5,3"/>
+    
+    <text x="400" y="408" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#FF6B6B">Transition point:</text>
+    <text x="400" y="426" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#FF6B6B">stability changes</text>
+  </g>
+  
+  <!-- Panel 3: Oscillatory Regime -->
+  <g id="panel3">
+    <rect x="540" y="70" width="240" height="380" fill="white" stroke="#666666" stroke-width="2" rx="5"/>
+    <text x="660" y="95" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">Oscillatory Regime</text>
+    <text x="660" y="115" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">(High Current)</text>
+    
+    <!-- Coordinate system -->
+    <line x1="580" y1="350" x2="740" y2="350" stroke="#999999" stroke-width="1"/>
+    <line x1="660" y1="150" x2="660" y2="370" stroke="#999999" stroke-width="1"/>
+    <text x="745" y="355" font-family="Arial, sans-serif" font-size="12" fill="#999999">x</text>
+    <text x="665" y="145" font-family="Arial, sans-serif" font-size="12" fill="#999999">y</text>
+    
+    <!-- Unstable fixed point -->
+    <circle cx="660" cy="280" r="8" fill="white" stroke="#FF6B6B" stroke-width="2.5"/>
+    <circle cx="660" cy="280" r="4" fill="#FF6B6B"/>
+    <text x="660" y="320" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#FF6B6B" font-weight="bold">Unstable Fixed Point</text>
+    
+    <!-- Limit cycle -->
+    <circle cx="660" cy="280" r="55" fill="none" stroke="#50C878" stroke-width="3.5"/>
+    <polygon points="715,280 710,285 710,275" fill="#50C878"/>
+    
+    <!-- Arrow showing direction -->
+    <path d="M 705 245 Q 712 238 720 245" fill="none" stroke="#50C878" stroke-width="2.5"/>
+    <polygon points="720,245 716,240 715,248" fill="#50C878"/>
+    
+    <text x="660" y="400" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#50C878" font-weight="bold">Stable Limit Cycle:</text>
+    <text x="660" y="418" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#50C878">sustained oscillations</text>
+  </g>
+  
+  <!-- Bottom arrow showing parameter change -->
+  <line x1="80" y1="470" x2="720" y2="470" stroke="#333333" stroke-width="3" marker-end="url(#arrowhead)"/>
+  <text x="400" y="490" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#333333" font-weight="bold">Increasing Input Current (I)</text>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333333"/>
+    </marker>
+  </defs>
+</svg>
+  </Svg>
+
+  <Section type="code">
+    <H3>Detecting Hopf Bifurcation via Eigenvalues</H3>
+    <Body>
+Scan across input current values and watch when eigenvalues cross zero:
+    </Body>
+    <Code lang="python">
+import numpy as np
+import matplotlib.pyplot as plt
+
+# FHN parameters
+K = 1.0
+alpha = 0.1
+b = 0.01
+c = 3.0
+
+# Scan input current
+I_values = np.linspace(-0.1, 0.2, 100)
+real_parts = []
+
+for I in I_values:
+    # Fixed point: solve -v(v-alpha)(v-1) - w + I/K = 0 and w = v/c
+    # Approximate: v_star depends on I
+    # For simplicity, assume small I: v_star ≈ 0 + perturbation
+    v_star = I / (K * alpha)  # linear approximation near origin
+    w_star = v_star / c
+
+    # Jacobian at this fixed point
+    df_v_dv = K * (-3*v_star**2 + 2*(alpha+1)*v_star - alpha)
+    df_v_dw = -K
+    df_w_dv = b
+    df_w_dw = -b*c
+
+    J = np.array([[df_v_dv, df_v_dw],
+                  [df_w_dv, df_w_dw]])
+
+    eigs = np.linalg.eigvals(J)
+    real_parts.append(np.max(eigs.real))
+
+# Plot bifurcation diagram
+plt.figure(figsize=(8, 5))
+plt.plot(I_values, real_parts, 'b-', linewidth=2)
+plt.axhline(0, color='r', linestyle='--', linewidth=1, label='Hopf threshold')
+plt.xlabel('Input current I', fontsize=12)
+plt.ylabel('Max real part of eigenvalues', fontsize=12)
+plt.title('Hopf Bifurcation: Eigenvalues vs Input Current', fontsize=14)
+plt.legend()
+plt.grid(alpha=0.3)
+plt.show()
+
+# Find approximate bifurcation point
+hopf_idx = np.argmin(np.abs(real_parts))
+print(f"Hopf bifurcation occurs near I = {I_values[hopf_idx]:.4f}")
+    </Code>
+  </Section>
+
+  <FlashCard id="fc-hopf-bifurcation">
+    <Front>What is a Hopf bifurcation and how does it relate to neuronal behavior?</Front>
+    <Back>A Hopf bifurcation occurs when a fixed point changes stability as eigenvalues cross the imaginary axis, creating a limit cycle. In neurons, this represents the transition from requiring input to fire (excitable) to firing spontaneously (oscillatory/pacemaker).</Back>
+  </FlashCard>
+
+  <Section type="tip">
+    <H2>Timescale Separation: Why $b$ Matters</H2>
+    <Body>
+The parameter $b$ controls the speed of the recovery variable $w$. Small $b$ (typically $b \ll 1$) means $w$ changes *much slower* than $v$.
+
+This **timescale separation** is biologically critical:
+- $v$ (voltage) responds to input in ~1 ms
+- $w$ (recovery) evolves over ~10-100 ms
+
+What happens if $b$ is too large? The system loses its excitability. Both variables move at similar speeds, and you lose the fast escape/slow return structure that creates action potential shape.
+
+Rule of thumb: For excitable behavior, you want $b$ at least 10-100 times smaller than $K$. This ensures $v$ can make its fast excursion while $w$ gradually builds up to pull it back.
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H2>Connecting FHN to Hodgkin-Huxley</H2>
+    <Body>
+The FHN model is a cartoon, but a surprisingly accurate one. Here's how it maps to HH:
+
+| FHN | Hodgkin-Huxley | Biological Substrate |
+|-----|----------------|----------------------|
+| $v$ | $V$ (voltage) | Membrane potential |
+| $w$ | $\sim h + n$ | Na inactivation + K activation |
+| Cubic term $-v(v-\alpha)(v-1)$ | Na and K conductances | Voltage-gated currents |
+| $I$ | $I_{\text{ext}}$ | Synaptic input or injected current |
+| Small $b$ | Different ion channel kinetics | Fast Na, slow K |
+
+The cubic nonlinearity in $v$ mimics the S-shaped activation curves of ion channels. The middle branch (positive feedback region) corresponds to the explosive sodium current. The recovery variable $w$ combines all the slower negative feedback (sodium inactivation + potassium activation).
+
+FHN reproduces HH action potential shape, duration, and threshold behavior — but misses quantitative details like exact voltage levels and refractory period duration.
+    </Body>
+  </Section>
+
+  <Section type="concept">
+    <H2>Key Takeaways: Why Two Dimensions Change Everything</H2>
+    <Body>
+The FitzHugh-Nagumo reduction teaches you to think **geometrically** about neuronal dynamics:
+
+1. **Nullclines reveal structure**: The cubic/linear nullcline geometry encodes excitability directly. You can see threshold, see limit cycles, see bifurcations.
+
+2. **Fixed points ≠ dynamics**: Just knowing there's a stable fixed point doesn't tell you about excitability. You need the full phase plane picture.
+
+3. **Timescale separation enables computation**: Fast $v$, slow $w$ creates a temporal structure — rapid upswing, gradual recovery — that lets neurons encode information in spike timing.
+
+4. **Reduction preserves insight**: You lost two HH variables but gained visual intuition. For understanding principles, FHN beats HH.
+
+When you see a neuron spike, you're watching a trajectory wrap around a cubic nullcline. That's the hidden geometry underneath the action potential.
+    </Body>
+  </Section>
+
+  <SingleSelect id="q1-fhn-reduction">
+    <Prompt>What is the primary advantage of reducing the 4D Hodgkin-Huxley model to the 2D FitzHugh-Nagumo model?</Prompt>
+    <Options>
+      <Option correct="true">It enables geometric visualization and phase plane analysis while preserving essential excitability properties</Option>
+      <Option>It provides more accurate quantitative predictions of action potential voltage and timing</Option>
+      <Option>It includes more biophysical detail about individual ion channel kinetics</Option>
+      <Option>It eliminates the need for numerical simulation by providing analytical solutions</Option>
+    </Options>
+  </SingleSelect>
+
+  <SingleSelect id="q2-nullcline-shape">
+    <Prompt>Why does the $v$-nullcline in the FHN model have a cubic shape?</Prompt>
+    <Options>
+      <Option correct="true">The cubic term $-v(v-\alpha)(v-1)$ captures the nonlinear voltage-gated ion channel dynamics that create positive and negative feedback regions</Option>
+      <Option>It's a mathematical approximation with no biological meaning, chosen for analytical convenience</Option>
+      <Option>It represents the three distinct ion channels: sodium, potassium, and leak</Option>
+      <Option>The cubic shape emerges from linearizing the HH equations around the resting potential</Option>
+    </Options>
+  </SingleSelect>
+
+  <MultiSelect id="q3-excitable-requirements">
+    <Prompt>Which conditions must hold for the FHN model to exhibit excitable (rather than oscillatory) behavior? Select all that apply.</Prompt>
+    <Options>
+      <Option correct="true">The fixed point must be stable (eigenvalues with negative real parts)</Option>
+      <Option correct="true">The timescale parameter $b$ must be small (slow recovery variable)</Option>
+      <Option correct="true">The input current must be below the Hopf bifurcation threshold</Option>
+      <Option>The $w$-nullcline must intersect the cubic on its middle unstable branch</Option>
+      <Option>The parameter $\alpha$ must be greater than 0.5</Option>
+    </Options>
+  </MultiSelect>
+
+  <SortQuiz id="q4-spike-sequence">
+    <Prompt>Order the following events during an FHN action potential from first to last:</Prompt>
+    <SortedItems>
+      <Item>Suprathreshold stimulus pushes $v$ past the left knee of the cubic nullcline</Item>
+      <Item>$v$ rapidly increases as trajectory follows right branch of cubic (upstroke)</Item>
+      <Item>Recovery variable $w$ slowly increases, eventually pushing trajectory back left</Item>
+      <Item>$v$ rapidly decreases as trajectory follows left branch back toward rest (downstroke)</Item>
+      <Item>Both variables return to stable fixed point (refractory period ends)</Item>
+    </SortedItems>
+  </SortQuiz>
+
+  <MatchPairs id="q5-parameter-roles">
+    <Prompt>Match each FHN parameter to its primary biological/dynamical role:</Prompt>
+    <Pairs>
+      <Pair>
+        <Left>$\alpha$</Left>
+        <Right>Determines threshold location</Right>
+      </Pair>
+      <Pair>
+        <Left>$b$</Left>
+        <Right>Controls recovery timescale</Right>
+      </Pair>
+      <Pair>
+        <Left>$K$</Left>
+        <Right>Sets fast dynamics speed</Right>
+      </Pair>
+      <Pair>
+        <Left>$I$</Left>
+        <Right>External input current</Right>
+      </Pair>
+      <Pair>
+        <Left>$c$</Left>
+        <Right>Coupling between recovery and voltage</Right>
+      </Pair>
+    </Pairs>
+    <RightDistractors>
+      <Distractor>Membrane capacitance</Distractor>
+      <Distractor>Synaptic weight</Distractor>
+    </RightDistractors>
+  </MatchPairs>
+
+  <FillBlanks id="q6-eigenvalue-interpretation">
+    <Prompt>
+To determine fixed point stability in the FHN model, compute the <Blank>Jacobian</Blank> matrix at the fixed point and find its <Blank>eigenvalues</Blank>. If all eigenvalues have <Blank>negative</Blank> real parts, the fixed point is stable. When a parameter crosses a critical value where eigenvalues have <Blank>zero</Blank> real part, a <Blank>Hopf</Blank> bifurcation occurs, potentially creating a limit cycle.
+    </Prompt>
+    <Distractors>
+      <Distractor>Hessian</Distractor>
+      <Distractor>determinant</Distractor>
+      <Distractor>positive</Distractor>
+      <Distractor>infinite</Distractor>
+      <Distractor>saddle-node</Distractor>
+      <Distractor>transcritical</Distractor>
+    </Distractors>
+  </FillBlanks>
+
+  <Subjective id="q7-nullcline-trajectory">
+    <Prompt>
+Suppose the linear $w$-nullcline intersects the cubic $v$-nullcline on its left stable branch, creating a stable fixed point. Explain, using nullcline geometry, why a trajectory that starts just to the right of the middle unstable branch will make a large excursion before returning to the fixed point, while a trajectory that starts slightly to the left will return directly. Your answer should reference vector field directions determined by the nullclines.
+    </Prompt>
+    <Rubric>
+      <Criterion points="4" required="true">
+        <Requirement>Correctly explains that above/below the v-nullcline determines whether dv/dt is positive or negative, creating horizontal flow directions</Requirement>
+        <Indicators>v-nullcline, dv/dt, horizontal, flow, right, left</Indicators>
+      </Criterion>
+      <Criterion points="3" required="true">
+        <Requirement>Identifies that trajectories starting right of the middle branch get swept upward and around because they're in the region where dv/dt is positive</Requirement>
+        <Indicators>middle branch, right of, swept, positive dv/dt, upward</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Explains that trajectories left of the middle branch experience negative dv/dt and return directly to the fixed point</Requirement>
+        <Indicators>left of, negative dv/dt, directly, return, stable</Indicators>
+      </Criterion>
+      <Criterion points="2">
+        <Requirement>Mentions the role of the w-nullcline in determining vertical flow (dw/dt)</Requirement>
+        <Indicators>w-nullcline, dw/dt, vertical, up, down</Indicators>
+      </Criterion>
+      <Criterion points="1">
+        <Requirement>Connects the geometry to the concept of threshold or separatrix</Requirement>
+        <Indicators>threshold, separatrix, boundary, divide</Indicators>
+      </Criterion>
+    </Rubric>
+    <Constraints minWords="100" maxWords="300" />
+  </Subjective>
+
+  <Section type="concept">
+    <H2>Summary: From Four Dimensions to Two</H2>
+    <Body>
+The FitzHugh-Nagumo model proves that you don't need four coupled differential equations to understand how neurons generate action potentials. Two variables — one fast, one slow — are enough to capture:
+
+- **Excitability**: stable rest, but large response to suprathreshold input
+- **All-or-none spiking**: small changes in stimulus near threshold produce qualitatively different responses
+- **Refractory period**: the slow recovery variable prevents immediate re-firing
+- **Transition to oscillations**: Hopf bifurcation from excitable to autonomous spiking
+
+The geometric tools you've learned here — nullcline analysis, fixed point classification, eigenvalue stability — extend far beyond this specific model. They're the language of nonlinear dynamics in neuroscience.
+
+Every time you sketch a phase plane, you're compressing infinite possible trajectories into a single visual summary. That's the power of low-dimensional reductions: they reveal the *structure* hidden inside complex systems.
+    </Body>
+  </Section>
+
+</Lesson>

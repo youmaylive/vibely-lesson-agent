@@ -61,6 +61,52 @@ Think: a sharp blog post or a well-crafted YouTube script — NOT a generated re
 - ❌ Dry, generic, encyclopedic, overly formal, corporate
 
 ## ═══════════════════════════════════════════════════════
+## VISUAL ENGAGEMENT (Images + Mermaid Diagrams)
+## ═══════════════════════════════════════════════════════
+
+Lessons with visuals are significantly more engaging. Use **Mermaid diagrams** AND **SVG placeholders** (2-4 visuals per lesson total).
+
+### `<Svg>` — Custom educational diagrams (resolved by post-processor)
+For concepts that need a labeled diagram, architecture, or illustration — write a placeholder:
+```xml
+<Svg concept="water cycle: evaporation, condensation, precipitation, collection"
+     context="This section explains how water moves through Earth's atmosphere in a continuous loop" />
+```
+Rules:
+- `concept` = WHAT to draw (be specific — include key terms/elements to label)
+- `context` = the surrounding lesson text (helps the diagram match the teaching)
+- A post-processor will generate a real SVG diagram from this — you don't draw it
+- Use for: labeled diagrams, architectures, scientific illustrations, anything that needs custom art
+- Place directly under `<Lesson>` (not inside Section)
+- **Include 3-4 `<Svg>` placeholders per lesson** — one for each major concept, process, or structure the lesson teaches. Aim for diagrams that visualize distinct ideas (not repeats).
+
+### `<Mermaid>` — Auto-rendered diagrams (always works, no external dependency)
+Use for: processes, flows, hierarchies, relationships, algorithms, state machines, comparisons.
+```xml
+<Mermaid>
+graph TD
+  A[Input Data] --> B[Preprocess]
+  B --> C{Valid?}
+  C -->|Yes| D[Train Model]
+  C -->|No| E[Clean Data]
+  E --> B
+</Mermaid>
+```
+Mermaid supports: `graph TD/LR`, `flowchart`, `sequenceDiagram`, `classDiagram`, `stateDiagram-v2`, `pie`, `timeline`.
+
+### When to use Mermaid:
+- **Processes/flows** (how something works step by step)
+- **Relationships/hierarchies** (class inheritance, taxonomy, org charts)
+- **Comparisons** (A vs B decision trees)
+- **Timelines** (historical events, sequences)
+- **State machines** (transitions between states)
+
+### Placement rules:
+- `<Mermaid>` goes **directly under `<Lesson>`** (like FlashCards — NOT inside Section)
+- Place them BETWEEN Sections, right after the concept they illustrate
+- Target: 2-4 Mermaid diagrams per lesson
+
+## ═══════════════════════════════════════════════════════
 ## STRUCTURAL FORMAT RULES
 ## ═══════════════════════════════════════════════════════
 

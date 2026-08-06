@@ -22,6 +22,7 @@ MLAI_FORMAT_GUIDE = Path(__file__).resolve().parent / "prompts" / "mlai_format_g
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = "claude-opus-4-5"
+# Bedrock inference-profile model ID (Claude via Amazon Bedrock)
+DEFAULT_MODEL = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 DEFAULT_MAX_TURNS = 30
 MAX_VALIDATION_ATTEMPTS = 500
