@@ -33,7 +33,7 @@ from prompts.svg_generate import build_svg_generation_prompt, build_svg_review_p
 MAX_ATTEMPTS = 4  # generate/review retries — extra attempt helps fix overlaps
 REVIEW_THRESHOLD = 7  # score >= 7 = accept
 # Bedrock inference-profile model ID (Claude via Amazon Bedrock)
-DEFAULT_MODEL = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+DEFAULT_MODEL = "global.anthropic.claude-sonnet-5"
 
 # Match any <Svg ...> placeholder tag (self-closing or not), multi-line safe.
 # We match the whole tag, then extract concept/context attributes separately
