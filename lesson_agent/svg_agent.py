@@ -597,7 +597,15 @@ async def resolve_svgs(mlai_path: Path, model: str = DEFAULT_MODEL, verbose: boo
 
     if not placeholders:
         if verbose:
-            print(f"   🎨 No SVG placeholders found in {mlai_path.name}")
+            # Report embedded SVGs, not just "no placeholders" — the old wording read
+            # like "this lesson has no SVGs" when it actually means the opposite:
+            # the in-agent generate_svg tool already embedded them, so this
+            # post-step has nothing left to resolve.
+            embedded = content.count("<svg")
+            if embedded:
+                print(f"   🎨 {embedded} SVG(s) already embedded in {mlai_path.name} — nothing to resolve")
+            else:
+                print(f"   ⚠️  {mlai_path.name} contains NO SVGs (none embedded, no placeholders to resolve)")
         return 0
 
     if verbose:
