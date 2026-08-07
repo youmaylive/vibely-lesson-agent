@@ -33,3 +33,16 @@ ENV/
 
 # Generated output
 lesson_agent/output/
+
+# Cline / agent local state (added 2026-08-07) — never commit chat logs
+.cline-context/
+.cline/
+.clinerules.local
+cline_task_*.md
+ui_messages*.json
+api_conversation_history*.json
+task_metadata.json
+context_history.json
+focus_chain_taskid_*.md
+taskHistory*.json
+service_account.json

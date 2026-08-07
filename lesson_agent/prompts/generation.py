@@ -71,16 +71,40 @@ You MUST follow this exact structure pattern:
     <Code lang="python">example()</Code>
   </Section>
 
+  <Mermaid>
+flowchart LR
+  A[Input] --> B[Process]
+  B --> C{{Decision}}
+  C -->|Yes| D[Output]
+  C -->|No| E[Retry]
+  </Mermaid>
+
   <FlashCard id="fc-1">
     <Front>Key term?</Front>
     <Back>Definition.</Back>
   </FlashCard>
+
+  <Svg>
+    <!-- markup returned by generate_svg(concept=..., context=...,
+         lesson_excerpt=<the Section text you just wrote>) — pasted verbatim -->
+  </Svg>
 
   <Section type="example">
     <H3>Worked Example</H3>
     <Body>...</Body>
     <Code lang="python">...</Code>
   </Section>
+
+  <Svg>
+    <!-- second generate_svg result — lesson_excerpt = the Worked Example above,
+         including its <Code> block -->
+  </Svg>
+
+  <Mermaid>
+sequenceDiagram
+  Client->>Server: Request
+  Server-->>Client: Response
+  </Mermaid>
 
   <SingleSelect id="q1">
     <Prompt>Question?</Prompt>
@@ -89,6 +113,10 @@ You MUST follow this exact structure pattern:
       <Option>Wrong</Option>
     </Options>
   </SingleSelect>
+
+  <Svg>
+    <!-- third generate_svg result -->
+  </Svg>
 
   <Section type="concept">
     <H2>Summary</H2>
@@ -137,16 +165,39 @@ You MUST include visuals to keep learners engaged. Use a MIX of Mermaid + SVG:
 - Just write Mermaid diagram code directly — auto-renders
 - Use for: flowcharts, sequence diagrams, timelines, state machines, comparisons
 
-### SVG placeholders (for custom labeled diagrams):
-- Write: `<Svg concept="specific concept to illustrate" context="surrounding lesson context" />`
-- A post-processor will generate a real, labeled educational SVG from this
-- Use for: architectures, scientific diagrams, labeled illustrations, anything Mermaid can't do
-- Be SPECIFIC in the concept field (include key terms to label)
-- **Include 3-4 `<Svg>` placeholders per lesson** — one for each distinct major concept/process/structure the lesson teaches (not repeats).
+### SVG diagrams — call the `generate_svg` tool (for custom labeled diagrams):
+
+Do NOT write `<Svg concept="..." />` placeholders, and do NOT hand-write `<svg>` markup.
+Call the **`generate_svg`** tool, then paste what it returns.
+
+Call it with THREE arguments:
+- `concept` — what to diagram, SPECIFIC, including the exact terms to label
+- `context` — one sentence on what this part of the lesson is doing
+- `lesson_excerpt` — **the actual lesson text you just wrote for this part**, including
+  its code blocks, copied verbatim (roughly the preceding Section)
+
+`lesson_excerpt` is the important one. The diagram generator can only see what you pass
+it. Leave it out and it invents its own example values — a real lesson taught
+`font-size: 20px` and got a diagram showing `24px`, because the generator never saw the
+lesson. Pass the real text and every label in the diagram comes from YOUR lesson.
+
+Then embed the returned markup exactly as given:
+
+```
+<Svg>
+  <svg viewBox="..." xmlns="http://www.w3.org/2000/svg">...</svg>
+</Svg>
+```
+
+Do not edit the returned SVG. If the tool returns an ERROR, skip that diagram and carry
+on — never substitute your own markup.
+
+Use SVG for: architectures, scientific diagrams, labeled illustrations, anatomy of a
+syntax/structure — anything Mermaid can't do.
 
 ### Target per lesson:
-- **3-4 `<Svg>` placeholders** (distinct concepts)
-- At least 1-2 Mermaid diagrams
+- **3-4 `generate_svg` calls** (distinct concepts), each embedded in `<Svg>...</Svg>`
+- At least 1-2 Mermaid diagrams (written directly)
 - Place both DIRECTLY under `<Lesson>` (NOT inside Section)
 
 Make the content genuinely educational and research-grade.

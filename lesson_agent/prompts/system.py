@@ -64,21 +64,35 @@ Think: a sharp blog post or a well-crafted YouTube script — NOT a generated re
 ## VISUAL ENGAGEMENT (Images + Mermaid Diagrams)
 ## ═══════════════════════════════════════════════════════
 
-Lessons with visuals are significantly more engaging. Use **Mermaid diagrams** AND **SVG placeholders** (2-4 visuals per lesson total).
+Lessons with visuals are significantly more engaging. Use **Mermaid diagrams** AND **generated SVGs** (2-4 visuals per lesson total).
 
-### `<Svg>` — Custom educational diagrams (resolved by post-processor)
-For concepts that need a labeled diagram, architecture, or illustration — write a placeholder:
+### `<Svg>` — Custom educational diagrams (via `generate_svg` tool)
+For concepts that need a labeled diagram, architecture, or illustration — call the **`generate_svg` tool**:
+```
+generate_svg(concept="water cycle: evaporation, condensation, precipitation, collection",
+             context="This section explains how water moves through Earth's atmosphere",
+             lesson_excerpt="<the lesson text you just wrote for this section, verbatim,
+                             including any <Code> blocks>")
+```
+The tool returns raw `<svg>...</svg>` markup. Embed it inside `<Svg>...</Svg>` tags in the .mlai:
 ```xml
-<Svg concept="water cycle: evaporation, condensation, precipitation, collection"
-     context="This section explains how water moves through Earth's atmosphere in a continuous loop" />
+<Svg>
+  <svg viewBox="...">...</svg>
+</Svg>
 ```
 Rules:
 - `concept` = WHAT to draw (be specific — include key terms/elements to label)
-- `context` = the surrounding lesson text (helps the diagram match the teaching)
-- A post-processor will generate a real SVG diagram from this — you don't draw it
+- `context` = one sentence on what this part of the lesson is doing
+- `lesson_excerpt` = **REQUIRED. The real lesson text, copied verbatim.** The generator sees
+  ONLY what you pass. Omit this and it will invent example values that contradict your
+  lesson (one lesson taught `font-size: 20px` and got a diagram showing `24px`). Include the
+  code blocks — the code is the concrete example the diagram must match.
+- The tool generates, validates, and returns a real SVG — you embed its output UNCHANGED
+- Never hand-write `<svg>` markup yourself, and never write `<Svg concept="..." />` placeholders
+- If the tool returns an ERROR, omit that diagram and continue — do not substitute your own
 - Use for: labeled diagrams, architectures, scientific illustrations, anything that needs custom art
-- Place directly under `<Lesson>` (not inside Section)
-- **Include 3-4 `<Svg>` placeholders per lesson** — one for each major concept, process, or structure the lesson teaches. Aim for diagrams that visualize distinct ideas (not repeats).
+- Place `<Svg>` directly under `<Lesson>` (not inside Section)
+- **Call generate_svg 3-4 times per lesson** — once for each major concept, process, or structure the lesson teaches. Aim for diagrams that visualize distinct ideas (not repeats).
 
 ### `<Mermaid>` — Auto-rendered diagrams (always works, no external dependency)
 Use for: processes, flows, hierarchies, relationships, algorithms, state machines, comparisons.
@@ -93,6 +107,27 @@ graph TD
 </Mermaid>
 ```
 Mermaid supports: `graph TD/LR`, `flowchart`, `sequenceDiagram`, `classDiagram`, `stateDiagram-v2`, `pie`, `timeline`.
+
+### XML Safety inside `<Mermaid>` — READ THIS, it is the #1 cause of failed validation
+`<Mermaid>` content is parsed as XML, **NOT** as CDATA or a raw text block. Every `<` you write is
+treated as the start of an XML tag. Escape them exactly as you would inside `<Code>`:
+- `<` → `&lt;`   ·   `>` → `&gt;`   ·   `&` → `&amp;`
+
+**Line breaks in node labels.** `<br/>` is valid Mermaid, but writing it raw here is not — you must
+escape it. This is the single most common mistake:
+- ❌ `A[Fetal Movement<br/>daily count]` → `INVALID_CHILD: Invalid child element <br> in <Mermaid>`
+- ✅ `A[Fetal Movement&lt;br/&gt;daily count]` → valid, and renders as a real line break
+
+The escaped form is decoded back to `<br/>` before Mermaid sees it, so you lose nothing. The same
+applies to `<b>`, `<i>`, and any other HTML tag you use inside a label.
+
+**Comparison operators in labels** are the other trap — an unescaped `<` silently swallows the rest
+of the label instead of erroring, so the diagram renders truncated and wrong:
+- ❌ `C{BP < 90 and HR > 100}` → label is cut off at `BP `
+- ✅ `C{BP &lt; 90 and HR &gt; 100}`
+
+Do not use HTML character entities other than the three above (`&nbsp;` is NOT valid — use a normal
+space). Arrow syntax (`-->`, `-.->`, `==>`) needs no escaping; only a bare `<` or `&` does.
 
 ### When to use Mermaid:
 - **Processes/flows** (how something works step by step)
@@ -144,6 +179,7 @@ Mermaid supports: `graph TD/LR`, `flowchart`, `sequenceDiagram`, `classDiagram`,
    - Bitwise shift operators: `<<`, `>>`
    - Generic type annotations or arrow syntax
    Failure to escape these will cause XML parsing errors like `UNKNOWN_ELEMENT` or `INVALID_CHILD`.
+   **The same escaping applies inside `<Mermaid>`** — see "XML Safety inside `<Mermaid>`" above.
 
 8. **Markdown in `<Body>` elements**: `<Body>` supports Markdown formatting (NOT HTML tags). Use:
    - `**bold**` for emphasis, `*italic*` for subtle emphasis

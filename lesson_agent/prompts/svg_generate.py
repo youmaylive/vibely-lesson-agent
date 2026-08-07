@@ -9,15 +9,45 @@ that are specific to the lesson concept being taught.
 def build_svg_generation_prompt(
     concept: str,
     context: str,
+    lesson_excerpt: str = "",
     audience: str = "learners",
     feedback: str | None = None,
 ) -> str:
-    """Build the prompt that asks Claude to generate an educational SVG."""
+    """Build the prompt that asks Claude to generate an educational SVG.
+
+    `lesson_excerpt` is the verbatim lesson text surrounding the diagram (the section
+    it sits after, including its code blocks). Without it the model invents example
+    values that contradict the lesson — a real observed failure was a diagram drawing
+    `font-size: 24px` for a lesson that teaches `20px`.
+    """
+    excerpt_block = ""
+    if lesson_excerpt.strip():
+        excerpt_block = f"""
+## LESSON EXCERPT — THE SOURCE OF TRUTH
+
+This is the actual lesson text the diagram sits inside. The diagram must illustrate
+THIS text, using THESE exact examples:
+
+```
+{lesson_excerpt.strip()}
+```
+"""
+
     base = f"""Generate a clean, educational SVG diagram for this concept:
 
 **Concept:** {concept}
 **Context:** {context}
 **Audience:** {audience}
+{excerpt_block}
+## ⚠️ GROUNDING — EVERY FACT COMES FROM THE LESSON (hard requirement):
+
+- Every label, value, identifier, and code fragment in the diagram MUST appear in the
+  LESSON EXCERPT above. Do not invent example values, element names, or property values.
+- If the excerpt says `20px`, the diagram says `20px` — never a different number.
+- If you need a label the excerpt does not provide, use a **generic role name**
+  (`property`, `value`, `selector`) rather than inventing a concrete one.
+- Do not import examples from your own knowledge of the topic. A diagram that is
+  beautiful but shows values the learner has never seen in this lesson is REJECTED.
 
 ## SVG Requirements:
 
@@ -60,6 +90,7 @@ Overlapping text/shapes make a diagram unreadable. Follow these STRICTLY:
 - Text clipped at the canvas edge or running off the box
 - Cramped elements with no breathing room
 - Generic unlabeled shapes; labels unrelated to the concept
+- **Any value or example NOT found in the LESSON EXCERPT** (invented facts contradict the lesson)
 """
 
     if feedback:
@@ -74,13 +105,47 @@ Generate an IMPROVED version that addresses all the feedback above.
     return base
 
 
-def build_svg_review_prompt(svg_content: str, concept: str, context: str) -> str:
-    """Build the prompt that asks Claude to review/judge a generated SVG."""
+def build_svg_review_prompt(
+    svg_content: str,
+    concept: str,
+    context: str,
+    lesson_excerpt: str = "",
+) -> str:
+    """Build the prompt that asks Claude to review/judge a generated SVG.
+
+    GROUNDING is a hard gate, not just another averaged dimension: a diagram that looks
+    polished but shows values absent from the lesson used to score 8/10 and ship.
+    """
+    excerpt_block = ""
+    grounding_dim = ""
+    grounding_rule = ""
+    grounding_field = ""
+    if lesson_excerpt.strip():
+        excerpt_block = f"""
+**The LESSON EXCERPT the diagram must be faithful to:**
+```
+{lesson_excerpt.strip()}
+```
+"""
+        grounding_dim = (
+            "- **Grounding** (1-10): Does EVERY concrete label, value, identifier and code\n"
+            "  fragment in the SVG appear in the LESSON EXCERPT? Go through them one at a time.\n"
+            "  Any invented value (e.g. the SVG shows `24px` but the excerpt says `20px`), invented\n"
+            "  element name, or example the learner has never seen scores 3 or below.\n"
+            "  Generic role words (`property`, `value`, `selector`) are always acceptable.\n"
+        )
+        grounding_rule = (
+            "\n**HARD RULE: if Grounding < 7, VERDICT is FAIL** no matter how high the average is.\n"
+            "List every ungrounded item under ISSUES, quoting the SVG text and what the excerpt\n"
+            "actually says.\n"
+        )
+        grounding_field = "GROUNDING: [score]\n"
+
     return f"""Review this SVG diagram for educational quality.
 
 **Concept it should teach:** {concept}
 **Lesson context:** {context}
-
+{excerpt_block}
 **The SVG:**
 ```xml
 {svg_content}
@@ -94,16 +159,18 @@ Score it 1-10 on each dimension:
 - **Clarity** (1-10): Can a learner understand it without additional explanation?
 - **Labels** (1-10): Are elements properly labeled with concept-specific, correct terms?
 - **Accuracy** (1-10): Is the information correct and not misleading? Does it faithfully represent the concept?
-
-**Overall score** = average of the 4 scores (round to nearest integer).
-
-If overall score < 7, list exactly what's wrong and how to fix it (focus on relevance/clarity/accuracy — NOT spacing).
+{grounding_dim}
+**Overall score** = average of the scores above (round to nearest integer).
+{grounding_rule}
+If overall score < 7, list exactly what's wrong and how to fix it (focus on
+relevance/clarity/accuracy/grounding — NOT spacing).
 
 Respond in this exact format:
 RELEVANCE: [score]
 CLARITY: [score]
 LABELS: [score]
 ACCURACY: [score]
-OVERALL: [score]
+{grounding_field}OVERALL: [score]
+VERDICT: [PASS or FAIL]
 ISSUES: [comma-separated list of issues, or "none"]
 """

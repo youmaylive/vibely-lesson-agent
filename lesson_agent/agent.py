@@ -14,9 +14,22 @@ Flow:
 import asyncio
 import copy
 import json
+import os
 from pathlib import Path
 
-from claude_agent_sdk import (
+# MUST be set before claude_agent_sdk is imported — Query reads it at construction time.
+#
+# With an SDK MCP server registered, the SDK waits this long for the FIRST result before
+# closing the subprocess's stdin (see _internal/query.py, `_stream_close_timeout`). The
+# default is 60s. Our generate_svg tool takes 15-90s (generate + review, up to 4 attempts),
+# so stdin was closing mid-run and every tool call after the first died with
+# "Tool permission stream closed before response received" / "Stream closed".
+#
+# This — not nested query() calls — is what actually broke the earlier in-agent-tool
+# attempt. Verified: 3 sequential 20s tool calls fail 1/3 at the default and pass 3/3 here.
+os.environ.setdefault("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT", "1800000")  # 30 min
+
+from claude_agent_sdk import (  # noqa: E402 — must follow the env var above
     query,
     ClaudeAgentOptions,
     AssistantMessage,
@@ -35,6 +48,7 @@ from prompts.generation import build_generation_prompt
 from prompts.fix import build_fix_prompt
 from validator import validate_mlai_file
 from svg_agent import resolve_svgs
+from svg_tool import svg_mcp_server
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +63,13 @@ def _agent_options(
 ) -> ClaudeAgentOptions:
     """Build common agent options, optionally resuming a session."""
     opts = ClaudeAgentOptions(
-        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+        allowed_tools=[
+            "Read", "Write", "Edit", "Bash", "Glob", "Grep",
+            "mcp__svg__generate_svg",
+        ],
+        # Dict of name -> server, NOT a list. Passing a list here is a second,
+        # independent cause of `Control request timeout: initialize`.
+        mcp_servers={"svg": svg_mcp_server},
         permission_mode="acceptEdits",
         model=model,
         system_prompt=build_system_prompt(),
@@ -59,6 +79,26 @@ def _agent_options(
     if session_id:
         opts.resume = session_id
     return opts
+
+
+async def _prompt_stream(text: str):
+    """Wrap a prompt string as a streaming-mode message iterator.
+
+    In-process MCP servers (our `generate_svg` tool) REQUIRE this. With a plain string
+    prompt the SDK runs one-shot and closes the subprocess's stdin, which kills the
+    control channel the SDK uses to serve tool calls back to the CLI — the first
+    `mcp__svg__generate_svg` call then dies with
+    `CLIConnectionError: ProcessTransport is not ready for writing`.
+
+    This is the actual reason the earlier in-agent-tool attempt failed. Do not "simplify"
+    this back to `query(prompt=some_string)` while an SDK MCP server is registered.
+    """
+    yield {
+        "type": "user",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+        "session_id": "default",
+    }
 
 
 async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, str | None]:
@@ -79,7 +119,7 @@ async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, st
     MAX_RETRIES = 3
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            async for message in query(prompt=prompt, options=options):
+            async for message in query(prompt=_prompt_stream(prompt), options=options):
                 if hasattr(message, "subtype") and message.subtype == "init":
                     if hasattr(message, "session_id"):
                         session_id = message.session_id
@@ -179,12 +219,13 @@ async def generate_lesson(
         return False
 
     # ------------------------------------------------------------------
-    # Phase 1b: Resolve SVG placeholders → real <Svg><svg>...</svg></Svg>.
-    # The MLAI parser now natively supports the <Svg> component, so resolved
-    # SVGs validate cleanly (no stripping by the fix-agent).
+    # Phase 1b: Safety net for leftover SVG placeholders
     # ------------------------------------------------------------------
+    # SVGs are generated in-agent now (mcp__svg__generate_svg), so this is a no-op on
+    # a normal run. It only fires if the agent ignored the tool and wrote placeholders
+    # anyway, or for older .mlai files. resolve_svgs prints and returns 0 when there is
+    # nothing to do, and derives the lesson excerpt itself in that fallback path.
     if output_file.exists():
-        print("\n🎨 Resolving SVG placeholders...")
         await resolve_svgs(output_file, model=model)
 
     # ------------------------------------------------------------------

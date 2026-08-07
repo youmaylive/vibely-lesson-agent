@@ -15,13 +15,13 @@ Usage:
 """
 
 import asyncio
+import os
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, TextBlock
+from anthropic import AsyncAnthropicBedrock
 
-from config import PROJECT_ROOT
 from prompts.svg_generate import build_svg_generation_prompt, build_svg_review_prompt
 
 
@@ -44,29 +44,44 @@ _CONTEXT_ATTR_RE = re.compile(r'context\s*=\s*"([^"]*)"', re.IGNORECASE | re.DOT
 
 
 # ---------------------------------------------------------------------------
-# LLM Helpers (via Claude Agent SDK — handles Foundry automatically)
+# LLM Helpers (direct Bedrock — plain text completion, no agent)
 # ---------------------------------------------------------------------------
 
-async def _llm_call_async(prompt: str, model: str) -> str:
-    """Make a single LLM call via the Agent SDK and return the text response.
+# SVG markup is verbose; a low cap silently truncates diagrams mid-element.
+MAX_OUTPUT_TOKENS = 8192
 
-    Uses the Agent SDK (same as the main lesson agent) so Foundry auth
-    works automatically. No tools needed — just a plain text completion.
+# One shared async client. Region: Bedrock model availability differs per region,
+# and the "global." inference-profile prefix is the only one valid in both
+# us-east-1 and ap-south-1.
+_bedrock = AsyncAnthropicBedrock(
+    aws_region=os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
+)
+
+
+async def _llm_call_async(prompt: str, model: str) -> str:
+    """Make a single LLM call and return the text response.
+
+    Calls Bedrock directly rather than going through the Claude Agent SDK.
+    This function only ever needed a plain text completion — routing it through
+    the Agent SDK spawned a Claude CLI subprocess per call (~3x slower), and made
+    it impossible to call from *inside* an agent tool: a nested SDK session
+    deadlocks during MCP initialization ("Control request timeout: initialize").
+    A direct call has no subprocess and no nesting, so `generate_one_svg` is safe
+    to invoke from the in-agent `generate_svg` tool.
     """
-    opts = ClaudeAgentOptions(
-        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-        permission_mode="acceptEdits",
+    resp = await _bedrock.messages.create(
         model=model,
-        max_turns=2,
-        cwd=str(PROJECT_ROOT),
+        max_tokens=MAX_OUTPUT_TOKENS,
+        # Sonnet 5 enables extended thinking by DEFAULT on Bedrock. Left on, it
+        # spends the entire max_tokens budget on thinking and returns a response
+        # with a single empty `thinking` block and no text at all (stop_reason
+        # "max_tokens", 8192/8192 thinking_tokens). Writing an SVG needs no
+        # reasoning budget — disabling it takes the call from ~95s/empty to
+        # ~14s/valid markup. Note: `temperature` is rejected by this model.
+        thinking={"type": "disabled"},
+        messages=[{"role": "user", "content": prompt}],
     )
-    text_parts: list[str] = []
-    async for message in query(prompt=prompt, options=opts):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    text_parts.append(block.text)
-    return "".join(text_parts)
+    return "".join(block.text for block in resp.content if block.type == "text")
 
 
 
@@ -330,9 +345,19 @@ def _extract_svg(raw: str) -> str:
 # SVG Review (LLM judge)
 # ---------------------------------------------------------------------------
 
-async def _review_svg(svg_content: str, concept: str, context: str, model: str) -> tuple[int, str]:
-    """Ask LLM to review the SVG. Returns (score, issues_string)."""
-    prompt = build_svg_review_prompt(svg_content, concept, context)
+async def _review_svg(
+    svg_content: str,
+    concept: str,
+    context: str,
+    model: str,
+    lesson_excerpt: str = "",
+) -> tuple[int, str, int]:
+    """Ask LLM to review the SVG. Returns (score, issues_string, grounding).
+
+    `grounding` is 10 when no lesson excerpt was supplied (nothing to check against),
+    so callers can gate on it unconditionally.
+    """
+    prompt = build_svg_review_prompt(svg_content, concept, context, lesson_excerpt)
     response = await _llm_call_async(prompt, model)
 
     # Robustly extract the OVERALL score. Handles many formats the model may emit:
@@ -349,10 +374,10 @@ async def _review_svg(svg_content: str, concept: str, context: str, model: str) 
         except (ValueError, TypeError):
             score = None
 
-    # Fallback: average the 4 dimension scores if OVERALL wasn't parseable
+    # Fallback: average the dimension scores if OVERALL wasn't parseable
     if score is None:
         dims = []
-        for dim in ("relevance", "clarity", "labels", "accuracy", "layout"):
+        for dim in ("relevance", "clarity", "labels", "accuracy", "grounding", "layout"):
             m = re.search(rf'{dim}[^0-9]{{0,20}}([0-9]+(?:\.[0-9]+)?)', response, re.IGNORECASE)
             if m:
                 try:
@@ -373,22 +398,187 @@ async def _review_svg(svg_content: str, concept: str, context: str, model: str) 
     if issues_match:
         issues = issues_match.group(1).strip().strip("*").strip()
 
-    return score, issues
+    # GROUNDING — a hard gate, parsed separately from the average. Only meaningful when
+    # a lesson excerpt was supplied; otherwise there is nothing to be unfaithful to.
+    grounding = 10
+    if lesson_excerpt.strip():
+        g_match = re.search(
+            r'grounding[^0-9]{0,20}([0-9]+(?:\.[0-9]+)?)', response, re.IGNORECASE
+        )
+        if g_match:
+            try:
+                grounding = round(float(g_match.group(1)))
+            except (ValueError, TypeError):
+                grounding = 10
+        # An explicit FAIL verdict counts as a grounding failure even if the model
+        # forgot to emit (or garbled) the numeric line.
+        v_match = re.search(r'verdict[^a-z]{0,10}(pass|fail)', response, re.IGNORECASE)
+        if v_match and v_match.group(1).lower() == "fail":
+            grounding = min(grounding, REVIEW_THRESHOLD - 1)
+
+    return score, issues, grounding
 
 
 # ---------------------------------------------------------------------------
-# Main resolver
+# Single SVG generator (reusable — called by tool or resolve_svgs)
+# ---------------------------------------------------------------------------
+
+async def generate_one_svg(
+    concept: str,
+    context: str,
+    lesson_excerpt: str = "",
+    model: str = DEFAULT_MODEL,
+) -> str:
+    """Generate ONE validated, overlap-free, autofit SVG. Returns <svg> markup or ''.
+
+    `lesson_excerpt` is the verbatim lesson text the diagram must be faithful to. When
+    supplied, the reviewer's GROUNDING score acts as a hard gate: a diagram showing
+    values absent from the lesson is never promoted to `best_svg`, however polished.
+    """
+    feedback = None
+    best_svg = None
+    best_score = -1
+    any_valid_svg = None
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        gen_prompt = build_svg_generation_prompt(
+            concept=concept,
+            context=context,
+            lesson_excerpt=lesson_excerpt,
+            feedback=feedback,
+        )
+        raw_response = await _llm_call_async(gen_prompt, model)
+        svg_content = _extract_svg(raw_response)
+
+        valid, reason = _validate_svg(svg_content)
+        if not valid:
+            feedback = f"Validation failed: {reason}. Fix the SVG structure."
+            continue
+
+        if any_valid_svg is None:
+            any_valid_svg = svg_content
+
+        has_overlap, overlap_reason = _detect_overlaps(svg_content)
+        if has_overlap:
+            feedback = (
+                f"OVERLAPPING elements detected: {overlap_reason}. "
+                "Fix by repositioning with ≥30px gaps."
+            )
+            if best_svg is None:
+                best_svg = svg_content
+                best_score = 3
+            continue
+
+        score, issues, grounding = await _review_svg(
+            svg_content, concept, context, model, lesson_excerpt
+        )
+
+        # HARD GATE: an ungrounded diagram invents facts that contradict the lesson.
+        # Never let it become the chosen candidate — retry with the specifics instead.
+        # (It stays reachable via any_valid_svg, so we still ship something rather
+        # than an empty diagram if every attempt fails.)
+        if grounding < REVIEW_THRESHOLD:
+            feedback = (
+                f"GROUNDING FAILURE ({grounding}/10) — the diagram shows facts that are NOT "
+                f"in the lesson: {issues}. Every label and value must come from the LESSON "
+                "EXCERPT verbatim. Use generic role names where the lesson gives no concrete "
+                "value. Regenerate using ONLY the lesson's own examples."
+            )
+            continue
+
+        if score > best_score:
+            best_svg = svg_content
+            best_score = score
+        if score >= REVIEW_THRESHOLD:
+            break
+        else:
+            feedback = f"Review score {score}/10. Issues: {issues}. Fix and regenerate."
+
+    final_svg = best_svg or any_valid_svg
+    if final_svg:
+        return _autofit_viewbox(final_svg)
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Lesson-context extraction
+# ---------------------------------------------------------------------------
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_CODE_EL_RE = re.compile(r"<Code\b[^>]*>([\s\S]*?)</Code>", re.IGNORECASE)
+_FENCE_RE = re.compile(r"```[\s\S]*?```")
+MAX_EXCERPT_CHARS = 2000
+
+
+def _extract_lesson_excerpt(content: str, placeholder_start: int) -> str:
+    """Pull the lesson text a placeholder sits after, as grounding for the diagram.
+
+    Placeholders are emitted between `</Section>` and the next `<Section>`, so the
+    relevant material is the preceding <Section> block. MLAI tags are stripped, but code
+    is preserved verbatim — the code IS the lesson's concrete example, and losing it is
+    what let the generator invent its own values.
+
+    Code appears two ways and both must survive: `<Code>` elements, and markdown ```
+    fences inside `<Body>`. Fenced regions are masked out before tag-stripping, otherwise
+    the stripper eats the HTML *inside* them (`<div class="banner">` → `banner`).
+
+    Returns "" if no preceding section can be found (nothing to ground against).
+    """
+    prev_open = content.rfind("<Section", 0, placeholder_start)
+    if prev_open == -1:
+        return ""
+
+    prev_close = content.rfind("</Section>", 0, placeholder_start)
+    if prev_close > prev_open:
+        # Placeholder sits AFTER a closed section — take that whole section.
+        segment = content[prev_open:prev_close]
+    else:
+        # Placeholder sits INSIDE an open section — take what's been written so far.
+        segment = content[prev_open:placeholder_start]
+
+    # Normalise <Code> elements into fences so both forms are handled identically.
+    segment = _CODE_EL_RE.sub(lambda m: f"\n```\n{m.group(1).strip()}\n```\n", segment)
+
+    # Mask fenced code, strip MLAI tags from the prose only, then restore the code.
+    fences: list[str] = []
+
+    def _mask(m: re.Match) -> str:
+        fences.append(m.group(0))
+        return f"\x00FENCE{len(fences) - 1}\x00"
+
+    segment = _FENCE_RE.sub(_mask, segment)
+    text = _TAG_RE.sub("", segment)
+    for i, block in enumerate(fences):
+        text = text.replace(f"\x00FENCE{i}\x00", block)
+
+    # Collapse the blank-line runs left behind by stripped tags.
+    lines = [ln.rstrip() for ln in text.splitlines()]
+    out: list[str] = []
+    for ln in lines:
+        if not ln.strip() and out and not out[-1].strip():
+            continue
+        out.append(ln)
+    excerpt = "\n".join(out).strip()
+
+    if len(excerpt) > MAX_EXCERPT_CHARS:
+        # Keep the TAIL — the text nearest the placeholder is the most relevant.
+        excerpt = "..." + excerpt[-MAX_EXCERPT_CHARS:]
+    return excerpt
+
+
+# ---------------------------------------------------------------------------
+# Main resolver (fallback path — Stage 2 generates in-agent instead)
 # ---------------------------------------------------------------------------
 
 async def resolve_svgs(mlai_path: Path, model: str = DEFAULT_MODEL, verbose: bool = True) -> int:
     """Resolve all <Svg concept="..." context="..." /> placeholders in an .mlai file.
 
-    For each placeholder:
-      1. Generate SVG from concept+context
-      2. Validate structure (code)
-      3. Review quality (LLM judge)
-      4. Regenerate on feedback (up to MAX_ATTEMPTS)
-      5. Embed final SVG or remove placeholder if all fail
+    Placeholders are resolved CONCURRENTLY (each is an independent generate/review
+    loop), then spliced back in reverse document order so earlier offsets stay valid.
+
+    Each placeholder goes through `generate_one_svg`, which validates structure, checks
+    overlaps geometrically, reviews quality, and enforces the grounding gate against the
+    surrounding lesson text.
 
     Returns the number of SVGs successfully resolved.
     """
@@ -413,100 +603,63 @@ async def resolve_svgs(mlai_path: Path, model: str = DEFAULT_MODEL, verbose: boo
     if verbose:
         print(f"   🎨 Found {len(placeholders)} SVG placeholder(s) to resolve...")
 
-    resolved_count = 0
-
-    for match in reversed(placeholders):  # Reverse to preserve positions
+    # Build the work list in document order, capturing the lesson text each diagram
+    # must be faithful to. Offsets are read from the ORIGINAL content, before any
+    # splicing, so they all stay valid.
+    jobs = []
+    for match in placeholders:
         attrs = match.group(1)
         concept_m = _CONCEPT_ATTR_RE.search(attrs)
         context_m = _CONTEXT_ATTR_RE.search(attrs)
-        concept = concept_m.group(1) if concept_m else ""
-        context = context_m.group(1) if context_m else ""
+        jobs.append({
+            "match": match,
+            "concept": concept_m.group(1) if concept_m else "",
+            "context": context_m.group(1) if context_m else "",
+            "excerpt": _extract_lesson_excerpt(content, match.start()),
+        })
 
-        if verbose:
-            print(f"\n      📐 Generating SVG for: '{concept[:50]}...'")
+    if verbose:
+        for j in jobs:
+            print(f"      📐 {j['concept'][:60]}...  (excerpt: {len(j['excerpt'])} chars)")
+        print(f"      ⏳ Generating {len(jobs)} SVG(s) concurrently...")
 
-        # Best-of-N loop: NEVER DROP — always embed the best SVG seen.
-        # Track all valid+overlap-free candidates with their scores.
-        feedback = None
-        best_svg = None
-        best_score = -1
-        any_valid_svg = None  # fallback: first valid SVG (even if score low)
-
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            if verbose:
-                print(f"         Attempt {attempt}/{MAX_ATTEMPTS}...", end=" ")
-
-            # GENERATE
-            gen_prompt = build_svg_generation_prompt(
-                concept=concept,
-                context=context,
-                feedback=feedback,
+    # Each placeholder is an independent generate/review loop — run them together.
+    results = await asyncio.gather(
+        *[
+            generate_one_svg(
+                concept=j["concept"],
+                context=j["context"],
+                lesson_excerpt=j["excerpt"],
+                model=model,
             )
-            raw_response = await _llm_call_async(gen_prompt, model)
-            svg_content = _extract_svg(raw_response)
+            for j in jobs
+        ],
+        return_exceptions=True,
+    )
 
-            # VALIDATE (code)
-            valid, reason = _validate_svg(svg_content)
-            if not valid:
-                if verbose:
-                    print(f"❌ validate: {reason}")
-                feedback = f"Validation failed: {reason}. Fix the SVG structure."
-                continue
+    resolved_count = 0
 
-            # Track first valid SVG as ultimate fallback
-            if any_valid_svg is None:
-                any_valid_svg = svg_content
+    # Splice in REVERSE document order so earlier offsets remain valid.
+    for j, result in reversed(list(zip(jobs, results))):
+        match = j["match"]
 
-            # OVERLAP CHECK (code — deterministic geometry)
-            has_overlap, overlap_reason = _detect_overlaps(svg_content)
-            if has_overlap:
-                if verbose:
-                    print(f"❌ overlap: {overlap_reason[:70]}")
-                feedback = (
-                    "The diagram has OVERLAPPING elements (detected geometrically). "
-                    f"Fix these exact collisions by repositioning with ≥30px gaps: {overlap_reason}. "
-                    "Enlarge boxes to fit their text, spread elements out on the canvas, "
-                    "and keep everything within a 40px inner margin."
-                )
-                # Still track it as a candidate if it's the only one
-                if best_svg is None:
-                    best_svg = svg_content
-                    best_score = 3  # low priority — overlapping fallback
-                continue
-
-            # REVIEW (LLM judge — only overlap-free SVGs reach here)
-            score, issues = await _review_svg(svg_content, concept, context, model)
+        if isinstance(result, BaseException):
             if verbose:
-                print(f"score={score}/10", end=" ")
+                print(f"      ⚠️ {j['concept'][:40]}: {type(result).__name__}: {result}")
+            final_svg = ""
+        else:
+            final_svg = result
 
-            # Track best overlap-free SVG
-            if score > best_score:
-                best_svg = svg_content
-                best_score = score
-
-            if score >= REVIEW_THRESHOLD:
-                if verbose:
-                    print("✅ accepted!")
-                break
-            else:
-                if verbose:
-                    print(f"↻ issues: {issues[:60]}")
-                feedback = f"Review score {score}/10. Issues: {issues}. Fix these and regenerate."
-
-        # ALWAYS EMBED — use best available (never drop, never leave lesson imageless)
-        final_svg = best_svg or any_valid_svg
         if final_svg:
-            # Auto-fit viewBox to prevent clipping
-            final_svg = _autofit_viewbox(final_svg)
+            # generate_one_svg already autofits the viewBox.
             embedded = f"  <Svg>\n{final_svg}\n  </Svg>"
             content = content[:match.start()] + embedded + content[match.end():]
             resolved_count += 1
-            if verbose and best_score < REVIEW_THRESHOLD:
-                print(f"         ⚠️ Used best available (score={best_score}) — not ideal but guaranteed present")
         else:
-            # Truly impossible (all attempts produced unparseable garbage) — extremely rare
+            # All attempts produced unparseable garbage — drop rather than ship a
+            # broken placeholder into the lesson.
             if verbose:
-                print(f"         ⚠️ All attempts invalid — removing placeholder")
+                print(f"      ⚠️ All attempts failed — removing placeholder")
             content = content[:match.start()] + content[match.end():]
 
     # Write back

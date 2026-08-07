@@ -5,6 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic>=0.120.2",
+    # [bedrock] pulls boto3/botocore, which anthropic imports lazily inside
+    # get_auth_headers() to SigV4-sign Bedrock requests. Without it, generate_svg
+    # dies with "No module named 'botocore'" on every call under ECS (which
+    # supplies AWS_ACCESS_KEY_ID/SECRET). A local shell with
+    # AWS_BEARER_TOKEN_BEDROCK set takes the bearer path and never needs it,
+    # which is why this only ever failed in prod.
+    "anthropic[bedrock]>=0.120.2",
     "claude-agent-sdk>=0.1.34",
 ]
