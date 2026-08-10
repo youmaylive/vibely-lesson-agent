@@ -128,6 +128,15 @@ break the grammar.
 - ❌ `A[Give oxytocin (10 IU IM)]` → **hard parse error** — the `(` ends the label early
 - ❌ `A[derivative(x)]` → **hard parse error**, same reason
 
+  Tested character by character, an **unquoted** label dies on any of `(` `)` `[` `]` `{` `}` `|`,
+  and on an `@` that touches a non-space character (mermaid 11 reads `alice@example.com` as its
+  `A@{...}` node-metadata syntax). Inside double quotes **every one of those is safe** — the only
+  thing that still breaks is a bare `"`, which is RULE 2. So quoting is not a style preference, it
+  is the fix:
+- ❌ `E[Large difference&lt;br/&gt;|Δt| &gt; 40ms]` → dies on the `|`
+- ❌ `H[alice@example.com]` → dies on the `@`
+- ✅ `E["Large difference&lt;br/&gt;|Δt| &gt; 40ms"]` · ✅ `H["alice@example.com"]`
+
 **RULE 2 — Never put a bare `"` inside a label.** Quoting is what delimits the label, so an inner
 quote terminates it and the diagram dies. Use `#quot;` — **no leading ampersand, that is not a typo**:
 - ❌ `E{Parameter blank or "not done"?}` → `Expecting 'SQE', 'DIAMOND_STOP', ... got 'STR'`
@@ -147,22 +156,35 @@ diagram parses fine, so only the automatic check catches it.
 - ❌ `A[Fetal Movement&#10;daily count]` → student sees a literal `&&#10;`, not a line break
 - ✅ `A["Fetal Movement&lt;br/&gt;daily count"]`
 - Do **not** "fix" this by writing `&amp;#40;` — that is worse, it guarantees a visible `&#40;`.
-- Named entities are equally wrong: `&nbsp;` → use a normal space; `&rarr;`/`&divide;` → write `↑`,
-  `→`, `÷` as literal Unicode characters.
+- Named entities beyond the five below are unreliable, not universally wrong: `&uarr;` happens to
+  resolve in a `flowchart` (whose labels become HTML) but appears literally as `&uarr;` in `timeline`
+  and `pie`, and vanishes in `stateDiagram`. Don't gamble — write `↑`, `→`, `÷` as literal Unicode
+  characters, and a normal space instead of `&nbsp;`.
 - The **only** entities you may write are `&lt;` `&gt;` `&amp;` `&quot;` `&apos;`.
 
-**RULE 5 — `timeline` diagrams need a `section`, and no `HH:MM` labels.** A bare time label collides
-with the `:` separator and hard-fails:
-- ❌ `timeline` / `title Monitoring` / `06:00 : Baseline, no severe features`
-- ✅ `timeline` / `title Monitoring` / `section Day 1` / `Morning : Baseline : No severe features`
+**RULE 5 — in a `timeline`, a period label must NOT contain a colon.** `timeline` uses `:` to separate
+the period from its events, so a clock time like `06:00` hard-fails. Quoting does **not** help, and
+neither does adding a `section`:
+- ❌ `06:00 : Baseline, no severe features` → `Expecting ... 'section', got 'INVALID'`
+- ❌ `"06:00" : Baseline` → fails the same way
+- ✅ `0600 hrs : Baseline, no severe features`
+- ✅ `Hour 0 : Baseline` · `Day 1 : Fundus descending` · `5 min : Firm`
+- `section` is optional in a timeline — add it to group periods, not to fix an error.
 
-**RULE 6 — escape `<`, `>`, `&` for the XML layer.** An unescaped `<` in a label silently swallows
+**RULE 6 — in a `sequenceDiagram`, never put `;` in a message.** `;` separates statements, so the
+message is cut off and the diagram hard-fails. This is the one case where quoting does **not** help
+(`A->>B: "one; two"` fails identically). Use a comma, an em dash, or the escape `#59;`:
+- ❌ `N->>M: Counsels directly; explains honestly` → `Expecting 'SOLID_ARROW', ... got 'NEWLINE'`
+- ✅ `N->>M: Counsels directly, explains honestly`
+- Commas, colons, parentheses and `→` are all fine in a sequence message — only `;` is fatal.
+
+**RULE 7 — escape `<`, `>`, `&` for the XML layer.** An unescaped `<` in a label silently swallows
 the rest of the label instead of erroring, so the diagram renders truncated and wrong:
 - ❌ `C{BP < 90 and HR > 100}` → label is cut off at `BP `
 - ✅ `C{"BP &lt; 90 and HR &gt; 100"}`
 - Arrow syntax (`-->`, `-.->`, `==>`) needs no escaping — only a bare `<` or `&` does.
 
-A safe, copy-this-shape example combining all six rules:
+A safe, copy-this-shape example combining all seven rules:
 ```xml
 <Mermaid>
 flowchart TD

@@ -44,17 +44,24 @@ Do NOT add XML escaping to fix these.
   - **A bare `"` inside a label** (`got 'STR'`). Wrap the whole label in quotes and write the inner
     quotes as `#quot;` — note there is **no leading ampersand**:
     `E{{Parameter blank or "not done"?}}` → `E{{"Parameter blank or #quot;not done#quot;?"}}`
-  - **Unquoted `(` or `)` in a label** (`got 'PS'`). Quote the label: `A[f(x)]` → `A["f(x)"]`
-  - **A `timeline` with no `section`**, or `HH:MM` labels whose `:` collides with the separator
-    (`Expecting ... 'section'`). Add `section <name>` before the entries and rename `06:00` to
-    `Morning` / `Day 1` etc.
+  - **An unquoted `(` `)` `[` `]` `{{` `}}` `|` in a label** (`got 'PS'`, `got 'PIPE'`, `got 'SQE'`), or an
+    **`@` touching a non-space character** (`got 'LINK_ID'` — mermaid reads `a@b.com` as node syntax).
+    Quote the label and all of them become safe: `A[f(x)]` → `A["f(x)"]`,
+    `E[|Δt| &gt; 40ms]` → `E["|Δt| &gt; 40ms"]`, `H[a@b.com]` → `H["a@b.com"]`
+  - **A `;` in a `sequenceDiagram` message** (`got 'NEWLINE'`, expecting an arrow). `;` separates
+    statements. Quoting does NOT help here — replace it with a comma, or write `#59;`.
+  - **A `timeline` period label containing a colon** (`Expecting ... 'section', got 'INVALID'`).
+    `timeline` uses `:` to separate period from events, so `06:00 : Baseline` breaks. Rename the
+    period so it has no colon — `0600 hrs : Baseline`, `Hour 0 : Baseline`. Quoting it does NOT
+    help, and adding a `section` does NOT help.
   - When in doubt, **double-quote every node and edge label** — that alone fixes most of these.
 - `MERMAID_NUMERIC_ENTITY` / `MERMAID_BAD_ENTITY` — the diagram parses but renders as visible
   garbage, because nothing decodes these entities and the renderer adds a stray `&`:
   - `&#10;` / `&#13;` (intended as a line break) → `&lt;br/&gt;`
   - `&#40;` `&#41;` `&#58;` → write the literal `(` `)` `:` **and wrap that label in double quotes**,
     or the decoded character becomes a hard parse error instead.
-  - `&nbsp;` → a normal space. `&rarr;` / `&divide;` → the literal `→` / `÷` character.
+  - `&nbsp;` → a normal space. `&uarr;` / `&divide;` → the literal `↑` / `÷` character (these resolve
+    in a flowchart but appear literally in `timeline`/`pie` and vanish in `stateDiagram`).
   - **Never** repair these by writing `&amp;#40;` — that guarantees a visible `&#40;` on screen.
   - Do not delete the label content to make the error go away.
 
