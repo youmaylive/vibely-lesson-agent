@@ -17,6 +17,18 @@ VALIDATOR_CLI = (
     / "dist"
     / "cli.js"
 )
+# Second validation layer: runs the real mermaid.parse() (the same one the
+# student's browser runs) plus an entity check. The MLAI validator above never
+# parses Mermaid — its schema for <Mermaid> is only "text must be non-empty" —
+# so without this a broken diagram passes validation and fails in the viewer.
+# Source .mjs, not dist/: the worker image never runs `npm run build`.
+MERMAID_CHECK_CLI = (
+    COURSE_ENGINE_ROOT
+    / "vibely-v2"
+    / "vibely-v2-parser"
+    / "scripts"
+    / "mermaid-check.mjs"
+)
 MLAI_FORMAT_GUIDE = Path(__file__).resolve().parent / "prompts" / "mlai_format_guide.md"
 
 # ---------------------------------------------------------------------------

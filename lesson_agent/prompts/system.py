@@ -99,35 +99,80 @@ Use for: processes, flows, hierarchies, relationships, algorithms, state machine
 ```xml
 <Mermaid>
 graph TD
-  A[Input Data] --> B[Preprocess]
-  B --> C{Valid?}
-  C -->|Yes| D[Train Model]
-  C -->|No| E[Clean Data]
+  A["Input Data"] --> B["Preprocess"]
+  B --> C{"Valid?"}
+  C -->|"Yes"| D["Train Model"]
+  C -->|"No"| E["Clean Data"]
   E --> B
 </Mermaid>
 ```
 Mermaid supports: `graph TD/LR`, `flowchart`, `sequenceDiagram`, `classDiagram`, `stateDiagram-v2`, `pie`, `timeline`.
 
-### XML Safety inside `<Mermaid>` — READ THIS, it is the #1 cause of failed validation
-`<Mermaid>` content is parsed as XML, **NOT** as CDATA or a raw text block. Every `<` you write is
-treated as the start of an XML tag. Escape them exactly as you would inside `<Code>`:
-- `<` → `&lt;`   ·   `>` → `&gt;`   ·   `&` → `&amp;`
+### `<Mermaid>` correctness — READ THIS, it is mechanically checked and it WILL fail you
 
-**Line breaks in node labels.** `<br/>` is valid Mermaid, but writing it raw here is not — you must
-escape it. This is the single most common mistake:
-- ❌ `A[Fetal Movement<br/>daily count]` → `INVALID_CHILD: Invalid child element <br> in <Mermaid>`
-- ✅ `A[Fetal Movement&lt;br/&gt;daily count]` → valid, and renders as a real line break
+Your diagram passes through **two different parsers**, and it must satisfy both:
 
-The escaped form is decoded back to `<br/>` before Mermaid sees it, so you lose nothing. The same
-applies to `<b>`, `<i>`, and any other HTML tag you use inside a label.
+1. **the XML parser** (validates the .mlai file) — cares about `<`, `>`, `&`
+2. **Mermaid's own grammar** (runs in the student's browser) — cares about quotes, brackets, entities
 
-**Comparison operators in labels** are the other trap — an unescaped `<` silently swallows the rest
-of the label instead of erroring, so the diagram renders truncated and wrong:
+Satisfying #1 tells you **nothing** about #2. A diagram can be perfectly escaped XML and still be a
+hard Mermaid syntax error that renders as a red `Diagram error` box for the student. Both are now
+checked automatically before your lesson is accepted, so a mistake here just costs you a retry.
+
+**RULE 1 — Put double quotes around EVERY node label and EVERY edge label.** Do this always, even
+when it looks unnecessary. It is the single habit that prevents most Mermaid failures, because a
+quoted label may contain parentheses, commas, colons, `&`, and punctuation that would otherwise
+break the grammar.
+- ✅ `A["Give oxytocin (10 IU IM), then reassess"] --> B["Document time: 06:00"]`
+- ✅ `C{"Bleeding controlled?"} -->|"Yes, escalate"| D["Observe"]`
+- ❌ `A[Give oxytocin (10 IU IM)]` → **hard parse error** — the `(` ends the label early
+- ❌ `A[derivative(x)]` → **hard parse error**, same reason
+
+**RULE 2 — Never put a bare `"` inside a label.** Quoting is what delimits the label, so an inner
+quote terminates it and the diagram dies. Use `#quot;` — **no leading ampersand, that is not a typo**:
+- ❌ `E{Parameter blank or "not done"?}` → `Expecting 'SQE', 'DIAMOND_STOP', ... got 'STR'`
+- ✅ `E{"Parameter blank or #quot;not done#quot;?"}` → renders with real quote marks
+
+**RULE 3 — Line breaks are `&lt;br/&gt;`, and nothing else.** `<br/>` is the only line-break
+mechanism Mermaid honours, and it must be XML-escaped so the .mlai file stays valid:
+- ✅ `A["Fetal Movement&lt;br/&gt;daily count"]`
+- ❌ a raw `<br/>` → `INVALID_CHILD: Invalid child element <br> in <Mermaid>`
+
+**RULE 4 — NEVER write numeric character entities.** `&#10;` `&#40;` `&#41;` `&#58;` and friends are
+**not decoded by anything** in this pipeline. They survive all the way to the renderer, which then
+adds an extra ampersand, and the student literally reads `derivative&&#40;x&&#41;` on screen. The
+diagram parses fine, so only the automatic check catches it.
+- ❌ `A[derivative&#40;x&#41;]` → student sees `derivative&&#40;x&&#41;`
+- ✅ `A["derivative(x)"]` — just write the character, inside quotes
+- ❌ `A[Fetal Movement&#10;daily count]` → student sees a literal `&&#10;`, not a line break
+- ✅ `A["Fetal Movement&lt;br/&gt;daily count"]`
+- Do **not** "fix" this by writing `&amp;#40;` — that is worse, it guarantees a visible `&#40;`.
+- Named entities are equally wrong: `&nbsp;` → use a normal space; `&rarr;`/`&divide;` → write `↑`,
+  `→`, `÷` as literal Unicode characters.
+- The **only** entities you may write are `&lt;` `&gt;` `&amp;` `&quot;` `&apos;`.
+
+**RULE 5 — `timeline` diagrams need a `section`, and no `HH:MM` labels.** A bare time label collides
+with the `:` separator and hard-fails:
+- ❌ `timeline` / `title Monitoring` / `06:00 : Baseline, no severe features`
+- ✅ `timeline` / `title Monitoring` / `section Day 1` / `Morning : Baseline : No severe features`
+
+**RULE 6 — escape `<`, `>`, `&` for the XML layer.** An unescaped `<` in a label silently swallows
+the rest of the label instead of erroring, so the diagram renders truncated and wrong:
 - ❌ `C{BP < 90 and HR > 100}` → label is cut off at `BP `
-- ✅ `C{BP &lt; 90 and HR &gt; 100}`
+- ✅ `C{"BP &lt; 90 and HR &gt; 100"}`
+- Arrow syntax (`-->`, `-.->`, `==>`) needs no escaping — only a bare `<` or `&` does.
 
-Do not use HTML character entities other than the three above (`&nbsp;` is NOT valid — use a normal
-space). Arrow syntax (`-->`, `-.->`, `==>`) needs no escaping; only a bare `<` or `&` does.
+A safe, copy-this-shape example combining all six rules:
+```xml
+<Mermaid>
+flowchart TD
+  A["Postpartum haemorrhage suspected&lt;br/&gt;(EBL &gt; 500 mL)"] --> B{"Uterus firm?"}
+  B -->|"No, atonic"| C["Massage + oxytocin (10 IU IM)"]
+  B -->|"Yes"| D{"Blood loss #quot;ongoing#quot;?"}
+  D -->|"Yes"| E["Inspect for trauma: cervix, vagina, perineum"]
+  D -->|"No"| F["Observe, chart BP &lt; 90 alerts"]
+</Mermaid>
+```
 
 ### When to use Mermaid:
 - **Processes/flows** (how something works step by step)

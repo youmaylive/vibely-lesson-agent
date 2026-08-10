@@ -73,10 +73,10 @@ You MUST follow this exact structure pattern:
 
   <Mermaid>
 flowchart LR
-  A[Input] --> B[Process]
-  B --> C{{Decision}}
-  C -->|Yes| D[Output]
-  C -->|No| E[Retry]
+  A["Input"] --> B["Process"]
+  B --> C{{"Decision"}}
+  C -->|"Yes"| D["Output"]
+  C -->|"No"| E["Retry"]
   </Mermaid>
 
   <FlashCard id="fc-1">
@@ -164,6 +164,9 @@ You MUST include visuals to keep learners engaged. Use a MIX of Mermaid + SVG:
 ### Mermaid (for flows/processes/relationships):
 - Just write Mermaid diagram code directly — auto-renders
 - Use for: flowcharts, sequence diagrams, timelines, state machines, comparisons
+- **Double-quote every node and edge label** (`A["Text"]`, `-->|"Yes"|`), use `&lt;br/&gt;` for line
+  breaks, and never write numeric entities like `&#10;` or `&#40;`. Diagrams are parsed by the real
+  Mermaid parser before your lesson is accepted — see the Mermaid rules in your instructions.
 
 ### SVG diagrams — call the `generate_svg` tool (for custom labeled diagrams):
 

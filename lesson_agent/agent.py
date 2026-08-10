@@ -55,6 +55,11 @@ from svg_tool import svg_mcp_server
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Lessons whose Mermaid gate could not run, collected across a batch so the
+# run-level summary can state it plainly instead of leaving it buried in a
+# multi-thousand-line log.
+_MERMAID_GATE_SKIPS: list[str] = []
+
 
 def _agent_options(
     model: str,
@@ -238,6 +243,17 @@ async def generate_lesson(
 
         result = validate_mlai_file(output_file)
 
+        if not result.mermaid_gate_ran:
+            # The gate could not run (missing deps, no node, crash). We do not
+            # fail the lesson over an infra problem, but this must never slide by
+            # unnoticed — a silently-skipped Mermaid check is exactly how broken
+            # diagrams reached students before the gate existed.
+            _MERMAID_GATE_SKIPS.append(lesson_id)
+            print("\n⚠️  MERMAID GATE UNAVAILABLE — diagrams in this lesson were NOT checked.")
+            for line in result.raw_output.splitlines():
+                if line.startswith("MERMAID GATE UNAVAILABLE"):
+                    print(f"   {line}")
+
         if result.success:
             print(f"\n✅ Validation passed! ({lesson_id})")
             print(f"   Output: {output_file}")
@@ -355,6 +371,20 @@ async def generate_all_lessons(
 
     # Emit usage summary marker (parsed by curriculum worker)
     total_lessons = len(results["success"]) + len(results["failed"])
+
+    # Run-level Mermaid gate report. State coverage explicitly either way: a
+    # missing line is indistinguishable from a passing one in a long log, and
+    # "the gate silently did nothing" is the failure mode this whole layer exists
+    # to prevent.
+    if _MERMAID_GATE_SKIPS:
+        print(
+            f"\n🚨 MERMAID GATE SKIPPED for {len(_MERMAID_GATE_SKIPS)}/{total_lessons} "
+            f"lesson(s) — their diagrams were NEVER checked and may not render: "
+            f"{', '.join(_MERMAID_GATE_SKIPS)}"
+        )
+    else:
+        print(f"\n🎯 Mermaid gate ran on all {total_lessons} lesson(s).")
+
     print(f"\n##USAGE:total_cost=0:input_tokens=0:output_tokens=0:api_calls={total_lessons}##")
 
     return results
