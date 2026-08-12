@@ -49,6 +49,7 @@ from prompts.fix import build_fix_prompt
 from validator import validate_mlai_file
 from svg_agent import resolve_svgs
 from svg_tool import svg_mcp_server
+import usage
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +145,14 @@ async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, st
                     if hasattr(message, "total_cost_usd") and message.total_cost_usd:
                         cost_usd = message.total_cost_usd
                         print(f"💰 Cost: ${cost_usd:.4f}")
+                    # Book this call's spend into the run total. Both callers below
+                    # discard the returned cost, and nothing tracked tokens at all —
+                    # the ##USAGE marker this feeds is the only way the MLAI phase's
+                    # spend reaches usage_records.
+                    usage.add_sdk_usage(
+                        getattr(message, "usage", None),
+                        cost_usd=getattr(message, "total_cost_usd", 0.0) or 0.0,
+                    )
 
             # If we got here without exception, we're done
             break
@@ -385,6 +394,12 @@ async def generate_all_lessons(
     else:
         print(f"\n🎯 Mermaid gate ran on all {total_lessons} lesson(s).")
 
-    print(f"\n##USAGE:total_cost=0:input_tokens=0:output_tokens=0:api_calls={total_lessons}##")
+    _snap = usage.snapshot()
+    print(
+        f"\n💰 Run usage: ${_snap['total_cost']:.4f}, "
+        f"{_snap['input_tokens']} in / {_snap['output_tokens']} out tokens, "
+        f"{_snap['api_calls']} API calls over {total_lessons} lesson(s)"
+    )
+    print(f"\n{usage.marker()}")
 
     return results

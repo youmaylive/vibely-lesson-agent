@@ -39,6 +39,7 @@ from svg_geometry import (
     detect_overlaps,
     element_boxes,
 )
+import usage
 
 
 
@@ -110,6 +111,10 @@ async def _llm_call_async(prompt: str, model: str) -> str:
         thinking={"type": "disabled"},
         messages=[{"role": "user", "content": prompt}],
     )
+    # Book the tokens. These calls are invisible to the Agent SDK's cost reporting
+    # (they bypass it entirely), and since the SVG design framework landed they run
+    # ~4 generate + ~4 review per diagram — material spend that reached no record.
+    usage.add_bedrock_usage(getattr(resp, "usage", None))
     return "".join(block.text for block in resp.content if block.type == "text")
 
 
