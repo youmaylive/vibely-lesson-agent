@@ -1,0 +1,92 @@
+<svg viewBox="-274 -50 1621 800" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="1000" height="700" fill="#f8f9fa"/>
+
+  <text x="500" y="40" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#333333" text-anchor="middle">Caesarean Urgency Categories — The Siren Volume Dial</text>
+  <text x="500" y="65" font-family="Arial, sans-serif" font-size="16" fill="#666666" text-anchor="middle">The dial position, not just the destination, is part of the record</text>
+
+  <!-- Dial arc background -->
+  <path d="M 150 400 A 350 350 0 0 1 850 400" fill="none" stroke="#dddddd" stroke-width="30"/>
+
+  <!-- Dial arc colored segments -->
+  <path d="M 150 400 A 350 350 0 0 1 320 130" fill="none" stroke="#FF6B6B" stroke-width="30"/>
+  <path d="M 320 130 A 350 350 0 0 1 500 100" fill="none" stroke="#F5A623" stroke-width="30"/>
+  <path d="M 500 100 A 350 350 0 0 1 680 130" fill="none" stroke="#4A90D9" stroke-width="30"/>
+  <path d="M 680 130 A 350 350 0 0 1 850 400" fill="none" stroke="#50C878" stroke-width="30"/>
+
+  <!-- Needle -->
+  <line x1="500" y1="420" x2="220" y2="200" stroke="#333333" stroke-width="4"/>
+  <circle cx="500" cy="420" r="14" fill="#333333"/>
+  <text x="500" y="455" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">sirens-blaring → scheduled appointment</text>
+
+  <!-- Category 1 box -->
+  <rect x="60" y="140" width="230" height="150" rx="8" fill="#FF6B6B"/>
+  <text x="175" y="168" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Category 1</text>
+  <text x="175" y="192" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">
+    <tspan x="175" dy="0">Immediate threat to</tspan>
+    <tspan x="175" dy="1.2em">mother or baby's life</tspan>
+    <tspan x="175" dy="1.2em">(e.g., cord prolapse,</tspan>
+    <tspan x="175" dy="1.2em">major abruption)</tspan>
+  </text>
+  <text x="175" y="270" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">Within 30 minutes</text>
+
+  <!-- Category 2 box -->
+  <rect x="330" y="60" width="230" height="150" rx="8" fill="#F5A623"/>
+  <text x="445" y="88" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Category 2</text>
+  <text x="445" y="112" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">
+    <tspan x="445" dy="0">Compromise, not</tspan>
+    <tspan x="445" dy="1.2em">immediately life-</tspan>
+    <tspan x="445" dy="1.2em">threatening (e.g., failure</tspan>
+    <tspan x="445" dy="1.2em">to progress, stable CTG)</tspan>
+  </text>
+  <text x="445" y="190" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">Within 75 minutes</text>
+
+  <!-- Category 3 box -->
+  <rect x="590" y="60" width="230" height="150" rx="8" fill="#4A90D9"/>
+  <text x="705" y="88" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Category 3</text>
+  <text x="705" y="112" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">
+    <tspan x="705" dy="0">Needs early delivery,</tspan>
+    <tspan x="705" dy="1.2em">no compromise present</tspan>
+    <tspan x="705" dy="1.2em">(e.g., scheduled repeat CS</tspan>
+    <tspan x="705" dy="1.2em">brought forward for labour)</tspan>
+  </text>
+
+  <!-- Category 4 box -->
+  <rect x="820" y="140" width="140" height="150" rx="8" fill="#50C878"/>
+  <text x="890" y="168" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Category 4</text>
+  <text x="890" y="192" font-family="Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">
+    <tspan x="890" dy="0">Elective, planned</tspan>
+    <tspan x="890" dy="1.2em">at a time to suit</tspan>
+    <tspan x="890" dy="1.2em">mother and unit</tspan>
+    <tspan x="890" dy="1.2em">(e.g., placenta</tspan>
+    <tspan x="890" dy="1.2em">previa at 38 wks)</tspan>
+  </text>
+
+  <!-- connecting arrows from arc segments to boxes -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#666666"/>
+    </marker>
+  </defs>
+  <line x1="230" y1="220" x2="175" y2="290" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="400" y1="150" x2="445" y2="210" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="600" y1="150" x2="705" y2="210" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="770" y1="220" x2="890" y2="290" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Bottom legend / summary strip -->
+  <rect x="60" y="540" width="900" height="110" rx="8" fill="#ffffff" stroke="#dddddd" stroke-width="2"/>
+  <text x="510" y="565" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333333" text-anchor="middle">From Loudest to Quietest</text>
+
+  <circle cx="130" cy="605" r="10" fill="#FF6B6B"/>
+  <text x="150" y="610" font-family="Arial, sans-serif" font-size="14" fill="#333333">Cat 1: sirens blaring, 30 min</text>
+
+  <circle cx="400" cy="605" r="10" fill="#F5A623"/>
+  <text x="420" y="610" font-family="Arial, sans-serif" font-size="14" fill="#333333">Cat 2: urgent, 75 min</text>
+
+  <circle cx="650" cy="605" r="10" fill="#4A90D9"/>
+  <text x="670" y="610" font-family="Arial, sans-serif" font-size="14" fill="#333333">Cat 3: early, no compromise</text>
+
+  <circle cx="130" cy="635" r="10" fill="#50C878"/>
+  <text x="150" y="640" font-family="Arial, sans-serif" font-size="14" fill="#333333">Cat 4: scheduled appointment</text>
+
+  <text x="600" y="638" font-family="Arial, sans-serif" font-size="13" fill="#666666">The dial position must be recorded with every indication</text>
+</svg>

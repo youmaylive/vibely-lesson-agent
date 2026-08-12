@@ -1,0 +1,57 @@
+<svg viewBox="-50 -50 1100 800" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="1000" height="700" fill="#f8f9fa"/>
+
+  <text x="500" y="40" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#333333" text-anchor="middle">Birth Weight Classification: A Nested Ladder</text>
+  <text x="500" y="65" font-family="Arial, sans-serif" font-size="15" fill="#666666" text-anchor="middle">Every ELBW baby is also VLBW and LBW — risks stack, they never disappear</text>
+
+  <!-- Outer ring: LBW -->
+  <rect x="80" y="100" width="840" height="540" rx="20" fill="#F5A623" opacity="0.18" stroke="#F5A623" stroke-width="3"/>
+  <text x="115" y="130" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#F5A623">LBW</text>
+  <text x="115" y="152" font-family="Arial, sans-serif" font-size="15" fill="#333333">Low Birth Weight</text>
+  <text x="115" y="172" font-family="Arial, sans-serif" font-size="15" fill="#333333">below 2500 g</text>
+
+  <!-- Middle ring: VLBW -->
+  <rect x="180" y="220" width="640" height="380" rx="20" fill="#FF6B6B" opacity="0.20" stroke="#FF6B6B" stroke-width="3"/>
+  <text x="215" y="250" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FF6B6B">VLBW</text>
+  <text x="215" y="272" font-family="Arial, sans-serif" font-size="15" fill="#333333">Very Low Birth Weight</text>
+  <text x="215" y="292" font-family="Arial, sans-serif" font-size="15" fill="#333333">below 1500 g</text>
+
+  <!-- Inner ring: ELBW -->
+  <rect x="290" y="340" width="420" height="220" rx="20" fill="#4A90D9" opacity="0.25" stroke="#4A90D9" stroke-width="3"/>
+  <text x="325" y="370" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#4A90D9">ELBW</text>
+  <text x="325" y="392" font-family="Arial, sans-serif" font-size="15" fill="#333333">Extremely Low</text>
+  <text x="325" y="412" font-family="Arial, sans-serif" font-size="15" fill="#333333">Birth Weight</text>
+  <text x="325" y="432" font-family="Arial, sans-serif" font-size="15" fill="#333333">below 1000 g</text>
+
+  <!-- Core center circle: Normal reference (outside ladder, shown separately below) -->
+  <circle cx="500" cy="470" r="70" fill="#50C878" opacity="0.85"/>
+  <text x="500" y="460" font-family="Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="middle">Baby</text>
+  <text x="500" y="482" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">meets all</text>
+  <text x="500" y="500" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">nested criteria</text>
+
+  <!-- Monitoring escalation callouts, arranged right side, pointing to rings -->
+  <rect x="740" y="140" width="220" height="60" rx="10" fill="#ffffff" stroke="#F5A623" stroke-width="2"/>
+  <text x="850" y="164" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">More frequent</text>
+  <text x="850" y="184" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">glucose checks</text>
+  <line x1="740" y1="170" x2="640" y2="200" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="740" y="260" width="220" height="60" rx="10" fill="#ffffff" stroke="#FF6B6B" stroke-width="2"/>
+  <text x="850" y="284" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">Aggressive thermal</text>
+  <text x="850" y="304" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">protection</text>
+  <line x1="740" y1="290" x2="640" y2="320" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="740" y="380" width="220" height="60" rx="10" fill="#ffffff" stroke="#4A90D9" stroke-width="2"/>
+  <text x="850" y="404" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">Closer watch for</text>
+  <text x="850" y="424" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">feeding trouble, jaundice</text>
+  <line x1="740" y1="410" x2="640" y2="420" stroke="#666666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Bottom summary box -->
+  <rect x="80" y="650" width="840" height="0" fill="none"/>
+  <text x="500" y="638" font-family="Arial, sans-serif" font-size="15" font-style="italic" fill="#666666" text-anchor="middle">Each rung down = tighter surveillance. Risks stack — you never leave a lower tier.</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#666666"/>
+    </marker>
+  </defs>
+</svg>

@@ -1,0 +1,79 @@
+<svg viewBox="-113 -50 1185 800" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="1000" height="700" fill="#f8f9fa"/>
+
+      <text x="500" y="45" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="#333333" text-anchor="middle">GPAL: Four Separate Tally Counters</text>
+      <text x="500" y="75" font-family="Arial, sans-serif" font-size="18" fill="#666666" text-anchor="middle">Example: G5P0A4L0</text>
+
+      <rect x="60" y="130" width="200" height="150" rx="8" fill="#4A90D9"/>
+      <text x="160" y="165" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">G — Gravida</text>
+      <text x="160" y="200" font-family="Arial, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle">
+        <tspan x="160">Total times pregnant</tspan>
+        <tspan x="160" dy="1.3em">(counts current one)</tspan>
+      </text>
+      <text x="160" y="255" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">= 5</text>
+
+      <rect x="300" y="130" width="200" height="150" rx="8" fill="#50C878"/>
+      <text x="400" y="165" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">P — Para</text>
+      <text x="400" y="200" font-family="Arial, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle">
+        <tspan x="400">Reached viability</tspan>
+        <tspan x="400" dy="1.3em">(alive or stillborn)</tspan>
+      </text>
+      <text x="400" y="255" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">= 0</text>
+
+      <rect x="540" y="130" width="200" height="150" rx="8" fill="#FF6B6B"/>
+      <text x="640" y="165" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">A — Abortion</text>
+      <text x="640" y="200" font-family="Arial, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle">
+        <tspan x="640">Ended before viability</tspan>
+        <tspan x="640" dy="1.3em">(spontaneous or induced)</tspan>
+      </text>
+      <text x="640" y="255" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">= 4</text>
+
+      <rect x="780" y="130" width="180" height="150" rx="8" fill="#F5A623"/>
+      <text x="870" y="165" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">L — Living</text>
+      <text x="870" y="200" font-family="Arial, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle">
+        <tspan x="870">Children alive</tspan>
+        <tspan x="870" dy="1.3em">right now</tspan>
+      </text>
+      <text x="870" y="255" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffffff" text-anchor="middle">= 0</text>
+
+      <rect x="780" y="310" width="180" height="90" rx="8" fill="none" stroke="#F5A623" stroke-width="2"/>
+      <text x="870" y="335" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle">
+        <tspan x="870">Only L can</tspan>
+        <tspan x="870" dy="1.3em">shrink over</tspan>
+        <tspan x="870" dy="1.3em">time</tspan>
+      </text>
+
+      <line x1="60" y1="440" x2="960" y2="440" stroke="#666666" stroke-width="2" stroke-dasharray="6,6"/>
+
+      <text x="500" y="480" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333333" text-anchor="middle">Unpacking G5P0A4L0</text>
+
+      <rect x="60" y="510" width="200" height="110" rx="8" fill="#4A90D9"/>
+      <text x="160" y="540" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+      <text x="160" y="565" font-family="Arial, sans-serif" font-size="15" fill="#ffffff" text-anchor="middle">
+        <tspan x="160">total</tspan>
+        <tspan x="160" dy="1.3em">pregnancies</tspan>
+      </text>
+
+      <rect x="300" y="510" width="200" height="110" rx="8" fill="#50C878"/>
+      <text x="400" y="540" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">0</text>
+      <text x="400" y="565" font-family="Arial, sans-serif" font-size="15" fill="#ffffff" text-anchor="middle">
+        <tspan x="400">reached</tspan>
+        <tspan x="400" dy="1.3em">viability</tspan>
+      </text>
+
+      <rect x="540" y="510" width="200" height="110" rx="8" fill="#FF6B6B"/>
+      <text x="640" y="540" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+      <text x="640" y="565" font-family="Arial, sans-serif" font-size="15" fill="#ffffff" text-anchor="middle">
+        <tspan x="640">losses before</tspan>
+        <tspan x="640" dy="1.3em">viability</tspan>
+      </text>
+
+      <rect x="780" y="510" width="180" height="110" rx="8" fill="#F5A623"/>
+      <text x="870" y="540" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">0</text>
+      <text x="870" y="565" font-family="Arial, sans-serif" font-size="15" fill="#ffffff" text-anchor="middle">
+        <tspan x="870">living</tspan>
+        <tspan x="870" dy="1.3em">children</tspan>
+      </text>
+
+      <text x="500" y="655" font-family="Arial, sans-serif" font-size="16" fill="#333333" text-anchor="middle">...and she's currently pregnant for the 5th time.</text>
+    </svg>

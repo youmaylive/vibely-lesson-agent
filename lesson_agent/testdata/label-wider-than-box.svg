@@ -1,0 +1,125 @@
+<svg viewBox="-50 -50 1100 800" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+  <rect x="0" y="0" width="1000" height="700" fill="#f8f9fa"/>
+
+  <text x="500" y="32" text-anchor="middle" font-size="22" font-weight="bold" fill="#333333">Two Clocks Crossing at 13:00 — Mrs. T</text>
+  <text x="500" y="55" text-anchor="middle" font-size="15" fill="#666666">Pre-eclampsia improving while MgSO4 toxicity quietly worsens</text>
+
+  <!-- Time axis -->
+  <line x1="150" y1="90" x2="920" y2="90" stroke="#666666" stroke-width="2"/>
+  <text x="130" y="94" text-anchor="end" font-size="15" fill="#333333">Time</text>
+
+  <!-- Time labels -->
+  <text x="215" y="80" text-anchor="middle" font-size="15" fill="#333333">08:00</text>
+  <text x="370" y="80" text-anchor="middle" font-size="15" fill="#333333">10:00</text>
+  <text x="500" y="80" text-anchor="middle" font-size="15" fill="#333333">11:00</text>
+  <text x="630" y="80" text-anchor="middle" font-size="15" fill="#333333">12:00</text>
+  <text x="800" y="80" text-anchor="middle" font-size="15" fill="#333333">13:00</text>
+
+  <circle cx="215" cy="90" r="4" fill="#666666"/>
+  <circle cx="370" cy="90" r="4" fill="#666666"/>
+  <circle cx="500" cy="90" r="4" fill="#666666"/>
+  <circle cx="630" cy="90" r="4" fill="#666666"/>
+  <circle cx="800" cy="90" r="4" fill="#666666"/>
+
+  <!-- MgSO4 start marker -->
+  <line x1="290" y1="105" x2="290" y2="640" stroke="#F5A623" stroke-width="2" stroke-dasharray="6,4"/>
+  <rect x="200" y="105" width="180" height="30" rx="8" fill="#F5A623"/>
+  <text x="290" y="120" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#ffffff" font-weight="bold">09:00 MgSO4 loading</text>
+
+  <!-- PRE-ECLAMPSIA CLOCK (top, green, improving) -->
+  <text x="60" y="180" font-size="18" font-weight="bold" fill="#50C878">Pre-eclampsia Clock</text>
+  <text x="60" y="200" font-size="13" fill="#666666">(improving)</text>
+
+  <rect x="150" y="165" width="130" height="80" rx="8" fill="#50C878"/>
+  <text x="215" y="195" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">08:00</text>
+  <text x="215" y="215" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">BP 162/108</text>
+  <text x="215" y="232" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">headache, spots</text>
+
+  <rect x="305" y="165" width="130" height="80" rx="8" fill="#50C878"/>
+  <text x="370" y="195" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">10:00</text>
+  <text x="370" y="215" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">BP 158/104</text>
+  <text x="370" y="232" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">headache improving</text>
+
+  <rect x="435" y="165" width="130" height="80" rx="8" fill="#50C878"/>
+  <text x="500" y="195" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">11:00</text>
+  <text x="500" y="215" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">BP 150/98</text>
+  <text x="500" y="232" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">no symptoms</text>
+
+  <rect x="565" y="165" width="130" height="80" rx="8" fill="#50C878"/>
+  <text x="630" y="195" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">12:00</text>
+  <text x="630" y="215" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">BP 148/96</text>
+  <text x="630" y="232" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">no symptoms</text>
+
+  <rect x="735" y="165" width="130" height="80" rx="8" fill="#50C878"/>
+  <text x="800" y="195" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">13:00</text>
+  <text x="800" y="215" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">BP 146/94</text>
+  <text x="800" y="232" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">looks "better"</text>
+
+  <line x1="280" y1="205" x2="305" y2="205" stroke="#50C878" stroke-width="3" marker-end="url(#arrowGreen)"/>
+  <line x1="435" y1="205" x2="435" y2="205" stroke="#50C878" stroke-width="3"/>
+  <line x1="565" y1="205" x2="565" y2="205" stroke="#50C878" stroke-width="3"/>
+  <line x1="695" y1="205" x2="735" y2="205" stroke="#50C878" stroke-width="3" marker-end="url(#arrowGreen)"/>
+  <line x1="435" y1="205" x2="435" y2="205" stroke="#50C878" stroke-width="3"/>
+
+  <!-- MGSO4 TOXICITY CLOCK (bottom, red, worsening) -->
+  <text x="60" y="400" font-size="18" font-weight="bold" fill="#FF6B6B">MgSO4 Toxicity Clock</text>
+  <text x="60" y="420" font-size="13" fill="#666666">(worsening)</text>
+
+  <rect x="150" y="330" width="130" height="105" rx="8" fill="#FF6B6B" opacity="0.75"/>
+  <text x="215" y="352" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">08:00</text>
+  <text x="215" y="372" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Reflex 2+</text>
+  <text x="215" y="390" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">RR 17</text>
+  <text x="215" y="408" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Urine 50ml</text>
+
+  <rect x="305" y="330" width="130" height="105" rx="8" fill="#FF6B6B" opacity="0.8"/>
+  <text x="370" y="352" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">10:00</text>
+  <text x="370" y="372" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Reflex 2+</text>
+  <text x="370" y="390" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">RR 16</text>
+  <text x="370" y="408" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Urine 40ml</text>
+
+  <rect x="435" y="330" width="130" height="105" rx="8" fill="#FF6B6B" opacity="0.85"/>
+  <text x="500" y="352" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">11:00</text>
+  <text x="500" y="372" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Reflex 1+</text>
+  <text x="500" y="390" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">RR 15</text>
+  <text x="500" y="408" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Urine 30ml</text>
+
+  <rect x="565" y="330" width="130" height="105" rx="8" fill="#FF6B6B" opacity="0.9"/>
+  <text x="630" y="352" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">12:00</text>
+  <text x="630" y="372" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Reflex 1+</text>
+  <text x="630" y="390" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">RR 14</text>
+  <text x="630" y="408" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Urine 25ml</text>
+
+  <rect x="735" y="330" width="130" height="105" rx="8" fill="#FF6B6B"/>
+  <text x="800" y="352" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#ffffff" font-weight="bold">13:00</text>
+  <text x="800" y="372" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Reflex absent</text>
+  <text x="800" y="390" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">RR 13</text>
+  <text x="800" y="408" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Urine 20ml</text>
+
+  <line x1="280" y1="382" x2="305" y2="382" stroke="#FF6B6B" stroke-width="3" marker-end="url(#arrowRed)"/>
+  <line x1="695" y1="382" x2="735" y2="382" stroke="#FF6B6B" stroke-width="3" marker-end="url(#arrowRed)"/>
+
+  <!-- Crisis convergence -->
+  <line x1="800" y1="245" x2="800" y2="330" stroke="#666666" stroke-width="2" stroke-dasharray="5,4"/>
+
+  <rect x="655" y="470" width="290" height="120" rx="10" fill="#333333"/>
+  <text x="800" y="495" text-anchor="middle" dominant-baseline="middle" font-size="17" font-weight="bold" fill="#ffffff">13:00 — Clocks Cross</text>
+  <text x="800" y="518" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Reflex absent, RR 13, Urine 20ml</text>
+  <text x="800" y="538" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#ffffff">Drowsy, slurred one word</text>
+  <text x="800" y="562" text-anchor="middle" dominant-baseline="middle" font-size="13" fill="#F5A623" font-weight="bold">Toxicity crisis, not improvement</text>
+
+  <line x1="800" y1="435" x2="800" y2="470" stroke="#FF6B6B" stroke-width="3" marker-end="url(#arrowRed)"/>
+
+  <!-- Legend / interpretation note -->
+  <rect x="80" y="620" width="840" height="55" rx="8" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+  <text x="500" y="642" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#333333">Green clock trends up (BP/headache improving) while red clock trends down</text>
+  <text x="500" y="662" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="#333333">(reflex, RR, urine falling) — improving BP can mask a worsening toxicity picture</text>
+
+  <defs>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#50C878"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#FF6B6B"/>
+    </marker>
+  </defs>
+</svg>

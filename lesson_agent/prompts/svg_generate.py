@@ -1,9 +1,37 @@
 """
 Prompt for SVG diagram generation.
 
-Used by svg_agent.py to generate educational SVG diagrams
-that are specific to the lesson concept being taught.
+The design rules themselves live in `prompts/svg_design_spec.md`, loaded from disk
+via `config.SVG_DESIGN_SPEC`, exactly as the MLAI format guide is loaded by
+`prompts/system.py`. This module only assembles the request around them.
+
+That split is the point of the framework: the spec is versioned, every rule in it
+carries an ID, and every rule that can be measured is measured by
+`svg_geometry.py`, which cites the same IDs back in its findings. Rules written
+into a prompt and never checked do not survive — the old inline "keep labels <= 20
+characters" was violated 208 times across 150 generated diagrams.
 """
+
+import hashlib
+
+from config import SVG_DESIGN_SPEC
+
+# Palette names in the same order as the SD-PALETTE table in the spec. A concept
+# maps to one deterministically, so a lesson's diagrams are mutually consistent
+# across separate generation calls while the corpus as a whole stops being one
+# colour scheme — 80 of 150 archived diagrams used only the 7 hexes the old prompt
+# hardcoded, because the hexes were *in* the prompt.
+PALETTES = ("clinical", "slate", "warm", "indigo", "forest", "ember")
+
+
+def choose_palette(concept: str) -> str:
+    """Pick a palette for a concept — stable across runs and processes.
+
+    `hash()` is salted per interpreter, so it would give a lesson's four diagrams
+    four different palettes when they are generated in separate worker processes.
+    """
+    digest = hashlib.sha256(concept.strip().lower().encode("utf-8")).digest()
+    return PALETTES[digest[0] % len(PALETTES)]
 
 
 def build_svg_generation_prompt(
@@ -33,64 +61,26 @@ THIS text, using THESE exact examples:
 ```
 """
 
-    base = f"""Generate a clean, educational SVG diagram for this concept:
+    spec = SVG_DESIGN_SPEC.read_text(encoding="utf-8")
+    palette = choose_palette(concept)
+
+    base = f"""Generate an educational SVG diagram for this concept.
 
 **Concept:** {concept}
 **Context:** {context}
 **Audience:** {audience}
+**Palette to use:** `{palette}` (see the SD-PALETTE table — use this row, not another)
 {excerpt_block}
-## ⚠️ GROUNDING — EVERY FACT COMES FROM THE LESSON (hard requirement):
+Follow the design spec below. It is not advice: a program measures every text and
+shape box in your output against the rules marked (measured), and a diagram that
+breaks one is sent back to you with the rule ID and the measured numbers.
 
-- Every label, value, identifier, and code fragment in the diagram MUST appear in the
-  LESSON EXCERPT above. Do not invent example values, element names, or property values.
-- If the excerpt says `20px`, the diagram says `20px` — never a different number.
-- If you need a label the excerpt does not provide, use a **generic role name**
-  (`property`, `value`, `selector`) rather than inventing a concrete one.
-- Do not import examples from your own knowledge of the topic. A diagram that is
-  beautiful but shows values the learner has never seen in this lesson is REJECTED.
+Before you place anything, decide two things:
+1. **Which SD-TYPE** this concept is. Write the drawing that type calls for.
+2. **How wide each label is**, using the SD-TEXT-FIT arithmetic. Size the boxes to
+   the labels you actually have.
 
-## SVG Requirements:
-
-1. Return ONLY the raw `<svg>...</svg>` — nothing else (no markdown, no explanation, no code fences)
-2. **VALID XML — CRITICAL:** Every element must be well-formed. NEVER repeat an attribute on the same element (e.g. `<rect x="10" x="20">` is INVALID — each attribute appears ONCE). Close every tag. Quote every attribute value.
-3. Use a LARGE canvas: `viewBox="0 0 1000 700"` — gives room to breathe (avoid cramping).
-
-## ⚠️ NO OVERLAP — SPACING IS CRITICAL (the #1 quality rule):
-Overlapping text/shapes make a diagram unreadable. Follow these STRICTLY:
-- **Leave ≥ 30px of empty space between EVERY element** (shapes, text, arrows). Never let two things touch or overlap.
-- **Boxes must fully contain their label** with ≥ 12px padding on all sides. Size the rectangle to fit the text — a 20-char label needs a box ≥ 200px wide.
-- **Center text inside shapes** with BOTH `text-anchor="middle"` AND `dominant-baseline="middle"`, positioned at the shape's exact center (x = rectX + width/2, y = rectY + height/2).
-- **Text NEVER straddles a shape edge or another text element.** If a label sits outside a shape, keep it ≥ 20px away from any border.
-- **Keep labels SHORT** (≤ 20 characters). For longer text, split across lines using `<tspan x="..." dy="1.2em">` so lines stack vertically (never let a long label run off the edge).
-- **Nothing touches the canvas border** — keep all content within a 40px inner margin (x: 40–960, y: 40–660).
-- **Prefer FEWER, well-spaced elements** over many cramped ones. A clear 4-box diagram beats a crowded 10-box mess.
-- Lay elements on an imaginary grid with generous, even gaps.
-
-## Other requirements:
-4. Include clear **text labels** for all important elements (a diagram without labels is useless)
-5. Use arrows (lines with markers) to show relationships/flow — arrows must not cross through text
-6. Clean color palette:
-   - Background: white or light gray (#f8f9fa)
-   - Primary shapes: #4A90D9 (blue), #50C878 (green), #FF6B6B (red/warning), #F5A623 (orange)
-   - Text: #333333 (dark) — or #ffffff on dark-filled shapes for contrast
-   - Arrows/lines: #666666
-7. Make it EDUCATIONAL, attractive, and charismatic — the diagram should TEACH clearly AND look polished
-8. Use meaningful shapes (rectangles = objects/steps, diamonds = decisions, circles = states, arrows = flow)
-9. Font: `font-family="Arial, sans-serif"`, minimum `font-size="16"` for labels, `font-size="22"` bold for titles
-10. Add a short title at the top and use rounded corners (`rx="8"`) on boxes for a modern look
-
-## What makes a GOOD educational SVG:
-- Zero overlaps — every element clearly separated with generous whitespace
-- You understand the concept by looking ONLY at the diagram
-- Specific labels (not "Step 1"), correct spatial layout (left→right = sequence, top→bottom = hierarchy)
-- Visual hierarchy + polish (titles, consistent colors, rounded corners)
-
-## What makes a BAD educational SVG (REJECTED):
-- ANY overlapping text or shapes
-- Text clipped at the canvas edge or running off the box
-- Cramped elements with no breathing room
-- Generic unlabeled shapes; labels unrelated to the concept
-- **Any value or example NOT found in the LESSON EXCERPT** (invented facts contradict the lesson)
+{spec}
 """
 
     if feedback:
@@ -110,16 +100,29 @@ def build_svg_review_prompt(
     concept: str,
     context: str,
     lesson_excerpt: str = "",
+    craft_notes: str = "",
 ) -> str:
     """Build the prompt that asks Claude to review/judge a generated SVG.
 
     GROUNDING is a hard gate, not just another averaged dimension: a diagram that looks
     polished but shows values absent from the lesson used to score 8/10 and ship.
+
+    `craft_notes` are the advisory findings from `svg_geometry.craft_findings` —
+    measured facts about fill, shape vocabulary and text balance that the judge
+    scores under CRAFT and DENSITY. Those two dimensions exist because nothing was
+    judging visual craft at all: the geometric tool only knew "boxes overlap", and
+    this prompt used to explicitly tell the reviewer *not* to look at layout.
     """
     excerpt_block = ""
     grounding_dim = ""
     grounding_rule = ""
     grounding_field = ""
+    craft_block = ""
+    if craft_notes.strip():
+        craft_block = (
+            "\n**Measured findings from the linter** (facts, not opinions — weigh them "
+            "under CRAFT and DENSITY):\n" + craft_notes.strip() + "\n"
+        )
     if lesson_excerpt.strip():
         excerpt_block = f"""
 **The LESSON EXCERPT the diagram must be faithful to:**
@@ -151,25 +154,36 @@ def build_svg_review_prompt(
 {svg_content}
 ```
 
-(Note: element spacing/overlap is already checked separately by a geometric tool —
-focus your judgment on MEANING and correctness, not pixel positions.)
-
+A geometric linter has already measured every text and shape box in this diagram
+exactly. Treat its findings as ground truth and do **not** re-derive coordinates or
+guess at pixel positions. Your job on layout is the part it cannot measure: does the
+*arrangement* carry meaning?
+{craft_block}
 Score it 1-10 on each dimension:
 - **Relevance** (1-10): Does it specifically illustrate THIS concept (not something generic)?
 - **Clarity** (1-10): Can a learner understand it without additional explanation?
 - **Labels** (1-10): Are elements properly labeled with concept-specific, correct terms?
 - **Accuracy** (1-10): Is the information correct and not misleading? Does it faithfully represent the concept?
+- **Craft** (1-10): Does this read as a designed figure or as a default flowchart? Is the
+  shape vocabulary suited to the idea, rather than rounded rectangles by reflex?
+  **1-3 = uniform rects and arrows only. 8-10 = the form of the drawing itself explains
+  the concept.** Be strict: most diagrams land at 4-6, and saying so is useful.
+- **Density** (1-10): Information per square pixel. Four boxes each holding one word scores
+  3. Penalise emptiness AND clutter. A dense, well-labelled figure scores high; a paragraph
+  of prose in a frame does not.
 {grounding_dim}
 **Overall score** = average of the scores above (round to nearest integer).
 {grounding_rule}
-If overall score < 7, list exactly what's wrong and how to fix it (focus on
-relevance/clarity/accuracy/grounding — NOT spacing).
+If overall score < 7, list exactly what's wrong and how to fix it — including layout, when
+the problem is what the arrangement means rather than where the pixels are.
 
 Respond in this exact format:
 RELEVANCE: [score]
 CLARITY: [score]
 LABELS: [score]
 ACCURACY: [score]
+CRAFT: [score]
+DENSITY: [score]
 {grounding_field}OVERALL: [score]
 VERDICT: [PASS or FAIL]
 ISSUES: [comma-separated list of issues, or "none"]

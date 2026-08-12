@@ -23,6 +23,22 @@ from pathlib import Path
 from anthropic import AsyncAnthropicBedrock
 
 from prompts.svg_generate import build_svg_generation_prompt, build_svg_review_prompt
+from svg_geometry import (
+    HARD,
+    SD_ANCHOR,
+    SD_CANVAS,
+    SD_DENSITY,
+    SD_FONT,
+    SD_MEASURABLE,
+    SD_PALETTE,
+    SD_SPACING,
+    SD_TEXT_FIT,
+    SD_TYPE,
+    autofit_viewbox,
+    craft_findings,
+    detect_overlaps,
+    element_boxes,
+)
 
 
 
@@ -32,6 +48,14 @@ from prompts.svg_generate import build_svg_generation_prompt, build_svg_review_p
 
 MAX_ATTEMPTS = 4  # generate/review retries — extra attempt helps fix overlaps
 REVIEW_THRESHOLD = 7  # score >= 7 = accept
+
+# How many review calls may be spent on candidates that already failed the geometry
+# gate. Clean candidates are ALWAYS reviewed. A geometry-flagged candidate is still
+# worth judging (its score decides which flawed draft to keep if every attempt fails,
+# and the judge sees problems the linter cannot), but not at unbounded cost — this
+# caps the worst case at MAX_ATTEMPTS generations + 2 wasted reviews rather than
+# MAX_ATTEMPTS of each.
+FLAGGED_REVIEW_BUDGET = 2
 # Bedrock inference-profile model ID (Claude via Amazon Bedrock)
 DEFAULT_MODEL = "global.anthropic.claude-sonnet-5"
 
@@ -48,7 +72,12 @@ _CONTEXT_ATTR_RE = re.compile(r'context\s*=\s*"([^"]*)"', re.IGNORECASE | re.DOT
 # ---------------------------------------------------------------------------
 
 # SVG markup is verbose; a low cap silently truncates diagrams mid-element.
-MAX_OUTPUT_TOKENS = 8192
+# Raised from 8192 because the design spec asks for denser drawings than the old
+# prompt did. Not binding on the archived corpus (max ~3667 tokens), but 8192 sits
+# *below* _validate_svg's own 50000-byte (~15k token) ceiling, so it was a silent
+# truncation waiting to happen: a diagram cut off mid-element fails validation with
+# no indication that the model was simply stopped.
+MAX_OUTPUT_TOKENS = 16384
 
 # One shared async client. Region: Bedrock model availability differs per region,
 # and the "global." inference-profile prefix is the only one valid in both
@@ -139,191 +168,110 @@ def _validate_svg(svg_content: str) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# Geometric Overlap Detection (code — free, deterministic, no LLM)
+# Geometry (code — free, deterministic, no LLM)
 # ---------------------------------------------------------------------------
-
-# Local tag (strip SVG namespace like {http://www.w3.org/2000/svg}rect -> rect)
-def _local(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1].lower()
-
-
-def _to_float(v, default=0.0):
-    try:
-        # Strip units like "px"
-        return float(str(v).replace("px", "").strip())
-    except (ValueError, TypeError, AttributeError):
-        return default
+#
+# All of it now lives in `svg_geometry.py`, which is pure stdlib and has no SDK
+# import, so it is testable in the worker image with no AWS credentials — this
+# module constructs `AsyncAnthropicBedrock` at import time. See that module's
+# docstring for the seven measurement defects the code deleted from here had, and
+# `svg_geometry.test.py` (51 cases) for the proof they are gone.
 
 
-def _boxes_overlap(a, b, margin: float = 0.0) -> float:
-    """Return overlap area of two boxes (x1,y1,x2,y2), shrunk by margin. >0 = overlap."""
-    ax1, ay1, ax2, ay2 = a
-    bx1, by1, bx2, by2 = b
-    ix1 = max(ax1, bx1) + margin
-    iy1 = max(ay1, by1) + margin
-    ix2 = min(ax2, bx2) - margin
-    iy2 = min(ay2, by2) - margin
-    if ix2 <= ix1 or iy2 <= iy1:
-        return 0.0
-    return (ix2 - ix1) * (iy2 - iy1)
+# What to do about each hard finding, keyed by the design-spec rule it cites.
+# The generator is corrected against a named clause rather than an ad-hoc
+# sentence — that linkage is what makes the spec a framework instead of a lint.
+# A single generic instruction cannot work here: 30 of the 47 flagged corpus
+# blocks carry only MISSING_TEXT_ANCHOR, which "reposition with 30px gaps" does
+# not describe at all, and following it would move correct geometry.
+_FIX_BY_RULE = {
+    SD_SPACING: (
+        "Reposition these so no two elements share pixels — a 30px gap between "
+        "boxes, and every label fully inside the shape it belongs to."
+    ),
+    SD_ANCHOR: (
+        'Add an explicit text-anchor ("start", "middle" or "end") to every '
+        "<text>, matching the x you positioned it at. Never rely on the default."
+    ),
+    SD_FONT: (
+        'Add font-family="Arial, sans-serif" to the root <svg> element. Nothing '
+        "else needs it — it inherits."
+    ),
+    SD_CANVAS: (
+        "Bring this geometry back inside the declared viewBox, keeping a 40px "
+        "margin. Do not widen the canvas to accommodate it."
+    ),
+    SD_TEXT_FIT: (
+        "Shorten the label or widen its box. Arial at font-size F fits about "
+        "W / (0.55 x F) characters in W px — compute it before writing the text."
+    ),
+    SD_MEASURABLE: (
+        "Rewrite this without rotate/matrix/scale transforms or <use>: group "
+        "with <g transform=\"translate(dx,dy)\"> only."
+    ),
+    SD_TYPE: "Pick the SD-TYPE that fits this idea and draw the form it calls for.",
+    SD_PALETTE: "Use the assigned palette's roles to distinguish what shapes mean.",
+    SD_DENSITY: "Rebalance: specific labels on shapes, not paragraphs in a frame.",
+}
 
 
-def _contains(outer, inner) -> bool:
-    """True if box `outer` fully contains box `inner` (label inside its own box)."""
-    return (
-        outer[0] <= inner[0] and outer[1] <= inner[1]
-        and outer[2] >= inner[2] and outer[3] >= inner[3]
-    )
+def _geometry_feedback(findings) -> str:
+    """Group hard findings by spec rule and pair each group with its fix."""
+    order: list[str] = []
+    grouped: dict[str, list[str]] = {}
+    for finding in findings:
+        if finding.rule_id not in grouped:
+            order.append(finding.rule_id)
+            grouped[finding.rule_id] = []
+        grouped[finding.rule_id].append(finding.message)
+
+    parts = []
+    for rule_id in order:
+        messages = grouped[rule_id]
+        # Cap per rule, not overall, so one noisy rule cannot crowd out another.
+        shown = "; ".join(messages[:4])
+        more = f" (+{len(messages) - 4} more)" if len(messages) > 4 else ""
+        fix = _FIX_BY_RULE.get(rule_id, "Fix the geometry this describes.")
+        parts.append(f"[{rule_id}] {shown}{more} → {fix}")
+    return "\n".join(parts)
 
 
-def _element_boxes(svg_content: str):
-    """Return lists of (kind, box, label) for shapes and texts in the SVG.
+def _geometry_check(svg_content: str) -> tuple[list, str, str]:
+    """Run both gates. Returns (hard_findings, retry_feedback, advisory_notes).
 
-    box = (x1, y1, x2, y2). Text width is estimated from char count × font size.
+    Hard findings drive the retry; advisory findings go to the reviewer as context
+    and are scored under CRAFT/DENSITY. Keeping them out of the retry feedback is
+    deliberate — they are matters of judgement, and a false retry trigger costs a
+    full generate+review cycle.
     """
-    try:
-        root = ET.fromstring(svg_content)
-    except ET.ParseError:
-        return [], [], None
+    report = detect_overlaps(svg_content)
+    if not report.gate_ran:
+        # Rule 21: a gate that cannot run must never pass silently. Fail *open* on
+        # broken infrastructure (a malformed SVG is already caught by
+        # _validate_svg), but say so on the way past.
+        print(f"      ⚠️  SVG_GEOMETRY_UNAVAILABLE: {report.error}")
+        return [], "", ""
 
-    # viewBox for bounds checking
-    vb = root.attrib.get("viewBox") or root.attrib.get("viewbox")
-    bounds = None
-    if vb:
-        parts = vb.replace(",", " ").split()
-        if len(parts) == 4:
-            bx, by, bw, bh = (_to_float(p) for p in parts)
-            bounds = (bx, by, bx + bw, by + bh)
+    craft = craft_findings(svg_content)
+    hard = report.hard + [f for f in craft if f.severity == HARD]
+    advisory = report.advisory + [f for f in craft if f.severity != HARD]
 
-    shapes = []  # (kind, box)
-    texts = []   # (box, label)
-
-    for el in root.iter():
-        tag = _local(el.tag)
-        a = el.attrib
-
-        if tag == "rect":
-            x, y = _to_float(a.get("x")), _to_float(a.get("y"))
-            w, h = _to_float(a.get("width")), _to_float(a.get("height"))
-            if w > 0 and h > 0:
-                shapes.append(("rect", (x, y, x + w, y + h)))
-        elif tag == "circle":
-            cx, cy, r = _to_float(a.get("cx")), _to_float(a.get("cy")), _to_float(a.get("r"))
-            if r > 0:
-                shapes.append(("circle", (cx - r, cy - r, cx + r, cy + r)))
-        elif tag == "ellipse":
-            cx, cy = _to_float(a.get("cx")), _to_float(a.get("cy"))
-            rx, ry = _to_float(a.get("rx")), _to_float(a.get("ry"))
-            if rx > 0 and ry > 0:
-                shapes.append(("ellipse", (cx - rx, cy - ry, cx + rx, cy + ry)))
-        elif tag == "text":
-            label = "".join(el.itertext()).strip()
-            if not label:
-                continue
-            x, y = _to_float(a.get("x")), _to_float(a.get("y"))
-            fs = _to_float(a.get("font-size"), 16.0)
-            if fs <= 0:
-                fs = 16.0
-            # Estimate text width: chars × avg glyph width (~0.6 em). Add safety.
-            w = len(label) * fs * 0.62
-            h = fs * 1.2
-            anchor = (a.get("text-anchor") or "start").lower()
-            if anchor == "middle":
-                x1 = x - w / 2
-            elif anchor == "end":
-                x1 = x - w
-            else:
-                x1 = x
-            # SVG text y is the baseline; box spans ~0.8em above, 0.3em below.
-            y1 = y - fs * 0.8
-            texts.append(((x1, y1, x1 + w, y1 + h), label))
-
-    return shapes, texts, bounds
+    notes = "\n".join(f"- [{f.rule_id}] {f.message}" for f in advisory)
+    return hard, (_geometry_feedback(hard) if hard else ""), notes
 
 
-def _autofit_viewbox(svg_content: str, padding: float = 50.0) -> str:
-    """Recompute the viewBox to wrap ALL content with padding. Guarantees nothing is clipped."""
-    shapes, texts, _ = _element_boxes(svg_content)
-    if not shapes and not texts:
-        return svg_content  # can't compute — leave as-is
-
-    all_boxes = [b for _, b in shapes] + [b for b, _ in texts]
-    min_x = min(b[0] for b in all_boxes) - padding
-    min_y = min(b[1] for b in all_boxes) - padding
-    max_x = max(b[2] for b in all_boxes) + padding
-    max_y = max(b[3] for b in all_boxes) + padding
-    w = max_x - min_x
-    h = max_y - min_y
-
-    # Replace viewBox attribute in the SVG
-    new_vb = f'viewBox="{min_x:.0f} {min_y:.0f} {w:.0f} {h:.0f}"'
-    svg_content = re.sub(r'viewBox="[^"]*"', new_vb, svg_content, count=1, flags=re.IGNORECASE)
-    return svg_content
+def _detect_overlaps(svg_content: str) -> tuple[bool, str]:
+    """Back-compatible boolean form of `_geometry_check`."""
+    hard, feedback, _ = _geometry_check(svg_content)
+    return bool(hard), feedback or "OK"
 
 
-def _detect_overlaps(svg_content: str, margin: float = 4.0) -> tuple[bool, str]:
-    """Detect overlapping elements geometrically. Returns (has_overlap, reason).
 
-    Checks:
-      - text vs text (worst for readability)
-      - text vs shape it is NOT contained in (label spilling onto unrelated shape)
-      - shape vs shape (partial overlap; full containment is allowed = nesting)
-      - elements outside the viewBox bounds
-    """
-    shapes, texts, bounds = _element_boxes(svg_content)
-    issues: list[str] = []
+def _autofit_viewbox(svg_content: str) -> str:
+    """Expand the canvas only if content overflows it; never rewrite from scratch."""
+    fitted, _ = autofit_viewbox(svg_content)
+    return fitted
 
-    def fmt(box):
-        return f"({box[0]:.0f},{box[1]:.0f})-({box[2]:.0f},{box[3]:.0f})"
-
-    # 1) text vs text
-    for i in range(len(texts)):
-        for j in range(i + 1, len(texts)):
-            if _boxes_overlap(texts[i][0], texts[j][0], margin) > 0:
-                issues.append(
-                    f"Text '{texts[i][1][:20]}' {fmt(texts[i][0])} overlaps "
-                    f"text '{texts[j][1][:20]}' {fmt(texts[j][0])}"
-                )
-
-    # 2) text vs shape (only if the text is NOT inside that shape)
-    for tbox, tlabel in texts:
-        for kind, sbox in shapes:
-            if _contains(sbox, tbox):
-                continue  # label sits inside its box — fine
-            if _boxes_overlap(tbox, sbox, margin) > 0:
-                # Only flag significant spill (>25% of text area)
-                area = max(1.0, (tbox[2] - tbox[0]) * (tbox[3] - tbox[1]))
-                if _boxes_overlap(tbox, sbox) / area > 0.25:
-                    issues.append(
-                        f"Text '{tlabel[:20]}' {fmt(tbox)} overlaps {kind} {fmt(sbox)}"
-                    )
-
-    # 3) shape vs shape (partial overlap, not full nesting)
-    for i in range(len(shapes)):
-        for j in range(i + 1, len(shapes)):
-            a, b = shapes[i][1], shapes[j][1]
-            if _contains(a, b) or _contains(b, a):
-                continue  # nesting is allowed
-            if _boxes_overlap(a, b, margin) > 0:
-                issues.append(
-                    f"{shapes[i][0]} {fmt(a)} overlaps {shapes[j][0]} {fmt(b)}"
-                )
-
-    # 4) out of bounds
-    if bounds:
-        for kind, sbox in shapes:
-            if sbox[0] < bounds[0] - 2 or sbox[1] < bounds[1] - 2 or sbox[2] > bounds[2] + 2 or sbox[3] > bounds[3] + 2:
-                issues.append(f"{kind} {fmt(sbox)} extends outside canvas {fmt(bounds)}")
-        for tbox, tlabel in texts:
-            if tbox[0] < bounds[0] - 2 or tbox[2] > bounds[2] + 2 or tbox[1] < bounds[1] - 2 or tbox[3] > bounds[3] + 2:
-                issues.append(f"Text '{tlabel[:20]}' {fmt(tbox)} is clipped at canvas edge")
-
-    if issues:
-        # Cap the list so feedback stays focused
-        shown = issues[:6]
-        more = f" (+{len(issues) - 6} more)" if len(issues) > 6 else ""
-        return True, "; ".join(shown) + more
-    return False, "OK"
 
 
 def _extract_svg(raw: str) -> str:
@@ -351,13 +299,17 @@ async def _review_svg(
     context: str,
     model: str,
     lesson_excerpt: str = "",
-) -> tuple[int, str, int]:
+    craft_notes: str = "",
+) -> tuple[int | None, str, int]:
     """Ask LLM to review the SVG. Returns (score, issues_string, grounding).
 
+    `score` is None when the review is unusable — see the REVIEW_UNAVAILABLE branch.
     `grounding` is 10 when no lesson excerpt was supplied (nothing to check against),
     so callers can gate on it unconditionally.
     """
-    prompt = build_svg_review_prompt(svg_content, concept, context, lesson_excerpt)
+    prompt = build_svg_review_prompt(
+        svg_content, concept, context, lesson_excerpt, craft_notes=craft_notes
+    )
     response = await _llm_call_async(prompt, model)
 
     # Robustly extract the OVERALL score. Handles many formats the model may emit:
@@ -377,20 +329,28 @@ async def _review_svg(
     # Fallback: average the dimension scores if OVERALL wasn't parseable
     if score is None:
         dims = []
-        for dim in ("relevance", "clarity", "labels", "accuracy", "grounding", "layout"):
+        # Must list EVERY dimension the review prompt asks for, or the average
+        # silently drops the missing ones and skews toward the rest.
+        for dim in (
+            "relevance", "clarity", "labels", "accuracy", "grounding", "layout",
+            "craft", "density",
+        ):
             m = re.search(rf'{dim}[^0-9]{{0,20}}([0-9]+(?:\.[0-9]+)?)', response, re.IGNORECASE)
             if m:
                 try:
                     dims.append(float(m.group(1)))
                 except (ValueError, TypeError):
                     pass
-        if dims:
+        # Fewer than 3 dimensions means the response was not a review at all —
+        # averaging 1 stray number is not a judgement.
+        if len(dims) >= 3:
             score = round(sum(dims) / len(dims))
 
-    # Last resort: if we truly can't parse a score, treat as borderline-pass (7)
-    # rather than 0 — a validated SVG shouldn't be discarded due to a parse miss.
+    # Rule 21: a gate that cannot run must never pass silently. This used to
+    # default to 7 — a borderline PASS — so an unparseable review shipped the
+    # diagram unjudged. Say so and let the caller retry instead.
     if score is None:
-        score = 7
+        print("      ⚠️  REVIEW_UNAVAILABLE: no parseable score in review response")
 
     # Extract issues (robust to markdown prefixes)
     issues = ""
@@ -428,19 +388,28 @@ async def generate_one_svg(
     context: str,
     lesson_excerpt: str = "",
     model: str = DEFAULT_MODEL,
+    *,
+    max_attempts: int = MAX_ATTEMPTS,
 ) -> str:
-    """Generate ONE validated, overlap-free, autofit SVG. Returns <svg> markup or ''.
+    """Generate ONE validated, reviewed, autofit SVG. Returns <svg> markup or ''.
 
     `lesson_excerpt` is the verbatim lesson text the diagram must be faithful to. When
     supplied, the reviewer's GROUNDING score acts as a hard gate: a diagram showing
     values absent from the lesson is never promoted to `best_svg`, however polished.
+
+    Candidates are ranked by `(0 if geometry-clean else 1, -score)` — clean beats
+    flagged, and within each group the higher review score wins. Geometry findings
+    therefore *inform* the ranking without skipping the judge: previously a flagged
+    candidate short-circuited the review and was pinned at a hardcoded 3, so the
+    first flawed draft beat every later one regardless of quality.
     """
     feedback = None
     best_svg = None
-    best_score = -1
+    best_key: tuple[int, float] | None = None
     any_valid_svg = None
+    flagged_reviews = 0
 
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    for attempt in range(1, max_attempts + 1):
         gen_prompt = build_svg_generation_prompt(
             concept=concept,
             context=context,
@@ -458,19 +427,43 @@ async def generate_one_svg(
         if any_valid_svg is None:
             any_valid_svg = svg_content
 
-        has_overlap, overlap_reason = _detect_overlaps(svg_content)
-        if has_overlap:
-            feedback = (
-                f"OVERLAPPING elements detected: {overlap_reason}. "
-                "Fix by repositioning with ≥30px gaps."
+        hard_findings, geometry_feedback, craft_notes = _geometry_check(svg_content)
+        if hard_findings:
+            geometry_note = (
+                "A geometric checker measured every text and shape box exactly "
+                "and found these design-spec violations. Each is followed by the "
+                f"fix it needs:\n{geometry_feedback}"
             )
-            if best_svg is None:
-                best_svg = svg_content
-                best_score = 3
+        else:
+            geometry_note = ""
+
+        # A flagged candidate is still reviewed — its score is what decides which
+        # flawed draft to keep — but only while the budget lasts. Past that, the
+        # geometry feedback alone drives the retry and no review call is spent.
+        if hard_findings and flagged_reviews >= FLAGGED_REVIEW_BUDGET:
+            print(
+                f"      ⏭️  review skipped (attempt {attempt}): "
+                f"{len(hard_findings)} geometry finding(s), budget spent"
+            )
+            if best_key is None:
+                best_svg, best_key = svg_content, (1, 0.0)
+            feedback = geometry_note
             continue
+        if hard_findings:
+            flagged_reviews += 1
 
         score, issues, grounding = await _review_svg(
-            svg_content, concept, context, model, lesson_excerpt
+            svg_content, concept, context, model, lesson_excerpt,
+            craft_notes=craft_notes,
+        )
+
+        # One line per attempt, so a run's transcript shows whether the judge actually
+        # ran and where the loop stopped. Without it, "resolved 2/2" is silent about
+        # whether reviews happened at all — the exact ambiguity Phase 2 was fixing.
+        print(
+            f"      🔎 attempt {attempt}: geometry "
+            f"{'clean' if not hard_findings else f'{len(hard_findings)} finding(s)'}, "
+            f"review {'n/a' if score is None else f'{score}/10'}, grounding {grounding}/10"
         )
 
         # HARD GATE: an ungrounded diagram invents facts that contradict the lesson.
@@ -486,13 +479,29 @@ async def generate_one_svg(
             )
             continue
 
-        if score > best_score:
-            best_svg = svg_content
-            best_score = score
-        if score >= REVIEW_THRESHOLD:
+        if score is None:
+            # REVIEW_UNAVAILABLE (already logged). Never count this as a pass. Keep the
+            # candidate reachable so a parse miss can't ship an empty diagram, but rank
+            # it below anything actually judged.
+            if best_key is None:
+                best_svg, best_key = svg_content, (1 if hard_findings else 0, 0.0)
+            feedback = (
+                "The previous review could not be parsed. Regenerate the diagram, "
+                "applying the design spec in full."
+            ) if not geometry_note else geometry_note
+            continue
+
+        key = (1 if hard_findings else 0, -float(score))
+        if best_key is None or key < best_key:
+            best_svg, best_key = svg_content, key
+
+        # Only a clean *and* well-scored candidate ends the loop. A high score on
+        # flagged geometry is not a pass — the linter's findings are ground truth.
+        if score >= REVIEW_THRESHOLD and not hard_findings:
             break
-        else:
-            feedback = f"Review score {score}/10. Issues: {issues}. Fix and regenerate."
+
+        review_note = f"Review score {score}/10. Issues: {issues}. Fix and regenerate."
+        feedback = f"{geometry_note}\n\n{review_note}" if geometry_note else review_note
 
     final_svg = best_svg or any_valid_svg
     if final_svg:

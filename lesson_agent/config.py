@@ -31,6 +31,12 @@ MERMAID_CHECK_CLI = (
 )
 MLAI_FORMAT_GUIDE = Path(__file__).resolve().parent / "prompts" / "mlai_format_guide.md"
 
+# The SVG design framework the generator must follow. Every rule in it that can be
+# measured is measured by `svg_geometry.py`, and every Finding cites the rule ID it
+# breaks — see the module docstring there. Loaded from disk (like the MLAI guide
+# above) so the spec can be revised without touching prompt code.
+SVG_DESIGN_SPEC = Path(__file__).resolve().parent / "prompts" / "svg_design_spec.md"
+
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
