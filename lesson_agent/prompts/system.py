@@ -5,12 +5,35 @@ The agent is responsible for generating MLAI content only.
 Validation is handled externally by the orchestration loop.
 """
 
-from config import MLAI_FORMAT_GUIDE
+from config import GAMES_GUIDE_DIR, MLAI_FORMAT_GUIDE
+from games import build_game_rules_section
+
+# The one numbered structural rule for `<Game>`, sitting with the other placement
+# rules. It deliberately **names no game type** — the catalog does that, and the
+# catalog is generated from the schema registry. A rule that named `hangman` here
+# would be a second place to edit when a game is added, which is exactly how
+# `mlai_format_guide.md` ended up describing a pipeline that no longer exists.
+_GAME_STRUCTURAL_RULE = """
+12. **Interactive game**: A lesson may include ONE `<Game>` block, placed **directly under
+    `<Lesson>`** (like FlashCards and the assessments — NEVER inside a `<Section>`), near the
+    end, after the concept has been taught. Choose the `type` from the game catalog in the
+    INTERACTIVE GAMES section above; if none of the catalogued types genuinely fits what this
+    lesson teaches, write no `<Game>` at all. The payload's escaping rules are **not** the same
+    as rule 8b's — read the catalog's rules section.
+"""
 
 
 def build_system_prompt() -> str:
     """Build the system prompt with the MLAI format guide embedded."""
     mlai_guide = MLAI_FORMAT_GUIDE.read_text(encoding="utf-8")
+
+    # Generated from mlai-games' schema registry, so a new game reaches the prompt via
+    # `npm run build` and nothing here changes. Empty string when the guide is missing
+    # (it warns loudly and lessons generate without games — see build_game_rules_section
+    # on why this path fails open), and in that case the numbered rule is dropped too:
+    # a rule pointing at a catalog that is not in the prompt is worse than no rule.
+    game_rules = build_game_rules_section(GAMES_GUIDE_DIR)
+    game_structural_rule = _GAME_STRUCTURAL_RULE if game_rules else ""
 
     # Using string concatenation instead of f-string to avoid issues with
     # backslashes in the mlai_guide content (LaTeX expressions like \frac, \sqrt)
@@ -208,6 +231,7 @@ flowchart TD
 - Place them BETWEEN Sections, right after the concept they illustrate
 - Target: 2-4 Mermaid diagrams per lesson
 
+""" + game_rules + """
 ## ═══════════════════════════════════════════════════════
 ## STRUCTURAL FORMAT RULES
 ## ═══════════════════════════════════════════════════════
@@ -255,6 +279,55 @@ flowchart TD
    - `- item` for bullet lists, `1. item` for numbered lists
    Do NOT use HTML tags like `<strong>`, `<em>`, `<b>`, `<i>`. Use Markdown equivalents instead.
 
+8b. **XML Safety in ALL text content — a tag named in prose needs backticks AND `&lt;`.**
+   Rule 7 covers `<Code>` and `<Mermaid>`. This rule covers everywhere else: `<Body>`,
+   `<H1>`/`<H2>`/`<H3>`, `<Prompt>`, `<Option>`, `<Front>`/`<Back>`, `<Item>`, `<Left>`/`<Right>`,
+   `<Criterion>` — all of it is parsed as XML first, and most of it is then rendered as Markdown.
+
+   **Write a tag as `` `&lt;td&gt;` `` — backticks AND entities. Both halves are load-bearing,
+   and each one alone fails, in a different place.**
+
+   - ❌ `<Body>Each row uses the <td> tag.</Body>` — bare
+   - ❌ `<Body>Each row uses the `<td>` tag.</Body>` — backticks only
+   - ❌ `<Body>Each row uses the &lt;td&gt; tag.</Body>` — entities only
+   - ✅ `<Body>Each row uses the `&lt;td&gt;` tag inside `&lt;tr&gt;`.</Body>`
+   - ✅ `<Body>Set `font-size: 16px` and `color: red`</Body>` — no `<`, nothing to escape
+
+   *Why the entities:* the XML parser runs first and does not know what a backtick is. In
+   `<Body>`, `<Code>` and `<Mermaid>` the content is captured whole, so a bare tag survives —
+   but `<Prompt>`, `<Option>`, `<Front>`, `<Back>` and `<Item>` are ordinary elements, so
+   `` `<td>` `` there opens a real `<td>` that never closes, `</Option>` then closes the wrong
+   element, and the errors cascade to the end of the file. Self-closing tags in prose
+   (`` `<br>` ``, `` `<img>` ``, `` `<hr>` ``) are the worst, and a stray closing tag (`</g>`)
+   closes whatever happened to be open.
+
+   *Why the backticks:* the parser **decodes** `&lt;` before anything downstream sees it, so
+   `&lt;td&gt;` and `<td>` are byte-identical by then. Text content is rendered as Markdown into
+   HTML, and a bare tag there is **injected into the page** — the student does not see `<td>`,
+   the student sees *nothing at all* where it should be. This is not theoretical: a shipped MCQ
+   whose four options were written `Every &lt;h2&gt; element…` / `Only the first &lt;h2&gt;
+   element…` renders as "Every element" / "Only the first element" — the same question four
+   times, unanswerable. Only inside backticks does the tag reach the student.
+
+   Both halves together are correct in *every* element, so you never have to work out which kind
+   you are in. What the student reads is `<td>`, styled as inline code.
+
+   **A `<` used as less-than needs `&lt;` and no backticks — the opposite mix.** `width < 600px`
+   is not tag-shaped, so it is not injected; it fails the XML parse outright as `MALFORMED_XML`.
+   Escaping is the whole fix, and backticks are only for when you want code styling.
+   - ❌ `<Body>Applies when width < 600px on phones. Then add a query.</Body>` → MALFORMED_XML
+   - ✅ `<Body>Applies when width &lt; 600px on phones. Then add a query.</Body>`
+
+   So the two cases pull apart: **a tag needs both** (`` `&lt;td&gt;` ``), **a comparison needs
+   only the entity** (`&lt;`). If unsure which you have, ask whether a browser would read it as a
+   tag — `<td>`, `<br>`, `</g>`, `<div class="x">` yes; `< 600px`, `a < b` no.
+
+   Two things that are genuinely fine, so do not over-escape: a bare `&` in prose
+   (`Subjects & Marks`, `AT&T`) parses and decodes correctly, and `$...$` math needs no
+   escaping. Only write `&amp;` if you prefer strict XML — both forms work. But never write
+   `&nbsp;` or other named/numeric entities: they are decoded by neither layer and reach the
+   student as the literal text `&nbsp;`.
+
 9. **Mathematical Expressions**: Use LaTeX notation with dollar-sign delimiters for mathematical content:
    - **Inline math**: Wrap with single `$...$` — e.g., `$x^2 + y^2 = z^2$` or `$E = mc^2$`
    - **Display math**: Wrap with double `$$...$$` for equations on their own line — e.g., `$$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$`
@@ -265,7 +338,7 @@ flowchart TD
 10. **ID format rules**: The `<Id>` in `<Meta>` must start with a letter and contain ONLY letters, numbers, and hyphens. No underscores, spaces, or special characters. Examples: `lesson-08-01`, `python-101`, `intro-to-loops`. The lesson ID will be provided to you — use it exactly as given.
 
 11. **Quality Bar**: Aim for research-grade content appropriate for the target audience. Questions should test genuine understanding, not just recall.
-
+""" + game_structural_rule + """
 ## Your Workflow
 
 1. Read the lesson specification markdown file

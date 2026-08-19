@@ -42,10 +42,13 @@ from config import (
     DEFAULT_MODEL,
     DEFAULT_MAX_TURNS,
     MAX_VALIDATION_ATTEMPTS,
+    GAMES_GUIDE_DIR,
+    MAX_GAME_CANDIDATES,
 )
 from prompts.system import build_system_prompt
 from prompts.generation import build_generation_prompt
 from prompts.fix import build_fix_prompt
+from games import build_game_prompt_section, registered_game_types
 from validator import validate_mlai_file
 from svg_agent import resolve_svgs
 from svg_tool import svg_mcp_server
@@ -60,6 +63,26 @@ import usage
 # run-level summary can state it plainly instead of leaving it buried in a
 # multi-thousand-line log.
 _MERMAID_GATE_SKIPS: list[str] = []
+
+
+def lesson_marker(status: str, output_file: Path) -> str:
+    """Render the ``##LESSON:<status>:rel=module_XX/lesson_XX.mlai##`` marker.
+
+    The curriculum worker uploads a lesson to S3 when it sees this marker with
+    ``status=validated``, instead of when the file first appears on disk. That
+    ordering is the whole point: the agent rewrites ``output_file`` in place on
+    every fix attempt, so "first appeared" meant S3 got the unvalidated draft and
+    kept it — the fix loop's output never shipped. See
+    ``memebu-engine-v2/workers/phases/curriculum.py``'s ``parse_lesson_marker``;
+    the field names and the ``key=value`` colon format must stay in sync with it,
+    exactly as for ``usage.marker()``.
+
+    ``rel`` is ``module_XX/lesson_XX.mlai`` — the worker needs the module segment
+    to rebuild the S3 key, and ``output_file.name`` alone would collide across
+    modules (every module has a ``lesson_01.mlai``).
+    """
+    rel = f"{output_file.parent.name}/{output_file.name}"
+    return f"##LESSON:{status}:rel={rel}##"
 
 
 def _agent_options(
@@ -216,11 +239,29 @@ async def generate_lesson(
     # ------------------------------------------------------------------
     print("📝 Phase 1: Generating MLAI content...\n")
 
+    # Which game types fit THIS lesson, with their full authoring specs. Deterministic
+    # narrowing (Stage A) so the prompt cost is bounded and flat in the size of the game
+    # registry; the model still makes the choice (Stage B), and may decline. Returns ""
+    # — loudly — if the generated guide is missing, so a missing build artifact costs
+    # games rather than the whole run. See games.py.
+    try:
+        spec_text = lesson_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        # The agent reads this file too, so this is not fatal here — it will fail with a
+        # better message. Don't lose the game section silently, though.
+        print(f"⚠️  GAMES: could not read the lesson spec for game selection: {exc}")
+        spec_text = ""
+
+    game_section = build_game_prompt_section(
+        GAMES_GUIDE_DIR, spec_text, MAX_GAME_CANDIDATES
+    )
+
     gen_prompt = build_generation_prompt(
         lesson_spec_path=lesson_spec_path,
         curriculum_path=curriculum_path,
         output_file=output_file,
         lesson_id=mlai_id,
+        game_section=game_section,
     )
 
     agent_ok, session_id, _cost = await _run_agent(
@@ -266,6 +307,9 @@ async def generate_lesson(
         if result.success:
             print(f"\n✅ Validation passed! ({lesson_id})")
             print(f"   Output: {output_file}")
+            # Signals the worker to upload THIS file now. Emitted only here, after
+            # the validator passed on the bytes currently on disk.
+            print(lesson_marker("validated", output_file), flush=True)
             return True
 
         print(f"\n❌ Validation failed ({result.error_count} error(s)):")
@@ -277,6 +321,7 @@ async def generate_lesson(
 
         if attempt == MAX_VALIDATION_ATTEMPTS:
             print(f"\n❌ Exhausted {MAX_VALIDATION_ATTEMPTS} validation attempts for {lesson_id}.")
+            print(lesson_marker("failed", output_file), flush=True)
             return False
 
         # ------------------------------------------------------------------
@@ -288,6 +333,9 @@ async def generate_lesson(
             output_file=output_file,
             validation_errors=result.raw_output,
             attempt=attempt,
+            # Empty when the guide is missing, which drops the game guidance rather
+            # than telling the agent to pick "one of ()".
+            game_types=registered_game_types(GAMES_GUIDE_DIR),
         )
 
         # Resume the same session so the agent has full context

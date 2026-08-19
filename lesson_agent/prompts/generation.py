@@ -10,8 +10,19 @@ def build_generation_prompt(
     curriculum_path: str,
     output_file: Path,
     lesson_id: str,
+    game_section: str = "",
 ) -> str:
-    """Build the user prompt that instructs the agent to generate an MLAI file."""
+    """Build the user prompt that instructs the agent to generate an MLAI file.
+
+    `game_section` is the per-lesson game half, built by
+    `games.build_game_prompt_section` from this lesson's spec. It carries the full
+    authoring specs for the few game types that fit this lesson's content; the
+    catalog and the cross-game rules live in the system prompt instead, because they
+    are identical for every lesson and belong in the cached prefix.
+
+    Defaults to `""` — a lesson with no fitting game, or a run where the generated
+    guide is missing, costs zero prompt tokens here and generates without a game.
+    """
     return f"""Generate an MLAI lesson from the specification.
 
 **Lesson spec file**: {lesson_spec_path}
@@ -118,6 +129,10 @@ sequenceDiagram
     <!-- third generate_svg result -->
   </Svg>
 
+  <Game type="TYPE_FROM_THE_CATALOG">
+{{ "...": "the fields that type's spec lists, and nothing else" }}
+  </Game>
+
   <Section type="concept">
     <H2>Summary</H2>
     <Body>Recap...</Body>
@@ -139,7 +154,12 @@ sequenceDiagram
    - SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective
    - Place them after the teaching sections, before the summary
 
-4. **Document flow**: Meta → Teaching Sections → FlashCards → More Sections → Assessments → Summary Section
+4. **A `<Game>` block, if one fits, goes DIRECTLY under <Lesson>** — NOT inside a Section
+   - `<Game>` inside a `<Section>` is `INVALID_CHILD` and the lesson will not ship
+   - Place it near the end, after the concept has been taught — it is reinforcement
+   - At most ONE per lesson, and none at all is a valid choice
+
+5. **Document flow**: Meta → Teaching Sections → FlashCards → More Sections → Assessments → Game → Summary Section
 
 ## Content Requirements:
 
@@ -155,6 +175,10 @@ sequenceDiagram
 - At least 1 FillBlanks question
 - At least 1 Subjective question with rubric
 - All assessment IDs must be unique
+- Exactly ONE `<Game>` block, chosen from the candidate specs at the end of this prompt —
+  unless none of them genuinely fits what this lesson teaches, in which case omit it. A
+  forced game asks the student to practise something the game shape cannot test, which is
+  worse than no game.
 - A final summary Section wrapping up key points
 
 ## 🎨 VISUAL REQUIREMENTS (MANDATORY — 2-4 visuals per lesson):
@@ -204,4 +228,6 @@ syntax/structure — anything Mermaid can't do.
 - Place both DIRECTLY under `<Lesson>` (NOT inside Section)
 
 Make the content genuinely educational and research-grade.
-Once you have written the file, confirm that you are done."""
+Once you have written the file, confirm that you are done.
+
+{game_section}"""
