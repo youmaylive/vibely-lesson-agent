@@ -31,8 +31,10 @@ ENV/
 .env
 .env.*
 
-# Generated output
+# Generated output. Two paths, because `main.py --output <dir>` is relative to the
+# CWD, not to the package: an ad-hoc run from the repo root lands in ./output/.
 lesson_agent/output/
+output/
 
 # Cline / agent local state (added 2026-08-07) — never commit chat logs
 .cline-context/
