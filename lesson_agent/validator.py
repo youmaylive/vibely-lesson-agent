@@ -15,6 +15,7 @@ Layer 2 exists because layer 1 never parses Mermaid — the schema for
 cannot render passes validation and fails in the student's browser instead.
 """
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,33 @@ class ValidationResult:
     checked, which the caller reports so it never passes silently.
     """
 
+
+# Validator subprocess limits. The timeout was 30s, and 4 lessons of a 50-lesson
+# course hit it — a lesson that is merely slow to validate was reported to the agent
+# as broken. 240s is well past the slowest observed clean parse while still bounding
+# a genuinely pathological file. The heap cap exists because one lesson OOMs the
+# validator outright; see the call site.
+_VALIDATOR_TIMEOUT_S = 240
+_HEAP_MB = 4096
+
+# Both a timeout and a heap crash have the same underlying cause and the same fix,
+# so they share one message. It must name something the agent can edit — a bare
+# "timed out" is unactionable and burns fix attempts on nothing.
+_PATHOLOGICAL_XML_HINT = (
+    "error PATHOLOGICAL_XML: the validator {what} on this file.\n"
+    "This is almost always unclosed inline tags in *text content* — prose that "
+    "mentions HTML like <br>, <td>, <div> or <strong> without escaping it. Backticks "
+    "alone do not help in <Prompt>/<Option>/<Front>/<Back>/<Item>, which are ordinary "
+    "elements: `<td>` there opens a real <td> that is never closed, and the parser's "
+    "error recovery then blows up.\n"
+    "Fix: write the tag with backticks AND entities — `&lt;td&gt;` / `&lt;br&gt;` — "
+    "which is correct in every element. Check every span that mentions a tag. (A `<` "
+    "that is not tag-shaped, like `a < b`, needs the entity only.)"
+)
+
+# The CLI colours its output, so strip SGR sequences before matching on it.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_ERROR_TOTAL_RE = re.compile(r"(\d+)\s+error\(s\)")
 
 # Exit codes of scripts/mermaid-check.mjs
 _MERMAID_OK = 0
@@ -103,6 +131,26 @@ def _run_mermaid_check(file_path: Path) -> tuple[str, int, bool]:
     return (f"MERMAID GATE UNAVAILABLE: {detail}", 0, False)
 
 
+def _count_errors(output: str) -> int:
+    """Count validator errors, preferring the CLI's own declared total.
+
+    The CLI prints a ``66 error(s)`` summary line and then one ``✗ Line N  CODE:``
+    line per error. The previous heuristic here counted lines *containing the word
+    "error"* — which the per-error lines do not, since the word only appears in the
+    summary. So a 66-error lesson was reported to the agent (and to the log) as
+    ``1 error(s)``, hiding the scale of a failure and making the fix loop look
+    closer to done than it was. Read the CLI's number; fall back to counting the
+    ``✗ Line`` markers, then to 1 — never 0, because the caller only gets here on a
+    non-zero exit and a count of 0 would read as success.
+    """
+    stripped = _ANSI_RE.sub("", output)
+    match = _ERROR_TOTAL_RE.search(stripped)
+    if match:
+        return max(int(match.group(1)), 1)
+    marked = sum(1 for line in stripped.splitlines() if line.lstrip().startswith("✗ Line"))
+    return max(marked, 1)
+
+
 def validate_mlai_file(file_path: Path) -> ValidationResult:
     """Run the MLAI validator CLI and the Mermaid gate against a file.
 
@@ -132,10 +180,14 @@ def validate_mlai_file(file_path: Path) -> ValidationResult:
 
     try:
         result = subprocess.run(
-            ["node", str(VALIDATOR_CLI), str(file_path)],
+            # --max-old-space-size: measured, module_02/lesson_04 of the html-css-basic
+            # course exhausts the default heap and the process dies on SIGABRT. Node's
+            # default cap is a fraction of host RAM, and the Fargate task has plenty —
+            # so raise it explicitly rather than inheriting whatever the box decides.
+            ["node", f"--max-old-space-size={_HEAP_MB}", str(VALIDATOR_CLI), str(file_path)],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=_VALIDATOR_TIMEOUT_S,
         )
 
         combined_output = result.stdout
@@ -143,20 +195,30 @@ def validate_mlai_file(file_path: Path) -> ValidationResult:
             combined_output += "\n" + result.stderr
 
         # The validator CLI exits with 0 on success, non-zero on errors.
-        # Count error lines for reporting (lines containing "error" or "Error").
-        error_lines = [
-            line
-            for line in combined_output.splitlines()
-            if "error" in line.lower() and not line.strip().startswith("#")
-        ]
-
         xml_ok = result.returncode == 0
-        xml_error_count = 0 if xml_ok else max(len(error_lines), 1)
+        xml_error_count = 0 if xml_ok else _count_errors(combined_output)
+
+        # A negative return code is a signal, not a validator verdict: the process
+        # was killed (SIGABRT on heap exhaustion, SIGKILL by the OOM killer) and
+        # printed a V8 stack trace instead of findings. The raw trace tells the
+        # agent nothing it can edit, so name the cause the same way a timeout does.
+        if result.returncode < 0:
+            combined_output = _PATHOLOGICAL_XML_HINT.format(
+                what=f"crashed (signal {-result.returncode}, heap limit {_HEAP_MB} MB)"
+            )
+            xml_error_count = 1
 
     except subprocess.TimeoutExpired:
+        # Not an infra problem, and not unfixable: in every observed case the cause
+        # was pathological XML — unclosed inline tags (`<br>`, `<td>`, `<strong>` in
+        # prose) make the parser's recovery branch blow up combinatorially. Saying
+        # only "timed out" gives the fix loop nothing to act on (rule 24: the retry
+        # message must be fixable by the thing it names), so state the likely cause.
         return ValidationResult(
             success=False,
-            raw_output="Validator timed out after 30 seconds.",
+            raw_output=_PATHOLOGICAL_XML_HINT.format(
+                what=f"timed out after {_VALIDATOR_TIMEOUT_S}s"
+            ),
             error_count=1,
         )
     except FileNotFoundError:
