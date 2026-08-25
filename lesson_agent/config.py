@@ -70,3 +70,27 @@ MAX_VALIDATION_ATTEMPTS = 500
 # per spec. At 100 games this projects to ~15k tokens and stays flat, against ~220k
 # for inlining every spec.
 MAX_GAME_CANDIDATES = 5
+
+# ---------------------------------------------------------------------------
+# Lesson shape budget
+# ---------------------------------------------------------------------------
+# The minimum number of <Svg> blocks a lesson must carry. This is a FLOOR, not the
+# target: the target (3-4) has been in the generation prompt since the SVG framework
+# landed and has NEVER been met. Measured over the 5 lessons this pipeline has written,
+# with a case-SENSITIVE count: median 2, min 1, max 4 — so 4 of 5 are under target and
+# one shipped with a single diagram. (A case-insensitive count says 4/2/8 because it
+# counts the `<Svg>` wrapper AND the `<svg>` inside it — exactly double, every time.
+# Rule 25 applies to one's own measurements too.)
+#
+# So this floor closes a live gap, not a hypothetical drift — rule 26: a rule stated in
+# a prompt and enforced by nothing is a regression no test catches.
+#
+# Enforced OUTSIDE the MAX_VALIDATION_ATTEMPTS loop, by one bounded top-up pass in
+# `agent.py`, and it fails open loudly — see `lesson_shape.py`.
+SVG_FLOOR = 3
+
+# Env-overridable so retuning needs no image rebuild, on the GAME_FLOOR_RATE
+# precedent. `budget.py` reads these; unset or unparseable falls back to the value
+# here, loudly.
+SVG_FLOOR_ENV = "SVG_FLOOR"
+LESSON_BUDGET_BAND_ENV = "LESSON_BUDGET_BAND"

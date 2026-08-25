@@ -11,6 +11,7 @@ def build_generation_prompt(
     output_file: Path,
     lesson_id: str,
     game_section: str = "",
+    budget_section: str = "",
 ) -> str:
     """Build the user prompt that instructs the agent to generate an MLAI file.
 
@@ -22,6 +23,19 @@ def build_generation_prompt(
 
     Defaults to `""` — a lesson with no fitting game, or a run where the generated
     guide is missing, costs zero prompt tokens here and generates without a game.
+
+    `budget_section` is the per-lesson length budget, built by
+    `budget.build_budget_section` from the `duration:` in this lesson's spec
+    frontmatter. It also defaults to `""`: a spec with no frontmatter (every spec in
+    `test_curriculum/` is like this) generates against the qualitative rules below
+    alone, rather than failing.
+
+    Why this parameter exists at all: measured across the 89 lessons of one real
+    planner run, the specs carry a median of 13 `content_outline` bullets and the
+    written lessons carry a median of 13 `<Section>` blocks — close to 1:1. Not one of
+    63 sampled sections exceeded 300 words, so the length is not prose bloat, it is
+    topic count, and topic count is the only thing a budget can fix. See
+    `budget.py`'s docstring for the full measurement.
     """
     return f"""Generate an MLAI lesson from the specification.
 
@@ -161,27 +175,26 @@ sequenceDiagram
 
 5. **Document flow**: Meta → Teaching Sections → FlashCards → More Sections → Assessments → Game → Summary Section
 
+{budget_section}
 ## Content Requirements:
 
 - Proper <Meta> block with lesson ID "{lesson_id}" and appropriate title/tags
-- Rich instructional content with multiple Sections (use types: concept, example, code, tip)
+- Sections that each make ONE point (use types: concept, example, code, tip)
 - Markdown formatting in Body text (**bold**, *italic*, `code`, lists)
 - LaTeX math expressions where appropriate ($inline$ and $$display$$)
-- At least 4 FlashCards for key concepts (placed between sections)
-- At least 2 SingleSelect questions
-- At least 1 MultiSelect question
-- At least 1 SortQuiz
-- At least 1 MatchPairs question
-- At least 1 FillBlanks question
-- At least 1 Subjective question with rubric
+- FlashCards for the key terms, placed between sections
+- A mix of assessment types — **chosen because they fit what this lesson teaches, not
+  one of every type.** A MatchPairs on a topic with nothing to pair, or a SortQuiz on
+  something with no natural order, teaches nothing and costs the learner a minute.
 - All assessment IDs must be unique
 - Exactly ONE `<Game>` block, chosen from the candidate specs at the end of this prompt —
   unless none of them genuinely fits what this lesson teaches, in which case omit it. A
   forced game asks the student to practise something the game shape cannot test, which is
   worse than no game.
-- A final summary Section wrapping up key points
+- A final summary Section wrapping up key points — ONE, at the end. Not a recap per
+  section.
 
-## 🎨 VISUAL REQUIREMENTS (MANDATORY — 2-4 visuals per lesson):
+## 🎨 VISUAL REQUIREMENTS (MANDATORY — see the counts in the LENGTH BUDGET above):
 
 You MUST include visuals to keep learners engaged. Use a MIX of Mermaid + SVG:
 
@@ -223,11 +236,15 @@ Use SVG for: architectures, scientific diagrams, labeled illustrations, anatomy 
 syntax/structure — anything Mermaid can't do.
 
 ### Target per lesson:
-- **3-4 `generate_svg` calls** (distinct concepts), each embedded in `<Svg>...</Svg>`
-- At least 1-2 Mermaid diagrams (written directly)
+- `generate_svg` calls (distinct concepts), each embedded in `<Svg>...</Svg>` — the count
+  is in the LENGTH BUDGET above, and the lower number there is a **hard floor**. A lesson
+  below it is sent back to you.
+- Mermaid diagrams (written directly) — count in the budget above
 - Place both DIRECTLY under `<Lesson>` (NOT inside Section)
+- **A diagram replaces prose, it does not accompany it.** After you embed an SVG of a
+  structure or a process, the surrounding text should be two sentences saying what to
+  notice — not a paragraph restating the diagram in words.
 
-Make the content genuinely educational and research-grade.
 Once you have written the file, confirm that you are done.
 
 {game_section}"""

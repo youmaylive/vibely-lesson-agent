@@ -49,6 +49,8 @@ from prompts.system import build_system_prompt
 from prompts.generation import build_generation_prompt
 from prompts.fix import build_fix_prompt
 from games import build_game_prompt_section, registered_game_types
+from budget import budget_for_spec, build_budget_section
+import lesson_shape
 from validator import validate_mlai_file
 from svg_agent import resolve_svgs
 from svg_tool import svg_mcp_server
@@ -63,6 +65,14 @@ import usage
 # run-level summary can state it plainly instead of leaving it buried in a
 # multi-thousand-line log.
 _MERMAID_GATE_SKIPS: list[str] = []
+
+# Lessons that shipped below the visual floor even after the one top-up pass, and the
+# per-lesson shape measurements, both collected across a batch for the run summary.
+# Rule 27's corollary: a number computed and never read is not a gate — these are read
+# by `_print_shape_summary` and, in a worker run, land in the phase metadata via the
+# per-course census in `workers/phases/curriculum.py`.
+_SHAPE_BELOW_FLOOR: list[str] = []
+_SHAPE_MEASUREMENTS: list[tuple[str, str]] = []
 
 
 def lesson_marker(status: str, output_file: Path) -> str:
@@ -197,6 +207,101 @@ async def _run_agent(prompt: str, options: ClaudeAgentOptions) -> tuple[bool, st
     return success, session_id, cost_usd
 
 
+async def _enforce_shape_floor(
+    output_file: Path,
+    budget,
+    lesson_id: str,
+    model: str,
+    max_turns: int,
+    session_id: str | None,
+) -> str | None:
+    """Measure the written lesson and, if it is below the visual floor, top it up once.
+
+    Returns the (possibly new) session id so the caller keeps resuming one session.
+
+    Bounded at exactly one attempt on purpose. The alternative shapes were both worse:
+    looping until the floor is met has no spend cap on a path where a single diagram is
+    ~$0.16 and 8 Bedrock calls, and failing the lesson throws away a working lesson over
+    a missing illustration. So: try once, then say so loudly and continue.
+    """
+    try:
+        content = output_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        # A read-only audit that cannot run must never pass silently (rule 21) — but it
+        # also must not take the run down.
+        print(f"\n⚠️  SHAPE GATE UNAVAILABLE — could not read {output_file}: {exc}")
+        return session_id
+
+    report = lesson_shape.check(content, budget)
+    print(f"\n📐 Shape: {report.one_line()}")
+    for finding in report.advisory:
+        print(f"   advisory {finding}")
+
+    if not report.has_hard:
+        _SHAPE_MEASUREMENTS.append((lesson_id, report.one_line()))
+        return session_id
+
+    for finding in report.hard:
+        print(f"   ⚠️  {finding}")
+
+    print(f"\n🎨 Topping up visuals for {lesson_id} (one attempt)...\n")
+
+    topup_prompt = lesson_shape.build_topup_prompt(
+        report=report,
+        budget=budget,
+        output_file=output_file,
+        section_headings=lesson_shape.sections_without_visuals(content),
+    )
+
+    # Resume the same session so the agent still has the lesson it just wrote in context
+    # — the top-up needs to know what the surrounding text says to diagram it, and
+    # `lesson_excerpt` grounding is the whole reason diagram labels match the lesson.
+    _ok, session_id, _cost = await _run_agent(
+        prompt=topup_prompt,
+        options=_agent_options(model=model, max_turns=max_turns, session_id=session_id),
+    )
+
+    # The agent may have written placeholders rather than calling the tool. resolve_svgs
+    # is a no-op when there are none, and it prints what it found either way.
+    await resolve_svgs(output_file, model=model)
+
+    try:
+        content = output_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"\n⚠️  SHAPE GATE UNAVAILABLE — could not re-read {output_file}: {exc}")
+        return session_id
+
+    report = lesson_shape.check(content, budget)
+    _SHAPE_MEASUREMENTS.append((lesson_id, report.one_line()))
+    print(f"\n📐 Shape after top-up: {report.one_line()}")
+
+    if report.has_hard:
+        _SHAPE_BELOW_FLOOR.append(lesson_id)
+        # One line, greppable, naming the lesson and the numbers. Fail-open is a
+        # deliberate choice here; fail-open QUIETLY is how the Mermaid bug shipped.
+        print(
+            f"\n🚨 SHAPE-BELOW-FLOOR {lesson_id} — "
+            f"{'; '.join(str(f) for f in report.hard)}. Shipping anyway."
+        )
+
+    return session_id
+
+
+def _print_shape_summary(total_lessons: int) -> None:
+    """Run-level shape report. Called once per batch, after every lesson."""
+    if _SHAPE_MEASUREMENTS:
+        print(f"\n📐 Shape census ({len(_SHAPE_MEASUREMENTS)} lesson(s)):")
+        for lesson_id, line in _SHAPE_MEASUREMENTS:
+            print(f"   {lesson_id}  {line}")
+
+    if _SHAPE_BELOW_FLOOR:
+        print(
+            f"\n🚨 SHAPE-BELOW-FLOOR for {len(_SHAPE_BELOW_FLOOR)}/{total_lessons} "
+            f"lesson(s) — they shipped with fewer diagrams than the floor: "
+            f"{', '.join(_SHAPE_BELOW_FLOOR)}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Single lesson generation
 # ---------------------------------------------------------------------------
@@ -256,12 +361,26 @@ async def generate_lesson(
         GAMES_GUIDE_DIR, spec_text, MAX_GAME_CANDIDATES
     )
 
+    # How long this lesson should be. Derived from the `duration:` the planner already
+    # writes into every spec's frontmatter and that nothing has ever read — see
+    # budget.py. A spec without frontmatter (every spec in test_curriculum/) silently
+    # gets the default band rather than failing.
+    budget = budget_for_spec(spec_text)
+    print(
+        f"  Budget: {budget.band} "
+        f"({'no duration in spec' if budget.minutes is None else str(budget.minutes) + ' min stated'})"
+        f" → {budget.sections[0]}-{budget.sections[1]} sections, "
+        f"{budget.words[0]}-{budget.words[1]} words, "
+        f"{budget.svgs[0]}-{budget.svgs[1]} SVG (floor {budget.svg_floor})"
+    )
+
     gen_prompt = build_generation_prompt(
         lesson_spec_path=lesson_spec_path,
         curriculum_path=curriculum_path,
         output_file=output_file,
         lesson_id=mlai_id,
         game_section=game_section,
+        budget_section=build_budget_section(budget),
     )
 
     agent_ok, session_id, _cost = await _run_agent(
@@ -282,6 +401,32 @@ async def generate_lesson(
     # nothing to do, and derives the lesson excerpt itself in that fallback path.
     if output_file.exists():
         await resolve_svgs(output_file, model=model)
+
+    # ------------------------------------------------------------------
+    # Phase 1c: Shape check — the visual floor, and one bounded top-up
+    # ------------------------------------------------------------------
+    # Deliberately OUTSIDE the validation loop below. Two reasons, both from AGENTS.md:
+    #
+    #   * rule 24 — a cheap gate placed before the expensive one silently replaces it,
+    #     and `MAX_VALIDATION_ATTEMPTS = 500` has no spend cap. A shape defect must not
+    #     be able to consume the budget that exists for repairing broken XML.
+    #   * rule 31 — fail-open vs fail-closed is a property of the path. This is a
+    #     read-only quality audit on a five-hour, ~$64 generation run, so it fails open
+    #     LOUDLY: one top-up attempt, then print and ship. A lesson with 2 diagrams
+    #     instead of 3 is weaker; refusing to ship it is the wrong trade.
+    #
+    # Only the SVG floor gets a retry. Word and section overruns are printed and left
+    # for the per-course census, because "cut 400 words" is not a fix the model can
+    # carry out safely — it has no way to know which paragraph was load-bearing.
+    if output_file.exists():
+        session_id = await _enforce_shape_floor(
+            output_file=output_file,
+            budget=budget,
+            lesson_id=lesson_id,
+            model=model,
+            max_turns=max_turns,
+            session_id=session_id,
+        )
 
     # ------------------------------------------------------------------
     # Phase 2: External validation loop
@@ -441,6 +586,8 @@ async def generate_all_lessons(
         )
     else:
         print(f"\n🎯 Mermaid gate ran on all {total_lessons} lesson(s).")
+
+    _print_shape_summary(total_lessons)
 
     _snap = usage.snapshot()
     print(
