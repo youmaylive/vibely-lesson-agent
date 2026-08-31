@@ -58,6 +58,8 @@ import re
 from dataclasses import dataclass
 
 from config import (
+    GAME_FLOOR,
+    GAME_FLOOR_ENV,
     SVG_FLOOR,
     SVG_FLOOR_ENV,
     LESSON_BUDGET_BAND_ENV,
@@ -77,8 +79,14 @@ _DURATION_RE = re.compile(r"^duration:[ \t]*(.+?)[ \t]*$", re.M | re.I)
 _IS_CHECKPOINT_RE = re.compile(r"^is_checkpoint:[ \t]*(.+?)[ \t]*$", re.M | re.I)
 
 
-def _frontmatter(spec_text: str) -> str:
-    """The raw YAML frontmatter block, or "" when the spec has none."""
+def frontmatter(spec_text: str) -> str:
+    """The raw YAML frontmatter block, or "" when the spec has none.
+
+    Public because `games.py` needs the same block for `title:` and `concepts:`, and a
+    second copy of this regex is where the anchoring would drift (rule 23) — the anchor
+    is the whole reason a `duration: 5 minutes` sentence in the lesson body cannot size
+    the lesson.
+    """
     match = _FRONTMATTER_RE.match(spec_text or "")
     return match.group(1) if match else ""
 
@@ -94,7 +102,7 @@ def parse_duration_minutes(spec_text: str) -> int | None:
     ranges (`"25-30 minutes"` → the low end, so a range never inflates the budget) and
     hours (`"1 hour"`, `"1.5 hours"`).
     """
-    front = _frontmatter(spec_text)
+    front = frontmatter(spec_text)
     if not front:
         return None
 
@@ -124,7 +132,7 @@ def parse_duration_minutes(spec_text: str) -> int | None:
 
 def parse_is_checkpoint(spec_text: str) -> bool:
     """Whether the spec's frontmatter marks this lesson as a checkpoint."""
-    front = _frontmatter(spec_text)
+    front = frontmatter(spec_text)
     if not front:
         return False
     match = _IS_CHECKPOINT_RE.search(front)
@@ -152,6 +160,10 @@ class Budget:
     assessments: tuple[int, int]
     flashcards: tuple[int, int]
     svg_floor: int
+    # Not a band shape: one game per lesson regardless of length, because the registry
+    # itself caps it at one (`maxPerLesson: 1`). So this is a floor that equals the
+    # ceiling — the only question is whether the lesson has its game or not.
+    game_floor: int = 1
 
     @property
     def reading_minutes(self) -> tuple[int, int]:
@@ -211,29 +223,27 @@ def _band_for_minutes(minutes: int | None) -> str:
     return "deep"
 
 
-def _env_svg_floor() -> int:
-    """`SVG_FLOOR` from the environment, falling back loudly.
+def _env_floor(name: str, default: int) -> int:
+    """An integer floor from the environment, falling back loudly.
 
-    Env-overridable on the `GAME_FLOOR_RATE` precedent so the floor can be retuned
-    without rebuilding the worker image. `0` disables the floor outright, which is a
-    legitimate choice for a run that is deliberately prose-only.
+    Env-overridable on the `GAME_FLOOR_RATE` precedent so a floor can be retuned without
+    rebuilding the worker image. `0` disables the floor outright — a legitimate choice
+    for a deliberately prose-only or game-free run.
+
+    One function for both floors rather than two near-identical ones: the second copy is
+    where the negative-value branch or the warning wording would drift (rule 23).
     """
-    raw = os.getenv(SVG_FLOOR_ENV, "")
+    raw = os.getenv(name, "")
     if not raw.strip():
-        return SVG_FLOOR
+        return default
     try:
         value = int(raw.strip())
     except ValueError:
-        print(
-            f"   ⚠️  {SVG_FLOOR_ENV}={raw!r} is not an integer — using the default "
-            f"{SVG_FLOOR}."
-        )
-        return SVG_FLOOR
+        print(f"   ⚠️  {name}={raw!r} is not an integer — using the default {default}.")
+        return default
     if value < 0:
-        print(
-            f"   ⚠️  {SVG_FLOOR_ENV}={raw!r} is negative — using the default {SVG_FLOOR}."
-        )
-        return SVG_FLOOR
+        print(f"   ⚠️  {name}={raw!r} is negative — using the default {default}.")
+        return default
     return value
 
 
@@ -271,7 +281,7 @@ def budget_for(minutes: int | None, is_checkpoint: bool = False) -> Budget:
             band = _promote(band)
 
     shape = _BAND_SHAPES[band]
-    floor = _env_svg_floor()
+    floor = _env_floor(SVG_FLOOR_ENV, SVG_FLOOR)
     svgs = shape["svgs"]
     # A floor above the band's target would be self-contradictory in the prompt. Let the
     # floor win and widen the target to match it.
@@ -289,6 +299,7 @@ def budget_for(minutes: int | None, is_checkpoint: bool = False) -> Budget:
         assessments=shape["assessments"],
         flashcards=shape["flashcards"],
         svg_floor=floor,
+        game_floor=_env_floor(GAME_FLOOR_ENV, GAME_FLOOR),
     )
 
 
@@ -318,6 +329,15 @@ def build_budget_section(budget: Budget) -> str:
     """
     low_words, high_words = budget.words
     low_read, high_read = budget.reading_minutes
+    # Omitted entirely when the floor is disabled (`GAME_FLOOR=0`), rather than printing
+    # "exactly 0" — a budget row telling the writer to produce no game would forbid what
+    # the knob merely stops enforcing.
+    game_row = (
+        f"\n| `<Game>` blocks | **exactly {budget.game_floor}** — the floor and the "
+        f"ceiling are the same number |"
+        if budget.game_floor > 0
+        else ""
+    )
     stated = (
         f"{budget.minutes} min stated"
         if budget.minutes is not None
@@ -335,7 +355,7 @@ def build_budget_section(budget: Budget) -> str:
 | `generate_svg` calls / `<Svg>` blocks | **{budget.svgs[0]}-{budget.svgs[1]}**, never fewer than {budget.svg_floor} |
 | `<Mermaid>` diagrams | **{budget.mermaid[0]}-{budget.mermaid[1]}** |
 | assessment blocks (SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective — combined) | **{budget.assessments[0]}-{budget.assessments[1]}** |
-| `<FlashCard>` blocks | **{budget.flashcards[0]}-{budget.flashcards[1]}** |
+| `<FlashCard>` blocks | **{budget.flashcards[0]}-{budget.flashcards[1]}** |{game_row}
 
 **This is a ceiling, not a floor.** Longer is not better — a learner who quits halfway
 learned less than one who finished a shorter lesson.

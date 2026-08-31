@@ -89,8 +89,21 @@ MAX_GAME_CANDIDATES = 5
 # `agent.py`, and it fails open loudly — see `lesson_shape.py`.
 SVG_FLOOR = 3
 
+# One playable game in every lesson — the same shape of gap as SVG_FLOOR, one level up.
+# Measured cause: nothing has ever counted games PER LESSON. The only game check is the
+# course-level census (`GAME_FLOOR_RATE`, `workers/phases/curriculum.py`), and at its
+# 0.30 default 70% of lessons may legitimately carry none. Meanwhile three prompt copies
+# told the model "if no catalogued type fits, write no `<Game>` block at all" — a hatch
+# that is never legitimately true: every one of the 31 real planner specs in
+# `test_curriculum/` scores a genuine fit for at least one registered game.
+#
+# 1, not 2: `maxPerLesson: 1` is the registry's own statement (`hangman.ts`,
+# `sort-the-court.ts`), so the floor and the ceiling meet at exactly one game.
+GAME_FLOOR = 1
+
 # Env-overridable so retuning needs no image rebuild, on the GAME_FLOOR_RATE
 # precedent. `budget.py` reads these; unset or unparseable falls back to the value
 # here, loudly.
 SVG_FLOOR_ENV = "SVG_FLOOR"
+GAME_FLOOR_ENV = "GAME_FLOOR"
 LESSON_BUDGET_BAND_ENV = "LESSON_BUDGET_BAND"

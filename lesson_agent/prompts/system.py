@@ -14,12 +14,13 @@ from games import build_game_rules_section
 # would be a second place to edit when a game is added, which is exactly how
 # `mlai_format_guide.md` ended up describing a pipeline that no longer exists.
 _GAME_STRUCTURAL_RULE = """
-12. **Interactive game**: A lesson may include ONE `<Game>` block, placed **directly under
-    `<Lesson>`** (like FlashCards and the assessments — NEVER inside a `<Section>`), near the
-    end, after the concept has been taught. Choose the `type` from the game catalog in the
-    INTERACTIVE GAMES section above; if none of the catalogued types genuinely fits what this
-    lesson teaches, write no `<Game>` at all. The payload's escaping rules are **not** the same
-    as rule 8b's — read the catalog's rules section.
+12. **Interactive game**: Every lesson includes **exactly ONE** `<Game>` block — not zero —
+    placed **directly under `<Lesson>`** (like FlashCards and the assessments — NEVER inside a
+    `<Section>`), near the end, after the concept has been taught. Choose the `type` from the
+    game catalog in the INTERACTIVE GAMES section above: pick the one whose shape matches what
+    a student who understood THIS lesson could do. The game is the only part of the lesson the
+    student *does* rather than reads, so a lesson without one is incomplete. The payload's
+    escaping rules are **not** the same as rule 8b's — read the catalog's rules section.
 """
 
 

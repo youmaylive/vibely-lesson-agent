@@ -244,13 +244,21 @@ async def _enforce_shape_floor(
     for finding in report.hard:
         print(f"   ⚠️  {finding}")
 
-    print(f"\n🎨 Topping up visuals for {lesson_id} (one attempt)...\n")
+    # Name what is actually being topped up — "visuals" was accurate when LS-SVG-FLOOR
+    # was the only hard rule, and would now be a false log line on a game-only miss.
+    gaps = sorted({f.rule_id for f in report.hard})
+    print(f"\n🎨 Topping up {lesson_id} ({', '.join(gaps)}, one attempt)...\n")
 
     topup_prompt = lesson_shape.build_topup_prompt(
         report=report,
         budget=budget,
         output_file=output_file,
         section_headings=lesson_shape.sections_without_visuals(content),
+        # Naming the valid types is what makes the game half fixable: a wrong `type` is
+        # `UNKNOWN_GAME_TYPE`, which no payload edit can repair (rule 24). Fails open to
+        # `[]` — this is one call on a five-hour run, and the loud warning has already
+        # been printed once by the prompt builders.
+        game_types=registered_game_types(GAMES_GUIDE_DIR),
     )
 
     # Resume the same session so the agent still has the lesson it just wrote in context

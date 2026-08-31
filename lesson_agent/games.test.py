@@ -35,6 +35,7 @@ import re
 import sys
 import tempfile
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -102,6 +103,38 @@ MISCONCEPTION_SPEC = """# When to Use const, let and var
 - Assuming const makes the value immutable rather than the binding
 - Believing var and let are interchangeable
 - Thinking await freezes the whole page
+"""
+
+# Ideal term-recall material, for contrast with TERM_HEAVY_SPEC above: one single word,
+# well inside the 6-14 letter band, that the spec goes on to use repeatedly. The
+# difference between these two fixtures is the discrimination the rescoring bought.
+SINGLE_TERM_SPEC = """# Myelination and Conduction Speed
+
+## Key Concepts
+- Myelination
+- Axon
+
+## Learning Objectives
+- Explain how myelination changes conduction speed
+- Identify myelination in a micrograph
+
+## Content Outline
+- Myelination as an insulating sheath
+- Where myelination is absent, current leaks
+"""
+
+# Misconceptions that are reports about students rather than claims about the subject.
+# There is nothing here a petition can be ruled on.
+VAGUE_MISCONCEPTION_SPEC = """# Introducing Recursion
+
+## Key Concepts
+- Recursion
+- Base case
+
+## Common Misconceptions
+- Students find recursion confusing at first
+- This topic is difficult and counterintuitive
+- Learners struggle with it
 """
 
 NO_SIGNAL_SPEC = """# A Reflective Essay on Learning
@@ -194,20 +227,177 @@ check("no-signal spec still has a title", n.title == "A Reflective Essay on Lear
 check("bare text does not raise", extract_signals("just one line").title == "just one line")
 check("empty string does not raise", extract_signals("").title == "")
 
+# --- the planner's ACTUAL dialect -------------------------------------------------
+#
+# Measured, and it is the whole reason `sort-the-court` won every lesson: over the 89
+# real specs in `memebu-lesson-planner/output/test_full_pipeline_neuro/`, **89 of 89**
+# declare `concepts:` in YAML frontmatter and **0** carry a `## Key Concepts` heading.
+# The 31 older `test_curriculum/` specs are the exact mirror. So `key_concepts` was
+# empty on every spec the planner emits today, `term-recall` scored a structural 0.00,
+# and hangman could not win a lesson it was perfect for. Rule 27: the value was there
+# and nothing read it.
+PLANNER_SPEC = '''---
+lesson_id: lesson_01
+title: "The Battery in Your Head"
+duration: "25 minutes"
+is_checkpoint: false
+concepts:
+  - Membrane Potential
+  - Ion Channel
+---
+
+## Learning Objectives
+
+- Explain why a resting neuron is not at rest
+- Predict the direction of ion flow
+
+## The Struggle
+
+Try it yourself:
+
+```python
+# Your attempt here
+voltage = 0  # what should this be?
+- not a bullet
+```
+
+### Misconceptions We'll Surface
+
+- Students think the membrane potential is caused by a chemical reaction
+- Students think ion channels are always open
+'''
+
+p = extract_signals(PLANNER_SPEC)
+check("frontmatter title is read, quotes stripped", p.title == "The Battery in Your Head",
+      repr(p.title))
+check("frontmatter concepts become key concepts",
+      p.key_concepts == ["Membrane Potential", "Ion Channel"], repr(p.key_concepts))
+check("the concepts block stops at the closing fence", "---" not in " ".join(p.key_concepts))
+check("headings still parse alongside frontmatter", len(p.objectives) == 2, repr(p.objectives))
+check("a 'Misconceptions' heading without 'Common' still matches",
+      len(p.misconceptions) == 2, repr(p.misconceptions))
+# The H1 the old code returned on all 89 planner specs was a Python comment inside a
+# fence ('Your attempt here'), and its `- not a bullet` line was an outline bullet.
+check("a fenced '# comment' is not the title", "attempt" not in p.title, repr(p.title))
+check("a fenced '- line' is not an outline bullet",
+      not any("not a bullet" in b for b in p.outline), repr(p.outline))
+# Without this, hangman's only shape scores 0.00 on every lesson the planner writes —
+# which is exactly the "it always picks sort-the-court" complaint, at its source.
+check("so term-recall has evidence to score", score_shapes(p)["term-recall"][0] > 0.5,
+      score_shapes(p)["term-recall"])
+
+# Frontmatter is read first and headings extend it, so a spec carrying both dialects
+# contributes both — and a term written in both is scored once.
+BOTH_DIALECTS = '''---
+title: "Two Dialects"
+concepts:
+  - Ion Channel
+  - Action Potential
+---
+
+## Key Concepts
+
+- ion channel
+- Refractory Period
+'''
+b = extract_signals(BOTH_DIALECTS)
+check("both dialects contribute",
+      b.key_concepts == ["Ion Channel", "Action Potential", "Refractory Period"],
+      repr(b.key_concepts))
+
+# A frontmatter key that follows `concepts:` must not be swallowed as a concept.
+NEXT_KEY = '''---
+title: "T"
+concepts:
+  - Alpha
+tags:
+  - beta
+---
+'''
+check("the next YAML key is not a concept",
+      extract_signals(NEXT_KEY).key_concepts == ["Alpha"],
+      repr(extract_signals(NEXT_KEY).key_concepts))
+
+# No frontmatter at all is the older dialect, and it must be untouched: `---` is a
+# horizontal rule there, never a title.
+check("a leading '---' rule is not a title", extract_signals("---\n\n# Real Title\n").title
+      == "Real Title", repr(extract_signals("---\n\n# Real Title\n").title))
+
 # ---------------------------------------------------------------------------
 # 2. Shape scoring — the two structural rules
 # ---------------------------------------------------------------------------
 print("2. shape scoring")
 
 term_scores = score_shapes(extract_signals(TERM_HEAVY_SPEC))
-check("term-recall scores high on a term-heavy spec",
-      term_scores["term-recall"][0] >= 0.9, str(term_scores["term-recall"]))
+# Mid-high, NOT ≥0.9, and the distinction is the whole point of the rescoring: every
+# key concept in this fixture is a two-word phrase the spec uses exactly once, which is
+# mediocre hangman material. The rule this replaced returned 1.00 here — and on 29 of
+# the 31 real planner specs — because it scored the *count* of usable terms.
+check("term-recall scores mid-high on phrase-shaped terms",
+      0.65 <= term_scores["term-recall"][0] <= 0.85, str(term_scores["term-recall"]))
+check("...and the reason names the term it graded",
+      "Coupling matrix" in term_scores["term-recall"][1]
+      or "Sparse matrix" in term_scores["term-recall"][1],
+      term_scores["term-recall"][1])
 check("judgement scores low with no misconceptions",
       term_scores["judgement"][0] < 0.6, str(term_scores["judgement"]))
 
+# The other direction, and the one that makes the score a measurement rather than a
+# threshold: a single-word term the lesson keeps using outscores the phrase above.
+single = score_shapes(extract_signals(SINGLE_TERM_SPEC))
+check("term-recall scores high on a single recurring word",
+      single["term-recall"][0] >= 0.9, str(single["term-recall"]))
+check("...strictly higher than phrase-shaped terms",
+      single["term-recall"][0] > term_scores["term-recall"][0] + 0.1,
+      f'{single["term-recall"][0]} vs {term_scores["term-recall"][0]}')
+
 misc_scores = score_shapes(extract_signals(MISCONCEPTION_SPEC))
-check("judgement maxes out on listed misconceptions",
-      misc_scores["judgement"][0] == 1.0, str(misc_scores["judgement"]))
+check("judgement scores high on verdict-shaped misconceptions",
+      misc_scores["judgement"][0] >= 0.9, str(misc_scores["judgement"]))
+# A lesson whose objective is "Decide which declaration keyword a situation calls for"
+# is a judgement lesson. It was losing to term-recall on the strength of one tidy
+# one-word key concept, because the old rule consulted decide-language ONLY when the
+# spec listed no misconceptions at all.
+check("...and decide-language in the objectives counts alongside them",
+      "decide-language" in misc_scores["judgement"][1], misc_scores["judgement"][1])
+check("judgement beats term-recall on a decide-shaped lesson",
+      misc_scores["judgement"][0] > misc_scores["term-recall"][0],
+      f'judgement {misc_scores["judgement"][0]} vs '
+      f'term-recall {misc_scores["term-recall"][0]}')
+
+# Vague misconceptions are not petitions. "Students find this confusing" has no verdict
+# to rule on, so it cannot be authored into a case however many of them are listed.
+vague = score_shapes(extract_signals(VAGUE_MISCONCEPTION_SPEC))
+check("vague misconceptions score far below verdict-shaped ones",
+      vague["judgement"][0] < misc_scores["judgement"][0] - 0.2,
+      f'vague {vague["judgement"][0]} vs crisp {misc_scores["judgement"][0]}')
+
+# REGRESSION, and it was a real bug in the first draft of this rescoring: the lesson
+# planner writes misconceptions as gerund-headed error phrases, and `"assume"` is not a
+# substring of `"assuming"`. Every one of these scored 0.00 until the markers became
+# stems — rule 25, caught only by running the rule over real specs.
+for gerund in (
+    "Assuming all neuronal models have unique attractors",
+    "Neglecting the role of initial conditions in determining long-term behavior",
+    "Confusing equilibrium points with attractors (not all equilibria are attracting)",
+    "Treating threshold crossing as continuous rather than discrete event",
+):
+    check(f"gerund error phrase is verdict-shaped: {gerund[:28]}...",
+          games._petition_quality(gerund) >= 0.45,
+          f"{games._petition_quality(gerund):.2f}")
+check("a verdictless report about students is not",
+      games._petition_quality("Students struggle to visualise this and find it tricky")
+      <= 0.2,
+      f"{games._petition_quality('Students struggle to visualise this and find it tricky'):.2f}")
+
+# THE saturation regression. Two specs with different material must not score the same;
+# that identity is exactly what made the ranking uninformative and handed the choice to
+# whichever spec happened to be longer.
+check("different lessons get different term-recall scores",
+      len({term_scores["term-recall"][0], single["term-recall"][0],
+           misc_scores["term-recall"][0]}) == 3,
+      str([term_scores["term-recall"][0], single["term-recall"][0],
+           misc_scores["term-recall"][0]]))
 
 # The precise part: a term the game physically cannot use must not count as evidence.
 # This is hangman's own `word` pattern as a predicate — a digit or a hyphen is
@@ -377,9 +567,15 @@ with tempfile.TemporaryDirectory() as tmp:
     # The inverse, or the case above passes for the wrong reason: when the dropped
     # games genuinely scored LOWER, there was no coin toss and no warning belongs.
     lower_guide = load_guide(big)
+    # `term-recall` is excluded on purpose, not tidiness: it scores 0.93 against
+    # judgement's 0.98 on this spec, which is inside `_TIE_EPSILON`, so a fixture built
+    # from "everything that is not judgement" would make this the near-tie case and
+    # prove nothing about the separated one.
+    scored_shapes = ("judgement", "term-recall")
     lower_guide.games = (
         [g for g in lower_guide.games if "judgement" in g.content_shapes][:2]
-        + [g for g in lower_guide.games if "judgement" not in g.content_shapes][:20]
+        + [g for g in lower_guide.games
+           if not any(s in g.content_shapes for s in scored_shapes)][:20]
     )
     lower_cands = select_candidates(
         extract_signals(MISCONCEPTION_SPEC), lower_guide, 2
@@ -390,6 +586,38 @@ with tempfile.TemporaryDirectory() as tmp:
     check("no tie warning when the withheld games simply scored lower",
           "spec withheld" in lower_trace and "arbitrary" not in lower_trace,
           lower_trace[-300:])
+    # That case has to be built from shapes that genuinely score ZERO on this spec, or
+    # it passes for the wrong reason: "not judgement" still admits `term-recall`, which
+    # scores 0.93 against judgement's 0.98 on MISCONCEPTION_SPEC — a real 0.05 gap that
+    # is inside `_TIE_EPSILON`. So assert the fixture's own premise.
+    lower_scores = sorted(
+        {round(c.score, 2) for c in games.rank_games(
+            extract_signals(MISCONCEPTION_SPEC), lower_guide)},
+        reverse=True,
+    )
+    check("...and the fixture's withheld games really do score lower",
+          len(lower_scores) > 1 and lower_scores[0] - lower_scores[1] > games._TIE_EPSILON,
+          str(lower_scores))
+    check("...so nothing is reported as cut near the boundary either",
+          "also cut" not in lower_trace, lower_trace[-300:])
+
+    # The middle case — withheld games inside the epsilon but NOT tied — gets its own
+    # line, and specifically not the "arbitrary" one: the cut fell in the right
+    # direction, it is only the margin that is too small to mean anything. Without this
+    # the two facts would collapse back into one sentence that is false for one of them.
+    near_guide = load_guide(big)
+    near_guide.games = (
+        [g for g in near_guide.games if "judgement" in g.content_shapes][:1]
+        + [g for g in near_guide.games if "term-recall" in g.content_shapes][:2]
+    )
+    near_trace = games.explain(
+        extract_signals(MISCONCEPTION_SPEC), near_guide,
+        select_candidates(extract_signals(MISCONCEPTION_SPEC), near_guide, 1),
+    )
+    check("a withheld game inside the epsilon is reported as near, not arbitrary",
+          "also cut" in near_trace and "arbitrary" not in near_trace, near_trace[-300:])
+    check("...naming the epsilon it is within", "within 0.05" in near_trace,
+          near_trace[-300:])
 
 # ---------------------------------------------------------------------------
 # 5. Unscorable shapes must warn, not silently drop
@@ -474,7 +702,66 @@ if real_guide_available:
     check("names the chosen candidate", "sort-the-court" in section)
     check("includes the full spec, not just the tagline",
           "## JSON Schema" in section and "Payloads that are rejected" in section)
-    check("permits writing no game at all", "no `<Game>` block" in section)
+    # The inverse of what this suite asserted before: the "if nothing fits, write no
+    # <Game> block" hatch is gone. It was never legitimately true — every one of the 31
+    # real planner specs scores a genuine fit — and it is the one sentence that permits
+    # a game-free lesson, which is what `LS-GAME-FLOOR` now measures.
+    check("mandates exactly one game", "**Exactly one** `<Game>` block" in section)
+    check("...with no hatch permitting a game-free lesson",
+          "no `<Game>` block" not in section and "write no" not in section)
+
+    # ---------------------------------------------------------------------------
+    # The evidence must reach the MODEL, not just the log. `Candidate.reasons` was
+    # computed and then only printed — rule 27's shape — which left the prompt saying
+    # "these look like the best fits, in order" over a 1.00 tie whose order was the
+    # alphabetical tie-break. With no fit signal in the text, the only signal left was
+    # prompt volume, and `sort-the-court`'s spec is 2.1x longer than `hangman`'s
+    # (12,530 vs 5,901 chars). That is the measured cause of "it always picks sort the
+    # court", so both halves are pinned here.
+    # ---------------------------------------------------------------------------
+    preamble = section.split("\n---\n")[0]
+    check("each candidate carries its score", "`sort-the-court` (0.98)" in preamble
+          and "`hangman` (0.93)" in preamble, preamble[:600])
+    for c in select_candidates(extract_signals(MISCONCEPTION_SPEC),
+                               load_guide(GAMES_GUIDE_DIR), MAX_GAME_CANDIDATES):
+        for reason in c.reasons:
+            check(f"...and its evidence verbatim ({c.game.type}: {reason[:24]}…)",
+                  reason in preamble, preamble[:600])
+    check("spec length is stated NOT to be evidence of fit",
+          "longer authoring spec" in preamble and "not in suitability" in preamble)
+    check("...and the old bare 'in order' claim is gone from the preamble",
+          "in order" not in preamble, preamble[:600])
+
+    # A near-tie is disclosed as what it is. 0.98 vs 0.93 is inside _TIE_EPSILON, so the
+    # margin is not worth trusting — but the leader DOES lead, so claiming the order is
+    # alphabetical here would be a false sentence in the prompt (it is not: `hangman`
+    # sorts first). The two cases get two different sentences.
+    check("a near-tie is disclosed with its real margin",
+          "leads by only 0.05" in preamble and "too small to settle it" in preamble,
+          preamble[:800])
+    check("...and is NOT described as alphabetical, because it is not",
+          "alphabetical" not in preamble, preamble[:800])
+    check("...and hands the decision to the lesson's content",
+          "which of those shapes is the thing a student who understood THIS lesson"
+          in preamble)
+
+    # The exact-tie branch, which is what fires at scale: identical scores mean the
+    # order IS the alphabetical tie-break and carries no information at all.
+    tied_cands = select_candidates(extract_signals(TERM_HEAVY_SPEC),
+                                  load_guide(GAMES_GUIDE_DIR), MAX_GAME_CANDIDATES)
+    forced = [replace(tied_cands[0], score=1.0), replace(tied_cands[1], score=1.0)]
+    members, kind = games.tie_group(forced)
+    check("tie_group calls identical scores an exact tie",
+          kind == "exact" and len(members) == 2, f"{kind} {len(members)}")
+    check("tie_group calls a sub-epsilon margin near, not exact",
+          games.tie_group([replace(forced[0], score=1.0),
+                           replace(forced[1], score=0.97)])[1] == "near")
+    check("tie_group reports no tie once the margin clears the epsilon",
+          games.tie_group([replace(forced[0], score=1.0),
+                           replace(forced[1], score=0.80)]) == ([], ""))
+    check("tie_group needs two candidates to have a tie at all",
+          games.tie_group(forced[:1]) == ([], ""))
+
     check("rules section carries the catalog", "# Game catalog" in rules)
     check("rules section carries the escaping contract",
           "Do NOT use backticks here" in rules)

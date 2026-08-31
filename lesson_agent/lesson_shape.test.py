@@ -109,8 +109,8 @@ def codes(report: S.ShapeReport) -> list[str]:
 
 
 def clean_env() -> env:
-    """No SVG_FLOOR / LESSON_BUDGET_BAND — the shipped defaults."""
-    return env(SVG_FLOOR=None, LESSON_BUDGET_BAND=None)
+    """No SVG_FLOOR / GAME_FLOOR / LESSON_BUDGET_BAND — the shipped defaults."""
+    return env(SVG_FLOOR=None, GAME_FLOOR=None, LESSON_BUDGET_BAND=None)
 
 
 def spec(duration: str | None = None, checkpoint: bool | None = None) -> str:
@@ -151,6 +151,13 @@ def svgs(count: int) -> str:
         f'  <Svg><svg viewBox="0 0 10 10"><text x="1" y="1">label {i}</text></svg></Svg>'
         for i in range(count)
     )
+
+
+def game(gtype: str = "hangman") -> str:
+    """One `<Game>` block, so a case about some *other* rule is not also below the game
+    floor. Payload shape is irrelevant here — `lesson_shape` counts tags, it never parses
+    JSON (that is the real `dist/cli.js`'s job)."""
+    return f'\n  <Game type="{gtype}">{{"word": "cat"}}</Game>'
 
 
 def std_budget(**over) -> B.Budget:
@@ -362,7 +369,9 @@ def _():
     with env(SVG_FLOOR="0", LESSON_BUDGET_BAND=None):
         b = B.budget_for(30)
         eq(b.svg_floor, 0, "floor disabled")
-        report = S.check(lesson(sections(5) + svgs(0)), b)
+        # The game is present so this asserts what it says it asserts: SVG_FLOOR=0
+        # disables the SVG floor. LS-GAME-FLOOR is a separate knob and still applies.
+        report = S.check(lesson(sections(5) + svgs(0) + game()), b)
         eq(report.has_hard, False, "no hard finding when the floor is 0")
 
 
@@ -657,6 +666,7 @@ def _():
             f'\n  <FlashCard id="f{i}"><Front>F</Front><Back>B</Back></FlashCard>'
             for i in range(b.flashcards[0])
         )
+        + game()
     )
     r = S.check(doc, b)
     eq(codes(r), [], f"a lesson written to budget must be clean; got {r.one_line()}")
@@ -665,7 +675,7 @@ def _():
 @case("LS-SVG-FLOOR/TOO_FEW_SVGS is hard")
 def _():
     b = std_budget()
-    r = S.check(lesson(sections(5) + svgs(b.svg_floor - 1)), b)
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor - 1) + game()), b)
     contains(str(codes(r)), "TOO_FEW_SVGS", "code")
     eq(len(r.hard), 1, "exactly one hard finding")
     eq(r.has_hard, True, "has_hard")
@@ -680,14 +690,14 @@ def _():
 def _():
     # A gate that cannot be satisfied is as bad as one that never fires.
     b = std_budget()
-    r = S.check(lesson(sections(5) + svgs(b.svg_floor)), b)
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor) + game()), b)
     eq([f.code for f in r.hard], [], "at the floor")
 
 
 @case("LS-SVG-FLOOR/UNRESOLVED_SVG_PLACEHOLDER is hard even above the floor")
 def _():
     b = std_budget()
-    doc = lesson(sections(5) + svgs(b.svg_floor) + '\n  <Svg concept="x" />')
+    doc = lesson(sections(5) + svgs(b.svg_floor) + game() + '\n  <Svg concept="x" />')
     r = S.check(doc, b)
     hard = [f.code for f in r.hard]
     eq(hard, ["UNRESOLVED_SVG_PLACEHOLDER"], "a placeholder renders as nothing")
@@ -702,15 +712,167 @@ def _():
     true("TOO_FEW_SVGS" in codes_, f"1 real + 2 placeholders is below the floor: {codes_}")
 
 
+# ---------------------------------------------------------------------------
+# lesson_shape.py — LS-GAME-FLOOR
+#
+# The floor and the ceiling are both 1, for two different reasons. The floor: nothing
+# has ever counted games per lesson, and the course-level census permits 70% of lessons
+# to have none. The ceiling: `maxPerLesson: 1` is the registry's statement and the
+# parser does NOT enforce it, so a second game would validate clean and ship.
+# ---------------------------------------------------------------------------
+
+
+@case("LS-GAME-FLOOR/no game is hard")
+def _():
+    b = std_budget()
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor)), b)
+    hard = [f.code for f in r.hard]
+    eq(hard, ["NO_GAME"], f"a game-free lesson must block once: {hard}")
+    finding = r.hard[0]
+    eq(finding.rule_id, "LS-GAME-FLOOR", "rule id")
+    eq(finding.severity, S.HARD, "severity")
+    contains(finding.message, "floor is 1", "the message must name the floor")
+
+
+@case("LS-GAME-FLOOR/exactly one game is clean")
+def _():
+    # A gate that cannot be satisfied is as bad as one that never fires.
+    b = std_budget()
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor) + game()), b)
+    eq([f.code for f in r.hard], [], "one game at the floor")
+
+
+@case("LS-GAME-FLOOR/two games is hard — the parser does not cap it")
+def _():
+    b = std_budget()
+    doc = lesson(sections(5) + svgs(b.svg_floor) + game() + game("sort-the-court"))
+    r = S.check(doc, b)
+    eq([f.code for f in r.hard], ["TOO_MANY_GAMES"], "two games must block")
+    contains(r.hard[0].message, "maxPerLesson", "the message must cite the registry")
+
+
+@case("LS-GAME-FLOOR/GAME_FLOOR=0 disables it")
+def _():
+    # The knob a run uses when games are deliberately off. It must disable the ceiling
+    # too, or "no games wanted" would still reject a lesson that has one.
+    with env(GAME_FLOOR="0", SVG_FLOOR=None, LESSON_BUDGET_BAND=None):
+        b = B.budget_for(30)
+        eq(b.game_floor, 0, "floor disabled")
+        eq(S.check(lesson(sections(5) + svgs(b.svg_floor)), b).hard, [], "none")
+        eq(S.check(lesson(sections(5) + svgs(b.svg_floor) + game()), b).hard, [], "one")
+        eq(
+            S.check(lesson(sections(5) + svgs(b.svg_floor) + game() + game()), b).hard,
+            [],
+            "two",
+        )
+
+
+@case("LS-GAME-FLOOR/GAME_FLOOR garbage falls back to the default, loudly")
+def _():
+    for bad in ("one", "-1", "   "):
+        with env(GAME_FLOOR=bad, SVG_FLOOR=None, LESSON_BUDGET_BAND=None):
+            eq(B.budget_for(30).game_floor, B.GAME_FLOOR, f"GAME_FLOOR={bad!r}")
+
+
+@case("LS-GAME-FLOOR/a game inside <Code> is not a game")
+def _():
+    # A lesson TEACHING MLAI must not count as HAVING a game. Same exclusion as
+    # `game_census` in workers/phases/curriculum.py. Measured there: 0 occurrences of
+    # `<Game` across all 1091 local .mlai files, so this is for a future false positive.
+    b = std_budget()
+    taught = (
+        '\n  <Code lang="xml">&lt;Game type="hangman"&gt;{}&lt;/Game&gt;</Code>'
+        '\n  <Code lang="xml"><Game type="hangman">{}</Game></Code>'
+    )
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor) + taught), b)
+    eq(S.measure(lesson(taught)).games, 0, "a <Game> inside <Code> is an example")
+    contains(str([f.code for f in r.hard]), "NO_GAME", "so the lesson is still game-free")
+
+
+@case("LS-GAME-FLOOR/a diagram inside <Code> is not a diagram either")
+def _():
+    # The same exclusion, on the rule that already existed — `measure()` counted every
+    # tag on the RAW text before LS-GAME-FLOOR needed this, so an MLAI-teaching lesson
+    # could reach the SVG floor on quoted examples alone.
+    taught = "\n".join(
+        '  <Code lang="xml"><Svg><svg viewBox="0 0 1 1"/></Svg></Code>' for _ in range(4)
+    )
+    m = S.measure(lesson(taught))
+    eq(m.svgs, 0, "quoted <Svg> examples are not diagrams")
+    eq(m.svg_placeholders, 0, "nor placeholders")
+
+
+@case("LS-GAME-FLOOR/both floors miss — one prompt naming both")
+def _():
+    b = std_budget()
+    r = S.check(lesson(sections(5) + svgs(0)), b)
+    eq(sorted(f.code for f in r.hard), ["NO_GAME", "TOO_FEW_SVGS"], "both fire")
+    text = S.build_topup_prompt(r, b, "/tmp/x.mlai", [], ["hangman", "sort-the-court"])
+    contains(text, "diagrams and its interactive game", "the opening names both")
+    contains(text, "generate_svg", "the SVG half survives")
+    contains(text, "`hangman`", "the game half names the valid types")
+
+
+@case("topup/game half is self-sufficient and states the INVERTED escaping rule")
+def _():
+    # The one line that cannot be dropped: a <Game> payload is a plain React child, so
+    # backticks reach the student literally while entities decode. That is the opposite
+    # of the <Body> rule the model has followed all lesson (AGENTS.md rule 32).
+    b = std_budget()
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor)), b)
+    text = S.build_topup_prompt(r, b, "/tmp/x.mlai", [], ["hangman"])
+    contains(text, "never backticks", "backticks are forbidden in a payload")
+    contains(text, "&lt;", "entities are the escaping form here")
+    contains(text, "INVALID_CHILD", "placement: not inside a <Section>")
+    contains(text, "UNKNOWN_GAME_TYPE", "and why the type must be exact")
+    # It must NOT ask for diagrams: this lesson already has its three.
+    true("generate_svg" not in text, f"no SVG instructions on a game-only miss: {text}")
+
+
+@case("topup/too many games is told to delete, not to add")
+def _():
+    b = std_budget()
+    doc = lesson(sections(5) + svgs(b.svg_floor) + game() + game("sort-the-court"))
+    text = S.build_topup_prompt(S.check(doc, b), b, "/tmp/x.mlai", [], ["hangman"])
+    contains(text, "delete 1 of them", "the fix is a deletion")
+    true("Add one now" not in text, "and must not also ask for another game")
+
+
+@case("topup/no game types available still produces a usable prompt")
+def _():
+    # `registered_game_types` fails open to [] when the guide is missing. The prompt must
+    # still be actionable rather than naming an empty list.
+    b = std_budget()
+    r = S.check(lesson(sections(5) + svgs(b.svg_floor)), b)
+    text = S.build_topup_prompt(r, b, "/tmp/x.mlai", [], [])
+    contains(text, "the catalog", "falls back to the catalog in the system prompt")
+    true("from  —" not in text, "no empty type list")
+
+
+@case("LS-GAME-FLOOR/the budget prompt states the rule the gate enforces")
+def _():
+    # Rule 26: a rule enforced by a gate but absent from the prompt is a trap — the
+    # model is failed for something it was never told. And the row must vanish when the
+    # floor is disabled, rather than telling the writer to produce "exactly 0".
+    b = std_budget()
+    table = B.build_budget_section(b)
+    contains(table, "`<Game>` blocks", "the row is present")
+    contains(table, "exactly 1", "and states the number")
+    eq(table.count("`<Game>` blocks"), 1, "one row, not two")
+    with env(GAME_FLOOR="0", SVG_FLOOR=None, LESSON_BUDGET_BAND=None):
+        off = B.build_budget_section(B.budget_for(30))
+    true("`<Game>` blocks" not in off, f"no row when the floor is off: {off}")
+
+
 @case("LS-WORDS/WORD_COUNT over and under, advisory")
 def _():
     b = std_budget(words=(1000, 1300))
-    over = S.check(lesson(sections(5, each=400) + svgs(3)), b)
+    over = S.check(lesson(sections(5, each=400) + svgs(3) + game()), b)
     contains(str(codes(over)), "WORD_COUNT", "over budget")
     true(all(f.severity == S.ADVISORY for f in over.findings), "must be advisory")
     contains([f for f in over.findings if f.code == "WORD_COUNT"][0].message, "(over)", "over")
 
-    under = S.check(lesson(sections(2, each=10) + svgs(3)), b)
+    under = S.check(lesson(sections(2, each=10) + svgs(3) + game()), b)
     contains(
         [f for f in under.findings if f.code == "WORD_COUNT"][0].message,
         "(under)",
@@ -721,7 +883,7 @@ def _():
 @case("LS-WORDS/never hard — 'cut 400 words' is not a fix the model can carry out")
 def _():
     b = std_budget()
-    r = S.check(lesson(sections(20, each=400) + svgs(b.svg_floor)), b)
+    r = S.check(lesson(sections(20, each=400) + svgs(b.svg_floor) + game()), b)
     eq(r.hard, [], "an enormous lesson must still not block")
     true(len(r.advisory) >= 2, f"but it must be reported: {codes(r)}")
 
@@ -863,12 +1025,15 @@ def _():
 @case("topup/section candidates are included and capped")
 def _():
     b = std_budget()
-    doc = lesson(sections(30, each=5) + svgs(1))
+    doc = lesson(sections(30, each=5) + svgs(1) + game())
     r = S.check(doc, b)
     text = S.build_topup_prompt(r, b, "/tmp/x.mlai", S.sections_without_visuals(doc))
     contains(text, "Heading 0", "a candidate heading")
     # Capped so a 30-section lesson does not produce a 30-line prompt.
-    true(text.count("\n- ") <= 12, f"candidate list must be capped, got {text.count(chr(10) + '- ')}")
+    # Counted on the heading lines specifically, not every "- " bullet: the game half of
+    # this prompt is a bullet list too, so a loose count would measure two things at once.
+    headings = text.count("\n- Heading")
+    true(headings <= 12, f"candidate list must be capped, got {headings}")
 
 
 @case("topup/no candidates still produces a usable prompt")
