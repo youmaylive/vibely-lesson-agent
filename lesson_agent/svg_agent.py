@@ -28,16 +28,20 @@ from svg_geometry import (
     SD_ANCHOR,
     SD_CANVAS,
     SD_DENSITY,
+    SD_DEPTH,
     SD_FONT,
     SD_MEASURABLE,
+    SD_MOTION,
     SD_PALETTE,
     SD_SPACING,
+    SD_STRUCTURE,
     SD_TEXT_FIT,
     SD_TYPE,
     autofit_viewbox,
     craft_findings,
     detect_overlaps,
     element_boxes,
+    motion_findings,
 )
 import usage
 
@@ -53,10 +57,21 @@ REVIEW_THRESHOLD = 7  # score >= 7 = accept
 # How many review calls may be spent on candidates that already failed the geometry
 # gate. Clean candidates are ALWAYS reviewed. A geometry-flagged candidate is still
 # worth judging (its score decides which flawed draft to keep if every attempt fails,
-# and the judge sees problems the linter cannot), but not at unbounded cost — this
-# caps the worst case at MAX_ATTEMPTS generations + 2 wasted reviews rather than
-# MAX_ATTEMPTS of each.
-FLAGGED_REVIEW_BUDGET = 2
+# and the judge sees problems the linter cannot), but not at unbounded cost.
+#
+# Raised 2 -> 3 after measuring a real run: every diagram logged "review skipped
+# (attempt 3)" and "(attempt 4)", so the judge was absent for HALF of every
+# diagram's attempts and the last two attempts were decided by the linter alone.
+# That is rule 24's shape — the cheap check quietly becoming the only check — and
+# the diagram that shipped from it was rejected on sight.
+#
+# The root cause was upstream and is fixed: two of that run's three "collisions"
+# were the geometry gate flagging a transmembrane protein for crossing its own
+# membrane, twice (see _crossing_bands and drop_coincident_overlays in
+# svg_geometry.py). Fewer candidates are flagged now, so this budget is reached
+# far less often — but leaving it at 2 would have kept the last attempt unjudged
+# whenever it IS reached, and an unjudged attempt is the one that ships.
+FLAGGED_REVIEW_BUDGET = 3
 # Bedrock inference-profile model ID (Claude via Amazon Bedrock)
 DEFAULT_MODEL = "global.anthropic.claude-sonnet-5"
 
@@ -217,6 +232,44 @@ _FIX_BY_RULE = {
     SD_TYPE: "Pick the SD-TYPE that fits this idea and draw the form it calls for.",
     SD_PALETTE: "Use the assigned palette's roles to distinguish what shapes mean.",
     SD_DENSITY: "Rebalance: specific labels on shapes, not paragraphs in a frame.",
+    # SD-DEPTH is now one advisory and one HARD code, and the hard one needs the
+    # *opposite* instruction from the advisory one — "add gradients" against
+    # "take this gradient off". Naming only the advisory fix would tell a model
+    # whose line is invisible *because* of a gradient to add more of them
+    # (rule 24, and rule 26's shape: the spec asked for gradients everywhere and
+    # a stroked one silently deletes the element).
+    SD_DEPTH: (
+        "Gradients are for FILLS. If a stroke references one, replace it with a "
+        "flat palette hex — a gradient stroked on a line that is flat along the "
+        "ramp's axis renders completely invisible. Otherwise: give the primary "
+        "shapes a two-stop <linearGradient> and the key surface a white "
+        "<radialGradient> sheen; depth is an offset translucent copy, never a "
+        "<filter>."
+    ),
+    # Two hard codes share this rule and BOTH fixes are named, because they are
+    # different edits: adding a missing declaration, or correcting a name that is
+    # not in the table. A single "declare an archetype" sentence would leave a
+    # model that already wrote `<!-- archetype: bathtub -->` with nothing to do
+    # (rule 24 — the retry message must be fixable by the thing it names).
+    SD_STRUCTURE: (
+        "Add `<!-- archetype: NAME -->` as the first line inside <svg>, or change "
+        "the name you declared to one from the SD-TYPE table. Then check the "
+        "drawing really is that form — and place every shape and label inside one "
+        "SD-STRUCTURE cell rather than at coordinates you chose."
+    ),
+    # Two shapes under one rule, so the text has to name both, and both are now hard:
+    # REVEAL_WITHOUT_FREEZE is a reveal that undoes itself, STATIC_STRUCTURE is a build
+    # that only moved the decorations. Rule 24 — the instruction must be fixable by the
+    # thing it names, which is why "stage the structure" is spelled out as *what goes
+    # inside one group* rather than "add more animation".
+    SD_MOTION: (
+        'Add fill="freeze" to every reveal <animate>, or the element snaps back to '
+        "opacity 0 and disappears permanently. And stage the STRUCTURE, not the "
+        "trimmings: each teaching step's shape, label and connector go together "
+        'inside one <g opacity="0"> with an increasing `begin`, so the figure '
+        "assembles in the order the lesson explains it. A diagram whose frame and "
+        "cards are all on screen at t=0 reads as static however many chips fade in."
+    ),
 }
 
 
@@ -257,7 +310,7 @@ def _geometry_check(svg_content: str) -> tuple[list, str, str]:
         print(f"      ⚠️  SVG_GEOMETRY_UNAVAILABLE: {report.error}")
         return [], "", ""
 
-    craft = craft_findings(svg_content)
+    craft = craft_findings(svg_content) + motion_findings(svg_content)
     hard = report.hard + [f for f in craft if f.severity == HARD]
     advisory = report.advisory + [f for f in craft if f.severity != HARD]
 
@@ -298,25 +351,15 @@ def _extract_svg(raw: str) -> str:
 # SVG Review (LLM judge)
 # ---------------------------------------------------------------------------
 
-async def _review_svg(
-    svg_content: str,
-    concept: str,
-    context: str,
-    model: str,
-    lesson_excerpt: str = "",
-    craft_notes: str = "",
+def parse_review_response(
+    response: str, *, has_excerpt: bool
 ) -> tuple[int | None, str, int]:
-    """Ask LLM to review the SVG. Returns (score, issues_string, grounding).
+    """Parse a reviewer response into (score, issues, grounding). Pure — no network.
 
-    `score` is None when the review is unusable — see the REVIEW_UNAVAILABLE branch.
-    `grounding` is 10 when no lesson excerpt was supplied (nothing to check against),
-    so callers can gate on it unconditionally.
+    Split out of `_review_svg` so it can be tested at all. While the parse was welded
+    to the Bedrock call, the only way to exercise it was to spend an LLM call, so it
+    had no cases — and it was carrying the inverted implication documented below.
     """
-    prompt = build_svg_review_prompt(
-        svg_content, concept, context, lesson_excerpt, craft_notes=craft_notes
-    )
-    response = await _llm_call_async(prompt, model)
-
     # Robustly extract the OVERALL score. Handles many formats the model may emit:
     #   "OVERALL: 8", "**OVERALL:** 8", "Overall - 8/10", "Overall score: 8", etc.
     score = None
@@ -338,7 +381,7 @@ async def _review_svg(
         # silently drops the missing ones and skews toward the rest.
         for dim in (
             "relevance", "clarity", "labels", "accuracy", "grounding", "layout",
-            "craft", "density",
+            "craft", "density", "polish",
         ):
             m = re.search(rf'{dim}[^0-9]{{0,20}}([0-9]+(?:\.[0-9]+)?)', response, re.IGNORECASE)
             if m:
@@ -366,7 +409,7 @@ async def _review_svg(
     # GROUNDING — a hard gate, parsed separately from the average. Only meaningful when
     # a lesson excerpt was supplied; otherwise there is nothing to be unfaithful to.
     grounding = 10
-    if lesson_excerpt.strip():
+    if has_excerpt:
         g_match = re.search(
             r'grounding[^0-9]{0,20}([0-9]+(?:\.[0-9]+)?)', response, re.IGNORECASE
         )
@@ -375,13 +418,78 @@ async def _review_svg(
                 grounding = round(float(g_match.group(1)))
             except (ValueError, TypeError):
                 grounding = 10
-        # An explicit FAIL verdict counts as a grounding failure even if the model
-        # forgot to emit (or garbled) the numeric line.
-        v_match = re.search(r'verdict[^a-z]{0,10}(pass|fail)', response, re.IGNORECASE)
-        if v_match and v_match.group(1).lower() == "fail":
-            grounding = min(grounding, REVIEW_THRESHOLD - 1)
+        else:
+            # The verdict clamp is a FALLBACK for a garbled numeric line, and ONLY
+            # that. It reads the review's *overall* VERDICT, and the prompt's rule is
+            # one-directional — "if Grounding < 7, VERDICT is FAIL"
+            # (`svg_generate.py:151`). Treating a FAIL as evidence of a grounding
+            # problem affirms the consequent: a faithful diagram with flat fills and
+            # wordy labels scores 6 overall, emits FAIL for that reason, and used to
+            # be relabelled a grounding failure.
+            #
+            # Measured on the real run in /tmp/full_probe.log, which is what found
+            # this: grounding came back as *exactly* 6 on 10 of 12 attempts across
+            # three independent figures. 6 is `REVIEW_THRESHOLD - 1`, i.e. the clamp,
+            # not a judgement — a model's own opinion does not land on one integer ten
+            # times. The cost was not cosmetic. Because the hard gate at the top of
+            # the loop `continue`s *before* the ranking key is computed, every clamped
+            # candidate was discarded rather than ranked:
+            #   * figure 0's attempt 4 was geometry CLEAN and was thrown away; the
+            #     only survivor was attempt 3, which shipped with STATIC_STRUCTURE,
+            #     TEXT_OVERFLOWS_RECT and TEXT_SPILL — the flat, overlapping diagram.
+            #   * figure 1 had all four attempts clamped, so `best_svg` was never set
+            #     and it shipped through the `any_valid_svg` fallback, ranking bypassed.
+            #   * figure 2 scored 8, so it alone kept its real grounding and took the
+            #     designed path — and it is the one figure that renders well.
+            # Rule 24 exactly, one level up: a gate placed before the ranking silently
+            # replaces it. And the retry text it triggers ("the diagram shows facts
+            # that are NOT in the lesson … regenerate using ONLY the lesson's own
+            # examples") is unfixable by the thing it names, which is the same rule's
+            # second half — three of figure 0's four attempts were told to fix
+            # grounding while its actual defect was that nothing was staged.
+            #
+            # Confirmed by one real Bedrock call against the diagram that shipped, rather
+            # than left as an inference from the log: the reviewer emits
+            # `GROUNDING: 9` alongside `VERDICT: FAIL` (failing it for craft — "a single
+            # pulsing dot with 0 opacity most of the time", "60/68 shapes are circles",
+            # a title spanning 60% of canvas width). Old code returned 6 for that
+            # response; this returns 9.
+            v_match = re.search(r'verdict[^a-z]{0,10}(pass|fail)', response, re.IGNORECASE)
+            if v_match and v_match.group(1).lower() == "fail":
+                grounding = min(grounding, REVIEW_THRESHOLD - 1)
+                # Say which of the two produced the number. Without this the log prints
+                # `grounding 6/10` for both "the model judged it unfaithful" and "the
+                # model never gave a number and we assumed the worst" — and it was
+                # exactly that ambiguity which let the inverted clamp hide in plain
+                # sight across three figures and twelve attempts (rule 21).
+                print(
+                    "      ⚠️  GROUNDING_ASSUMED: the review gave no numeric GROUNDING "
+                    f"line, and its overall VERDICT was FAIL — assuming "
+                    f"{REVIEW_THRESHOLD - 1}/10 rather than passing it unmeasured"
+                )
 
     return score, issues, grounding
+
+
+async def _review_svg(
+    svg_content: str,
+    concept: str,
+    context: str,
+    model: str,
+    lesson_excerpt: str = "",
+    craft_notes: str = "",
+) -> tuple[int | None, str, int]:
+    """Ask LLM to review the SVG. Returns (score, issues_string, grounding).
+
+    `score` is None when the review is unusable — see the REVIEW_UNAVAILABLE branch.
+    `grounding` is 10 when no lesson excerpt was supplied (nothing to check against),
+    so callers can gate on it unconditionally.
+    """
+    prompt = build_svg_review_prompt(
+        svg_content, concept, context, lesson_excerpt, craft_notes=craft_notes
+    )
+    response = await _llm_call_async(prompt, model)
+    return parse_review_response(response, has_excerpt=bool(lesson_excerpt.strip()))
 
 
 # ---------------------------------------------------------------------------
@@ -509,9 +617,39 @@ async def generate_one_svg(
         feedback = f"{geometry_note}\n\n{review_note}" if geometry_note else review_note
 
     final_svg = best_svg or any_valid_svg
-    if final_svg:
-        return _autofit_viewbox(final_svg)
-    return ""
+    if not final_svg:
+        return ""
+    shipped = _autofit_viewbox(final_svg)
+
+    # A diagram that still carries hard findings after every attempt SHIPS — an
+    # empty figure is worse than a flawed one, and the SVG floor depends on this
+    # returning markup. But it must not ship *quietly*, which is what happened: a
+    # diagram whose labels demonstrably collided was ranked second, shipped, and
+    # the only trace was a per-attempt line buried in a concurrent log. Rule 31's
+    # corollary — a verdict computed and then not surfaced is not a gate — and
+    # rule 21's: fail-open is a legitimate choice, fail-open silently is not.
+    #
+    # Measured on the bytes that ship, AFTER autofit, not on `best_svg`: autofit
+    # rewrites the viewBox, so it is the only thing that can decide
+    # CONTENT_OUTSIDE_CANVAS either way (rule 29 — validate the artifact the
+    # student reads). Re-derived here rather than carried from the loop for the
+    # same reason, and it costs no LLM call.
+    #
+    # Deliberately a print and not an exception: this audits a candidate we have
+    # already chosen to keep, and aborting a five-hour run over one label
+    # collision is the wrong trade (rule 31 — fail-open vs fail-closed is
+    # per-path). The `any_valid_svg` fallback is covered too, since that path
+    # never set `best_key` and would otherwise report nothing at all.
+    hard_findings, _, _ = _geometry_check(shipped)
+    if hard_findings:
+        codes = ", ".join(sorted({f.code for f in hard_findings}))
+        print(
+            f"      ⚠️  SVG-SHIPPED-FLAGGED: '{concept[:60]}' ships with "
+            f"{len(hard_findings)} unresolved geometry finding(s) after "
+            f"{max_attempts} attempts — {codes}"
+        )
+
+    return shipped
 
 
 # ---------------------------------------------------------------------------
