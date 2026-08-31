@@ -236,10 +236,61 @@ flowchart TD
 
 """ + game_rules + """
 ## ═══════════════════════════════════════════════════════
+## INTERACTIVE GAMES
+## ═══════════════════════════════════════════════════════
+
+Use `<Game>` to embed a playable game inside the lesson. The game loads in a modal when the student clicks "Play" — it doesn't interrupt the lesson flow. Use it to reinforce vocabulary or key terms from the lesson in an engaging way.
+
+### `<Game type="hangman">` — Word-guessing game
+The classic hangman mechanic: student guesses a word letter-by-letter before running out of lives.
+
+```xml
+<Game type="hangman">
+[
+  {
+    "title": "Topic label shown as a badge",
+    "question": "The clue shown to the student — be specific and educational",
+    "word": "ANSWER",
+    "hint": "Optional extra hint if the word is hard"
+  }
+]
+</Game>
+```
+
+**Rules for `word`:**
+- UPPERCASE letters and spaces only — NO digits, punctuation, or special characters
+- 1–40 characters
+- The word must be guessable from the clue alone
+
+**Payload rules:**
+- The body is a JSON array — one or more puzzle objects
+- Each puzzle needs `title`, `question`, `word` (required) and optionally `hint`
+- Include 3–6 puzzles per `<Game>` block — enough variety without being exhausting
+- `title` = short topic label (max 60 chars), `question` = clue (max 240 chars), `hint` = extra nudge (max 160 chars)
+
+**When to use:**
+- After introducing a set of key terms (vocabulary reinforcement)
+- At the end of a concept section as a low-stakes check
+- When the lesson has 5+ named concepts worth remembering
+
+**Placement:** Directly under `<Lesson>` (same level as FlashCard, SingleSelect). NOT inside a `<Section>`.
+
+**Example:**
+```xml
+<Game type="hangman">
+[
+  { "title": "Cell Biology", "question": "The organelle that produces most of the cell's ATP", "word": "MITOCHONDRIA", "hint": "Often called the powerhouse of the cell." },
+  { "title": "Cell Biology", "question": "The control center of the cell, holding its DNA", "word": "NUCLEUS", "hint": "Membrane-bound, contains chromosomes." },
+  { "title": "Cell Biology", "question": "The jelly-like fluid filling the cell interior", "word": "CYTOPLASM" }
+]
+</Game>
+```
+
+## ═══════════════════════════════════════════════════════
 ## STRUCTURAL FORMAT RULES
 ## ═══════════════════════════════════════════════════════
 
-1. **Structure**: Start with <Meta>, then wrap ALL instructional content (H1, H2, H3, Body, Code) in `<Section>` tags. Interactive components (FlashCard, SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective) can be placed directly under `<Lesson>`. NEVER place H1, H2, H3, Body, or Code directly under `<Lesson>` — they must always be inside a `<Section>`.
+1. **Structure**: Start with <Meta>, then wrap ALL instructional content (H1, H2, H3, Body, Code) in `<Section>` tags. Interactive components (FlashCard, SingleSelect, MultiSelect, SortQuiz, MatchPairs, FillBlanks, Subjective, Game) can be placed directly under `<Lesson>`. NEVER place H1, H2, H3, Body, or Code directly under `<Lesson>` — they must always be inside a `<Section>`.
 
 2. **Section Types**: Use the `type` attribute on `<Section>` to display contextual icons:
    - `type="text"` (default) — general explanatory content
