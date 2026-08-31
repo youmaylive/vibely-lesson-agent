@@ -126,6 +126,9 @@ SD_MEASURABLE = "SD-MEASURABLE"
 SD_TYPE = "SD-TYPE"
 SD_PALETTE = "SD-PALETTE"
 SD_DENSITY = "SD-DENSITY"
+SD_DEPTH = "SD-DEPTH"    # tonal depth: gradients, elevation, rounded corners
+SD_MOTION = "SD-MOTION"  # SMIL reveal timing
+SD_STRUCTURE = "SD-STRUCTURE"  # declared archetype, fixed zones, labels not prose
 
 
 @dataclass(frozen=True)
@@ -580,6 +583,12 @@ NON_RENDERING = frozenset({
     "defs", "marker", "symbol", "clippath", "mask", "pattern",
     "lineargradient", "radialgradient", "filter", "metadata", "title", "desc",
     "style", "script",
+    # SMIL timing elements. They declare *behaviour* on the parent shape and
+    # draw nothing themselves, so walking into them would measure an
+    # `<animate>` as page geometry. `animateMotion`'s `path` attribute is the
+    # sharp case: it carries a `d`-shaped value that is a trajectory, not a
+    # drawn stroke.
+    "animate", "animatetransform", "animatemotion", "set", "mpath",
 })
 
 # Transform functions we can represent exactly with an axis-aligned box.
@@ -1307,6 +1316,12 @@ EDGE_MOUNT_TOLERANCE = 8.0
 # 1 unit: this is about coordinates an author typed to match, not near misses.
 JOINT_TOLERANCE = 1.0
 
+# How exactly two boxes must coincide to be the same object drawn twice. Same
+# reasoning as JOINT_TOLERANCE and the same value: the SD-DEPTH raised-card idiom
+# repeats the *identical* x/y/width/height for its sheen layer, so this is about
+# coordinates that match to the digit, not shapes that happen to sit close.
+COINCIDENT_TOLERANCE = 1.0
+
 # Grid resolution for region sampling. 32x32 = 1024 probes per pair: the area
 # error is under 3% on an ellipse, well inside the 10% depth threshold, and it is
 # fully deterministic (no Monte Carlo), so two identical blocks always agree.
@@ -1390,6 +1405,103 @@ def _mounted_on_edge(small: Element, large: Element) -> bool:
         and b.y1 - t <= c.cy <= b.y2 + t
     )
     return on_horizontal_edge or on_vertical_edge
+
+
+# How close to a label's edge the covered run must reach, and how much real ink the
+# shape must actually put on the label. Both measured on the 150-block corpus rather
+# than chosen: at END_CLIP_INK_FLOOR = 0.05 the seven curved-<ellipse> bounding-box
+# artifacts (ink 0.000-0.048) drop out and the true case (0.061) survives. See the
+# TEXT_END_CLIPPED branch in detect_overlaps for the full measurement.
+END_CLIP_EDGE_FRACTION = 0.15
+END_CLIP_INK_FLOOR = 0.05
+END_CLIP_MIN_CHARS = 1.0
+
+
+def _end_clipped(t: Element, s: Element, share: float) -> bool:
+    """Does `s` cover a contiguous run at the left or right extremity of label `t`?
+
+    Three conditions, each doing distinct work. The covered run must be at least one
+    character wide (a hairline graze hides nothing); it must reach within
+    END_CLIP_EDGE_FRACTION of an edge (a shape biting the MIDDLE of a label is a
+    different defect, and one TEXT_SPILL's area measure already sees); and there must
+    be real ink on the label, which is what excludes a curved shape whose bounding box
+    overlaps while its outline passes clear of the text.
+    """
+    if share < END_CLIP_INK_FLOOR:
+        return False
+    label = (t.label or "").strip()
+    width = t.box.x2 - t.box.x1
+    if not label or width <= 0:
+        return False
+    char_w = width / max(1, len(label))
+    x1, x2 = max(t.box.x1, s.box.x1), min(t.box.x2, s.box.x2)
+    if x2 - x1 < char_w * END_CLIP_MIN_CHARS:
+        return False
+    margin = width * END_CLIP_EDGE_FRACTION
+    return x1 <= t.box.x1 + margin or x2 >= t.box.x2 - margin
+
+
+def _crossing_bands(a: Element, b: Element) -> bool:
+    """Do these two shapes cross at right angles, each spanning the other?
+
+    A transmembrane protein through a membrane band, a pipe through a wall, an
+    axis rule through a plot area: one shape's horizontal span contains the
+    other's entirely, and the other's vertical span contains the first's
+    entirely. That mutual perpendicular containment is a "+" — the lap is the
+    crossing, which is the whole point of the drawing.
+
+    Found by measuring, not anticipated. The first diagram generated under
+    SD-DEPTH drew a Na+/K+ pump embedded in a membrane and the gate called it a
+    27% SHAPE_OVERLAP twice, so the generator spent attempts trying to move a
+    protein out of the membrane it is defined by. That is rule 24's trap exactly:
+    a hard finding whose retry text cannot be satisfied, because the drawing was
+    already correct. Neither NESTING_SHARE nor _mounted_on_edge can exempt it —
+    the pump is 27% inside (under the 45% nesting bar) and its centre is 65 units
+    from the nearest band edge (well past EDGE_MOUNT_TOLERANCE).
+
+    Deliberately strict: BOTH spans must be full containments. Two rects that
+    merely straddle each other diagonally are still a collision.
+    """
+    t = JOINT_TOLERANCE
+    a_spans_b_x = a.box.x1 - t <= b.box.x1 and b.box.x2 <= a.box.x2 + t
+    b_spans_a_y = b.box.y1 - t <= a.box.y1 and a.box.y2 <= b.box.y2 + t
+    b_spans_a_x = b.box.x1 - t <= a.box.x1 and a.box.x2 <= b.box.x2 + t
+    a_spans_b_y = a.box.y1 - t <= b.box.y1 and b.box.y2 <= a.box.y2 + t
+    return (a_spans_b_x and b_spans_a_y) or (b_spans_a_x and a_spans_b_y)
+
+
+def drop_coincident_overlays(shapes: list[Element]) -> list[Element]:
+    """Collapse shapes drawn at the same box into one, keeping the first.
+
+    The SD-DEPTH raised-card idiom stacks three rects to fake elevation without
+    `<filter>`: an offset shadow, the gradient card, and a `gSheen` highlight at
+    the *identical* box as the card. The sheen is a lighting layer, not a second
+    object — but the walker sees two shapes, so every collision involving a
+    raised card was reported TWICE, and every shape-count-based density measure
+    read high.
+
+    Measured on the first diagram generated under SD-DEPTH: 13 of its 34 shapes
+    were coincident duplicates, and both of its two hard findings were the same
+    finding. So this is a defect that arrived with the depth idiom rather than one
+    the corpus ever had — which is why it is a dedup here and not a rule the
+    generator has to remember.
+
+    Keeps the FIRST occurrence, so the reported box belongs to the card rather
+    than to its highlight, and stays order-stable for the same reason the region
+    sampler is deterministic: two runs over one diagram must agree.
+    """
+    kept: list[Element] = []
+    for el in shapes:
+        if any(
+            abs(el.box.x1 - k.box.x1) <= COINCIDENT_TOLERANCE
+            and abs(el.box.y1 - k.box.y1) <= COINCIDENT_TOLERANCE
+            and abs(el.box.x2 - k.box.x2) <= COINCIDENT_TOLERANCE
+            and abs(el.box.y2 - k.box.y2) <= COINCIDENT_TOLERANCE
+            for k in kept
+        ):
+            continue
+        kept.append(el)
+    return kept
 
 
 def _is_boxy(el: Element) -> bool:
@@ -1502,7 +1614,10 @@ def detect_overlaps(
         findings.append(Finding(rule, code, severity, message))
 
     texts = [t for t in geo.texts if _pairable(t)]
-    shapes = [s for s in geo.shapes if _pairable(s)]
+    # Dedup BEFORE pairing, not after reporting: a coincident sheen layer would
+    # otherwise duplicate every finding it participates in, and a deduplicated
+    # *report* would still have paid to measure each pair twice.
+    shapes = drop_coincident_overlays([s for s in geo.shapes if _pairable(s)])
 
     # 1) text vs text — the worst case for readability
     for i in range(len(texts)):
@@ -1524,11 +1639,43 @@ def detect_overlaps(
             if overlap_area(t.box, s.box, margin) <= 0:
                 continue
             area = max(1.0, t.box.area)
-            if region_overlap_area(t, s) / area > text_spill:  # ink vs ink
+            share = region_overlap_area(t, s) / area  # ink vs ink
+            if share > text_spill:
                 add(
                     "TEXT_SPILL",
                     SD_SPACING,
                     f"text '{t.label[:32]}' {t.box} overlaps {s.kind} {s.box}",
+                )
+            elif _end_clipped(t, s, share):
+                # TEXT_SPILL measures the *share of a label's area* that is covered,
+                # and that is the wrong instrument for the way labels actually become
+                # unreadable: words are lost at the ENDS, where the covered area is a
+                # few percent. Measured on the diagram that provoked this — a centred
+                # band label with a channel glyph at each end reads as
+                # "ll Membrane — ion channels clos" at a share of **0.061**, against a
+                # threshold of 0.25. Four times too loose, and the gate reported clean.
+                #
+                # ADVISORY, and the corpus is the reason it is not hard yet (rule 25).
+                # The end-clip *geometry* alone fires on 9 instances across the 150
+                # blocks that TEXT_SPILL misses, and 7 of those are one latch diagram's
+                # labels beside curved <ellipse> shapes whose bounding boxes overlap
+                # while their ink does not — ink shares of 0.000, 0.004, 0.035, 0.048.
+                # That is the same curved-hull false positive that made
+                # TEXT_OVERFLOWS_RECT 50% precise until it was restated. Requiring real
+                # ink (>= END_CLIP_INK_FLOOR) separates them from the true case at
+                # 0.061 and leaves 5 corpus instances. Five is too few to sample ten
+                # and clear the >=90% bar, so it stays advisory and reaches the
+                # reviewer under CRAFT until a bigger corpus can settle it.
+                add(
+                    "TEXT_END_CLIPPED",
+                    SD_SPACING,
+                    f"text '{t.label[:32]}' {t.box} is covered at its "
+                    f"{'left' if s.box.x1 <= t.box.x1 else 'right'} end by {s.kind} "
+                    f"{s.box} — only {100 * share:.0f}% of the label's area, but the "
+                    "covered part is at the extremity, so whole words are hidden. "
+                    "Shorten the label, move the shape clear of it, or give the label "
+                    "its own row",
+                    ADVISORY,
                 )
 
     # 3) shape vs shape — a partial bite only. Two idioms are deliberate and must
@@ -1558,6 +1705,8 @@ def detect_overlaps(
             if _mounted_on_edge(small, large):
                 continue
             if _corner_joined(small, large):
+                continue
+            if _crossing_bands(small, large):
                 continue
             if shared / smaller > shape_depth:
                 # HARD, and the 90%-precision bar was cleared by rendering, not
@@ -1684,6 +1833,61 @@ TEXT_DOMINANCE_RATIO = 0.60
 # Anything smaller is unreadable at presentation size.
 MIN_FONT_SIZE = 12.0
 
+# SD-DEPTH: a diagram with at least this many drawn shapes and no gradient fill
+# at all is flat. Below it, a 3-shape diagram legitimately needs no tonal work.
+FLAT_FILL_MIN_SHAPES = 4
+
+# SD-SPACING: a marker-bearing <line> shorter than this multiple of its own
+# stroke-width reads as a floating arrowhead rather than an arrow — the default
+# `markerUnits="strokeWidth"` scales the head with the stroke, so at 3px stroke
+# a 30px line is ~40% head.
+#
+# Measured, because the rule this replaced was written from looking at a render
+# and would never have fired: the two "floating arrowheads" in the probe
+# diagram are real 30px lines at stroke-width 3 (ratio 10.0), not zero-length.
+# Corpus distribution over 448 marker-bearing lines in 150 blocks:
+# ratio <8 → 2.2%, <12 → 8.7%, <16 → 19%. At 12x this fires on 16/150 diagrams
+# (11%) and includes the probe case. ADVISORY: precision has not been measured
+# by rendering 10 instances, which is the bar for promotion (rule 25).
+STUBBY_ARROW_RATIO = 12.0
+
+# SD-MOTION: the whole reveal must be over by this point. A learner scrolling
+# back to a diagram should not have to wait for it.
+MAX_REVEAL_SECONDS = 4.0
+
+# SD-MOTION: a diagram of this many drawn elements with fewer than this many
+# staged reveals is not building itself in teaching order — it just appears.
+#
+# 3 is the floor rather than a target because the spec's own idiom is one group
+# per teaching step, and two steps is a fade, not a build. The shape gate keeps
+# it off tiny diagrams (a single labelled axis has nothing to stage). Both
+# numbers are a starting point, not a measurement: the ENTIRE archive is static,
+# so there is no distribution to fit — which is why this is advisory and why the
+# thing to watch is the count on fresh output.
+MOTION_FLOOR_REVEALS = 3
+MOTION_FLOOR_SHAPES = 6
+
+# What share of the drawn elements a diagram's reveals must actually carry, and the
+# size below which the question is not worth asking.
+#
+# Unlike the two numbers above, this one IS fitted — to the only data that exists,
+# which is this generator's own output. Measured over 6 diagrams from two rounds:
+# the round the user rejected on looks scored 61%, 26% and 59% staged; the round
+# after SD-STRUCTURE landed scored 16%, 44% and 0%. So 0.50 is a bar the model has
+# already cleared twice unaided, not an aspiration — and the mean falling 48.8% ->
+# 20.1% while the reveal COUNT looked healthy (8 staged steps on a diagram whose
+# every card was on screen at t=0) is the whole reason a share exists beside a
+# count. A count cannot see decoration bolted onto a static picture.
+MOTION_FLOOR_STAGED_SHARE = 0.50
+MOTION_SHARE_MIN_DRAWN = 10
+
+# Every tag that puts ink on the page. Counted from the raw markup rather than
+# from `element_boxes` because `motion_findings` is the one entry point that does
+# not already parse the tree, and a floor gate is not worth a second parse.
+_DRAWN_TAG = re.compile(
+    r"<(rect|circle|ellipse|line|path|polyline|polygon|text)\b", re.IGNORECASE
+)
+
 # A rendered line wider than this share of the declared canvas is a sentence
 # stretched across the frame, not a label.
 #
@@ -1695,18 +1899,629 @@ MIN_FONT_SIZE = 12.0
 # canvas is where the corpus separates: 32/150 blocks above it, 4 above 0.70.
 LONG_LINE_SHARE = 0.60
 
+# SD-STRUCTURE: what makes a stack of <text> elements a pasted paragraph rather
+# than a set of labels.
+#
+# An element-level word cap CANNOT detect this, which is why these exist. A
+# paragraph in SVG is not one long <text> — it is many short ones, because the
+# author has to wrap the lines by hand. The worst offender measured (the "you can
+# hold the level constant forever if the faucet runs at exactly the rate the drain
+# empties" card) is 5 lines of 4-5 words each, so every individual line passes any
+# per-label cap comfortably. The detectable fingerprint is the *arrangement*: a
+# stack of left-aligned lines sharing an x, at one font size, with regular line
+# spacing.
+PROSE_RUN_MIN_LINES = 3
+PROSE_RUN_MIN_WORDS = 12
+PROSE_RUN_X_TOLERANCE = 2.0     # hand-wrapped lines share their x exactly
+PROSE_RUN_SIZE_TOLERANCE = 1.0  # ...and one font size
+PROSE_LINE_SPACING_MIN = 0.9    # as a multiple of font-size; below is overlap
+PROSE_LINE_SPACING_MAX = 2.0    # above is a list of separate labels, not wrapping
+
+# The two things that look exactly like wrapped prose geometrically and are not.
+#
+# A key/value table (`sodium_inside = 10` / `sodium_outside = 140` / `ratio = 14`)
+# is a left-aligned stack at one size with even spacing — the same shape, and a
+# legitimate, information-dense thing to put in a diagram. So is a bullet list.
+# Both are excluded by content, and both exclusions were forced by measurement
+# rather than anticipated: the first prototype flagged the value table in the
+# probe diagram's own axis panel, and 4 of the 14 corpus instances it reported
+# were bullet lists or legends.
+_VALUEY = re.compile(r"[=:]|\d")
+_BULLET_START = re.compile(r"^\s*(?:[•‣◦⁃∙*\-–—]|\d+[.)])\s")
+
+# SD-STRUCTURE: a label names a thing. Beyond this it is narrating.
+#
+# ADVISORY, and the corpus is why. A 6-word cap fires on nearly every block ever
+# shipped — measured, a per-label cap fires on 83% of blocks at >=8 words, 51% at
+# >=12, and the longest label per block has a median of 12 words. Some of those are
+# legitimate (a full-width caption under a plot). So this is the number the SPEC
+# states and the number the reviewer is shown, not a retry trigger; making it hard
+# against a corpus that violates it everywhere is how a gate becomes unsatisfiable.
+#
+# At 6 it fires on 136 of 150 corpus blocks (91%), so it carries almost no
+# discriminating information TODAY and is honestly a regression tripwire rather
+# than a signal — the same standing as LOW_CANVAS_FILL and OFF_CENTER. The number
+# to watch is whether it falls after SD-STRUCTURE lands; if it stays at 91% the
+# spec did not take.
+LABEL_WORD_CAP = 6
+
+# The ten explanatory forms SD-TYPE lists, and the declaration that names one.
+#
+# This set is the single place the names live on the Python side. It must stay in
+# step with the SD-TYPE list in `prompts/svg_design_spec.md`, which is the same
+# two-copies problem as rule 23 — hence `svg_geometry.test.py` reads the spec file
+# and asserts the two agree, rather than a comment asking someone to remember.
+ARCHETYPES = frozenset({
+    "layered-stack",
+    "annotated-cutaway",
+    "timeline-with-bands",
+    "comparison-columns",
+    "cycle",
+    "decision-tree",
+    "part-whole",
+    "quantity-plot",
+    "before-after",
+    "anatomy-callout",
+})
+
+# Deliberately tolerant of whitespace and case, and deliberately NOT anchored to
+# the start of the document: the generator writes the comment inside <svg>, after
+# the opening tag, and an XML declaration or the tag itself may precede it.
+#
+# `[^>]` and not `[^->]`: EVERY archetype name contains a hyphen
+# (`comparison-columns`), so a class excluding `-` matches none of them and the
+# check would have reported ARCHETYPE_NOT_DECLARED on a correctly declared
+# diagram — a gate that cannot be satisfied. Caught by running it, not by reading
+# it; the corpus run is what proved the negative case fires, and the test suite's
+# positive case is what proves this half.
+_ARCHETYPE_DECL = re.compile(r"<!--\s*archetype\s*:\s*([^>]*?)\s*-->", re.IGNORECASE)
+
 _FILL_ATTR = re.compile(r'\bfill\s*=\s*"([^"]*)"', re.IGNORECASE)
+
+# `fill="url(#g-primary)"` — the id being referenced, with or without quotes.
+_FILL_URL_REF = re.compile(r"^url\(\s*['\"]?#([^)'\"\s]+)['\"]?\s*\)$", re.IGNORECASE)
+
+# One gradient definition and its stops. Non-greedy so two gradients in one
+# <defs> do not merge into a single blob whose stops get attributed to both.
+_GRADIENT_DEF = re.compile(
+    r"<(linearGradient|radialGradient)\b([^>]*)>(.*?)</\1\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_ID_ATTR = re.compile(r'\bid\s*=\s*"([^"]*)"', re.IGNORECASE)
+_XLINK_HREF_ATTR = re.compile(r'\b(?:xlink:)?href\s*=\s*"\s*#([^"]*)"', re.IGNORECASE)
+_STOP_COLOR = re.compile(r'\bstop-color\s*=\s*"([^"]*)"', re.IGNORECASE)
+
+
+def _gradient_stops(svg_content: str) -> dict[str, set[str]]:
+    """`{gradient id: {stop colours}}`, following one level of `href` inheritance.
+
+    A gradient may carry its stops by reference — `<linearGradient id="b"
+    href="#a"/>` inherits a's stops — which is the idiom for "same ramp, other
+    direction". One level is enough for anything a generator writes, and a cycle
+    cannot loop because the resolve is a single non-recursive pass.
+    """
+    raw: dict[str, set[str]] = {}
+    inherits: dict[str, str] = {}
+
+    for _kind, attrs, body in _GRADIENT_DEF.findall(svg_content):
+        id_match = _ID_ATTR.search(attrs)
+        if not id_match:
+            continue
+        gid = id_match.group(1).strip()
+        if not gid:
+            continue
+        raw[gid] = {
+            c.strip().lower() for c in _STOP_COLOR.findall(body)
+            if c.strip().lower() not in _NO_PAINT
+        }
+        href = _XLINK_HREF_ATTR.search(attrs)
+        if href:
+            inherits[gid] = href.group(1).strip()
+
+    # Self-closing `<linearGradient id="b" href="#a"/>` has no body, so
+    # _GRADIENT_DEF never sees it. Pick those up separately.
+    for match in re.finditer(
+        r"<(?:linearGradient|radialGradient)\b([^>]*?)/>", svg_content, re.IGNORECASE
+    ):
+        attrs = match.group(1)
+        id_match = _ID_ATTR.search(attrs)
+        href = _XLINK_HREF_ATTR.search(attrs)
+        if id_match and href:
+            gid = id_match.group(1).strip()
+            raw.setdefault(gid, set())
+            inherits[gid] = href.group(1).strip()
+
+    for gid, parent in inherits.items():
+        if not raw.get(gid):
+            raw[gid] = set(raw.get(parent, ()))
+    return raw
 
 
 def _fill_palette(svg_content: str) -> set[str]:
-    """Distinct painted fill values, normalised. Excludes "none"/transparent."""
+    """Distinct painted fill values, normalised. Excludes "none"/transparent.
+
+    A `fill="url(#id)"` reference resolves to the *stop colours* of the gradient
+    it names, so a gradient-toned diagram counts its real palette. Skipping
+    `url(...)` — what this did before gradients were in the spec — would report
+    `PALETTE_MONOTONY` on every well-toned diagram, and that advisory is handed
+    to the LLM reviewer as a measured fact. A cheap check that tells the
+    expensive judge to mark down the exact thing the spec asks for is rule 24's
+    trap; the two changes have to land together.
+
+    A reference to an id that is not a gradient (a `<pattern>`, or a typo)
+    contributes nothing — it is genuinely unknown paint, and inventing a colour
+    for it would be worse than not counting it.
+    """
+    stops = _gradient_stops(svg_content)
     fills = set()
     for raw in _FILL_ATTR.findall(svg_content):
-        value = raw.strip().lower()
-        if value in _NO_PAINT or value.startswith("url("):
+        value = raw.strip()
+        if value.lower() in _NO_PAINT:
             continue
-        fills.add(value)
+        # The id is matched against the un-lowercased value: SVG ids are
+        # case-sensitive, so `url(#gPrimary)` must not be looked up as
+        # `gprimary`. Only the colour literals below are case-folded.
+        ref = _FILL_URL_REF.match(value)
+        if ref:
+            fills.update(stops.get(ref.group(1), ()))
+            # A gradient the document does not define resolves to nothing.
+            continue
+        fills.add(value.lower())
     return fills
+
+
+# The root element only: a `xmlns` on some inner node does not make the document
+# standalone. CASE-SENSITIVE on `<svg` for the reason SVG_OPEN_TAG is — the MLAI
+# wrapper is the capitalised `<Svg>`.
+_HAS_XMLNS = re.compile(r'<svg\b[^>]*\bxmlns\s*=\s*"[^"]*"')
+
+# A <line> carrying an arrowhead, with its own attributes. Source-level on
+# purpose: the length/stroke-width ratio this feeds is invariant under uniform
+# scale, so it needs no transform accumulation — and Element carries neither a
+# marker flag nor a stroke width.
+_MARKED_LINE = re.compile(r"<line\b[^>]*\bmarker-(?:end|start)\s*=[^>]*?/?>", re.IGNORECASE)
+_ATTR_NUM_TMPL = r'\b{}\s*=\s*"\s*([-+]?[\d.]+)'
+
+
+def _attr_number(tag: str, name: str, default: float) -> float:
+    match = re.search(_ATTR_NUM_TMPL.format(name), tag, re.IGNORECASE)
+    if not match:
+        return default
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return default
+
+
+def _stubby_arrows(svg_content: str) -> list[tuple[float, float]]:
+    """`(length, stroke_width)` for every marker-bearing line that is too short."""
+    out = []
+    for tag in _MARKED_LINE.findall(svg_content):
+        x1 = _attr_number(tag, "x1", 0.0)
+        y1 = _attr_number(tag, "y1", 0.0)
+        x2 = _attr_number(tag, "x2", 0.0)
+        y2 = _attr_number(tag, "y2", 0.0)
+        width = _attr_number(tag, "stroke-width", 1.0)
+        length = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        if length < STUBBY_ARROW_RATIO * max(0.5, width):
+            out.append((length, width))
+    return out
+
+
+def _gradient_fill_count(svg_content: str) -> int:
+    """How many fills reference a gradient this document actually defines."""
+    stops = _gradient_stops(svg_content)
+    count = 0
+    for raw in _FILL_ATTR.findall(svg_content):
+        ref = _FILL_URL_REF.match(raw.strip())
+        if ref and ref.group(1) in stops:
+            count += 1
+    return count
+
+
+# A gradient stroked onto a line that is flat along the gradient's own axis
+# paints NOTHING. Measured, not reasoned: three lines rendered in Chrome with the
+# spec's own `gPrimary` (`x1=0 y1=0 x2=0 y2=1`, i.e. vertical) — a horizontal
+# `<path>` came out completely blank, the same path with a flat stroke drew, and
+# a sloped path drew. The cause is that an `objectBoundingBox` gradient on a
+# zero-height bbox is degenerate, so the ramp has nowhere to run.
+#
+# This is HARD, and it is the worst defect this gate has ever caught: the element
+# validates, ships, and is invisible. The diagram that provoked it is a two-curve
+# comparison whose *entire point* is the contrast, and the "real neuron holds at
+# -70 mV" line — half the message — was simply not there. Same student-visible
+# shape as the escaping bug (rule 32): a green check about a document the student
+# never sees painted.
+#
+# Precision is by construction rather than by sampling (rule 25's bar, met the
+# other way, like ARCHETYPE_NOT_DECLARED): the geometry either has extent along
+# the gradient's axis or it does not, and where it does not the render is blank
+# 100% of the time. `userSpaceOnUse` is exempt because its ramp is in page
+# coordinates and does not depend on the bbox at all.
+GRADIENT_AXIS_MIN_EXTENT = 1.0
+
+_STROKE_ATTR = re.compile(r'\bstroke\s*=\s*"([^"]*)"', re.IGNORECASE)
+
+# Every element that can carry a stroke and be degenerate. `rect`/`circle`/
+# `ellipse` are deliberately absent: they always have extent in both axes, so a
+# gradient stroke on them is fine and flagging it would be a false positive.
+_STROKEABLE = re.compile(
+    r"<(path|line|polyline|polygon)\b((?:[^>\"]|\"[^\"]*\")*?)/?>", re.IGNORECASE
+)
+
+_NUMBERS = re.compile(r"-?\d*\.?\d+(?:[eE][-+]?\d+)?")
+
+
+def _gradient_axes(svg_content: str) -> dict[str, str]:
+    """`{gradient id: "x" | "y" | ""}` — the axis its ramp runs along.
+
+    `""` means the ramp is safe to stroke with: a radial gradient, or one in
+    `userSpaceOnUse`, neither of which collapses on a flat bbox. SVG's defaults
+    are `x1="0%" y1="0%" x2="100%" y2="0%"`, i.e. horizontal — so a
+    `<linearGradient>` with no coordinates at all is an "x" gradient and dies on
+    a *vertical* line.
+    """
+    axes: dict[str, str] = {}
+    pattern = re.compile(
+        r"<(linearGradient|radialGradient)\b((?:[^>\"]|\"[^\"]*\")*?)/?>",
+        re.IGNORECASE,
+    )
+    for match in pattern.finditer(svg_content):
+        kind, attrs = match.group(1).lower(), match.group(2)
+        id_match = _ID_ATTR.search(attrs)
+        if not id_match or not id_match.group(1).strip():
+            continue
+        gid = id_match.group(1).strip()
+        units = re.search(r'\bgradientUnits\s*=\s*"([^"]*)"', attrs, re.IGNORECASE)
+        if kind == "radialgradient" or (
+            units and units.group(1).strip().lower() == "userspaceonuse"
+        ):
+            axes[gid] = ""
+            continue
+
+        def coord(name: str, default: float) -> float:
+            found = re.search(rf'\b{name}\s*=\s*"([^"]*)"', attrs, re.IGNORECASE)
+            return to_float(found.group(1).replace("%", "") if found else default, default)
+
+        x1, x2 = coord("x1", 0.0), coord("x2", 100.0)
+        y1, y2 = coord("y1", 0.0), coord("y2", 0.0)
+        dx, dy = abs(x2 - x1), abs(y2 - y1)
+        # Whichever axis the ramp actually travels along is the one that has to
+        # have extent. A diagonal ramp needs both, so it is reported as the
+        # dominant one; either way the flat line is the defect.
+        axes[gid] = "" if dx == dy == 0 else ("y" if dy > dx else "x")
+    return axes
+
+
+def degenerate_gradient_strokes(svg_content: str) -> list[tuple[str, str, str]]:
+    """`[(tag, gradient id, axis)]` for every stroke that will paint nothing."""
+    axes = _gradient_axes(svg_content)
+    out: list[tuple[str, str, str]] = []
+    for match in _STROKEABLE.finditer(svg_content):
+        tag, attrs = match.group(1).lower(), match.group(2)
+        stroke = _STROKE_ATTR.search(attrs)
+        if not stroke:
+            continue
+        ref = _FILL_URL_REF.match(stroke.group(1).strip())
+        if not ref:
+            continue
+        axis = axes.get(ref.group(1))
+        if not axis:  # undefined, radial, or userSpaceOnUse — nothing to check
+            continue
+
+        if tag == "line":
+            xs = [to_float(_attr(attrs, "x1")), to_float(_attr(attrs, "x2"))]
+            ys = [to_float(_attr(attrs, "y1")), to_float(_attr(attrs, "y2"))]
+        elif tag == "path":
+            # Alternating x/y over every number in `d`. Crude for arcs — an `A`
+            # command's radii and flags land in the wrong slot — but it can only
+            # ever *widen* the measured extent, so it never invents a finding.
+            nums = [float(n) for n in _NUMBERS.findall(_attr(attrs, "d") or "")]
+            xs, ys = nums[0::2], nums[1::2]
+        else:
+            pts = [float(n) for n in _NUMBERS.findall(_attr(attrs, "points") or "")]
+            xs, ys = pts[0::2], pts[1::2]
+
+        if not xs or not ys:
+            continue
+        extent = (max(xs) - min(xs)) if axis == "x" else (max(ys) - min(ys))
+        if extent < GRADIENT_AXIS_MIN_EXTENT:
+            out.append((tag, ref.group(1), axis))
+    return out
+
+
+def _attr(attrs: str, name: str) -> str | None:
+    found = re.search(rf'\b{re.escape(name)}\s*=\s*"([^"]*)"', attrs, re.IGNORECASE)
+    return found.group(1) if found else None
+
+
+# ---------------------------------------------------------------------------
+# SD-MOTION
+# ---------------------------------------------------------------------------
+
+_ANIMATION_TAGS = frozenset({"animate", "animatetransform", "animatemotion", "set"})
+
+# "1.5s", "900ms", "0.4" (seconds implied). Whole-token on purpose: the SMIL
+# clock grammar also admits "00:03", and half-parsing that as 0 would report a
+# 3-second reveal as instant.
+_CLOCK = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*(ms|s)?\s*$", re.IGNORECASE)
+
+
+def _clock_seconds(raw: str | None) -> float | None:
+    """A SMIL offset value in seconds, or None if it is not a plain offset.
+
+    None is the honest answer for `a.end+2s`, `btn.click` and `indefinite`: they
+    are timings this checker cannot place on a timeline, and the parser rejects
+    them anyway.
+    """
+    if raw is None:
+        return None
+    match = _CLOCK.match(raw)
+    if not match:
+        return None
+    value = float(match.group(1))
+    return value / 1000.0 if (match.group(2) or "s").lower() == "ms" else value
+
+
+@dataclass(frozen=True)
+class _Animation:
+    """One SMIL element, with the parent attribute it is animating."""
+
+    tag: str
+    attribute: str
+    values: str
+    dur: float | None
+    begin: float | None
+    freeze: bool
+    repeats: bool
+    parent_tag: str
+    parent_value: str | None  # the parent's static value for `attribute`
+
+
+def _animations(svg_content: str) -> tuple[list[_Animation], bool]:
+    """Every SMIL element in the document, plus whether the document parsed."""
+    try:
+        root = ET.fromstring(svg_content)
+    except ET.ParseError:
+        return [], False
+
+    found: list[_Animation] = []
+
+    def visit(parent: ET.Element) -> None:
+        for child in parent:
+            tag = local_tag(child.tag)
+            if tag in _ANIMATION_TAGS:
+                attribute = (child.get("attributeName") or "").strip()
+                found.append(
+                    _Animation(
+                        tag=tag,
+                        attribute=attribute,
+                        values=(child.get("values") or "").strip(),
+                        dur=_clock_seconds(child.get("dur")),
+                        begin=_clock_seconds(child.get("begin") or "0s"),
+                        freeze=(child.get("fill") or "").strip().lower() == "freeze",
+                        repeats=(child.get("repeatCount") or "").strip().lower()
+                        in {"indefinite"}
+                        or (child.get("repeatDur") or "").strip().lower() == "indefinite",
+                        parent_tag=local_tag(parent.tag),
+                        parent_value=parent.get(attribute) if attribute else None,
+                    )
+                )
+                continue
+            visit(child)
+
+    visit(root)
+    return found, True
+
+
+def _starts_hidden(anim: _Animation) -> bool:
+    """Whether this animation's own start state is invisible.
+
+    Only opacity-family attributes: those are the ones where the start value is
+    literally "not rendered". A `values="0;1"` on `r` starts small, not absent.
+    """
+    if anim.attribute.lower() not in {"opacity", "fill-opacity", "stroke-opacity"}:
+        return False
+    first = anim.values.split(";")[0].strip() if anim.values else ""
+    if not first:
+        first = (anim.parent_value or "").strip()
+    try:
+        return float(first) == 0.0
+    except ValueError:
+        return False
+
+
+_DRAWN_LOCAL = {
+    "rect", "circle", "ellipse", "line", "path", "polyline", "polygon", "text",
+}
+
+
+def _is_staging(anim: _Animation) -> bool:
+    """Whether this animation reveals its subtree, rather than decorating it.
+
+    Two forms, and only two, because they are the two the spec's cookbook teaches:
+    a group that starts at `opacity="0"` and fades in, and a connector drawn on via
+    `stroke-dashoffset`. A pulsing `r` is emphasis — it does not stage anything.
+    """
+    if anim.repeats:
+        return False
+    if anim.attribute.lower() == "stroke-dashoffset":
+        return True
+    return _starts_hidden(anim)
+
+
+def staged_ink(svg_content: str) -> tuple[int, int]:
+    """`(drawn elements inside a staged reveal, drawn elements total)`.
+
+    Counting *reveals* said nothing about how much of the drawing they carry, and
+    that gap was visible the whole time: a diagram scored 8 staged steps while its
+    title, both bands, the pump, both explanation cards and the footer were all on
+    screen at t=0 — only the ion chips and connectors were staged. The build was
+    decoration on a static picture, which is exactly what "it's not animated" means
+    from the other side of the screen. A count cannot see that; a share can.
+
+    An element is staged if it, or any ancestor, carries a staging animation — the
+    group is what gets wrapped, so the credit has to flow down the subtree.
+    """
+    try:
+        root = ET.fromstring(svg_content)
+    except ET.ParseError:
+        return 0, 0
+
+    staged = total = 0
+
+    def visit(element: ET.Element, inherited: bool) -> None:
+        nonlocal staged, total
+        tag = local_tag(element.tag)
+        if tag in NON_RENDERING:
+            return
+
+        here = inherited or any(
+            local_tag(child.tag) in _ANIMATION_TAGS
+            and _is_staging(
+                _Animation(
+                    tag=local_tag(child.tag),
+                    attribute=(child.get("attributeName") or "").strip(),
+                    values=(child.get("values") or "").strip(),
+                    dur=None,
+                    begin=None,
+                    freeze=False,
+                    repeats=(child.get("repeatCount") or "").strip().lower()
+                    == "indefinite"
+                    or (child.get("repeatDur") or "").strip().lower() == "indefinite",
+                    parent_tag=tag,
+                    parent_value=element.get(
+                        (child.get("attributeName") or "").strip() or "opacity"
+                    ),
+                )
+            )
+            for child in element
+        )
+
+        if tag in _DRAWN_LOCAL:
+            total += 1
+            if here:
+                staged += 1
+
+        for child in element:
+            visit(child, here)
+
+    visit(root, False)
+    return staged, total
+
+
+def motion_findings(svg_content: str) -> list[Finding]:
+    """SD-MOTION checks over the SMIL in a document. [] when there is none.
+
+    One HARD rule, and it is hard for the same reason SD-ANCHOR is: not that the
+    diagram looks wrong, but that it provably does not render. An `<animate>`
+    that fades opacity 0 -> 1 with neither `fill="freeze"` nor an indefinite
+    repeat *reverts to the start value when it ends* — the element is animated
+    into view and then vanishes, permanently, for every learner who scrolls back
+    to it. That is a certainty from the SMIL spec, not a heuristic, so it needs
+    no precision measurement before being fed back as a fixable defect.
+    """
+    animations, parsed = _animations(svg_content)
+    if not parsed:
+        return []
+
+    findings: list[Finding] = []
+
+    # Is anything staged at all, and do the reveals carry the diagram or decorate it?
+    #
+    # Two findings, one message: the *share* one is HARD and the *count* one is
+    # advisory, and the suppression runs from the hard one to the advisory one. It used
+    # to run the other way, which was right while both were advisory and became a hole
+    # the moment the share went hard: a diagram with **zero** animations trips the count
+    # gate, which would suppress the share finding, so the worst case — no motion at all
+    # — would have been the one case that produced no hard finding. Rule 24's shape: the
+    # message the model acts on must be the one that names the fixable defect.
+    #
+    # This fires on an EMPTY animation list, which is why the early return above
+    # no longer covers `not animations` — a diagram with no motion was previously
+    # the one case SD-MOTION could not say anything about, so "the spec asks for a
+    # build-up" was enforced by nothing (rule 26, and it regressed exactly that
+    # way: the three diagrams generated right after SD-STRUCTURE landed carried
+    # 3, 1 and 5 animations against 9, 8 and 9 before it — the new zone rules
+    # crowded motion out of the model's attention and no number noticed).
+    #
+    # The share is now HARD. Reachability is measured, not assumed:
+    # 0.50 is a bar this generator cleared twice unaided on round 1 (61%, 59%) and the
+    # hand-restaged figure reached 95% with zero motion findings at a 3.8s build. SVG
+    # generation is bounded at 4 attempts per diagram, unlike the MLAI loop's 500 with
+    # no spend cap, so a hard motion rule here cannot run away (rule 24).
+    reveals = [a for a in animations if not a.repeats]
+    drawn = len(_DRAWN_TAG.findall(svg_content))
+    staged, total = staged_ink(svg_content)
+    static_structure = False
+    if total >= MOTION_SHARE_MIN_DRAWN:
+        share = staged / total
+        if share < MOTION_FLOOR_STAGED_SHARE:
+            static_structure = True
+            findings.append(Finding(
+                SD_MOTION,
+                "STATIC_STRUCTURE",
+                HARD,
+                f"only {staged} of {total} drawn elements ({share * 100:.0f}%) are "
+                f"inside a staged reveal, below {MOTION_FLOOR_STAGED_SHARE * 100:.0f}%"
+                " — the frame, the cards and the labels are all on screen before the "
+                "build starts, so the animation decorates a static picture instead of "
+                "assembling it. Wrap each teaching STEP — its shape, its label and its "
+                'connector together — in one <g opacity="0"> reveal, not just the '
+                "chips and arrows on top",
+            ))
+
+    # Advisory: the *count* of staged steps. Suppressed when STATIC_STRUCTURE fired —
+    # telling a model whose share is already flagged that its count is low too is the
+    # same defect twice, and retry feedback is repeated per finding (rule 32's fourth
+    # lesson: length is a cost). It survives as its own finding for the diagram too
+    # small for the share question (`total < MOTION_SHARE_MIN_DRAWN`), which is the only
+    # case the hard rule stays silent on.
+    if not static_structure and drawn >= MOTION_FLOOR_SHAPES and len(reveals) < MOTION_FLOOR_REVEALS:
+        findings.append(Finding(
+            SD_MOTION,
+            "NO_BUILD_UP",
+            ADVISORY,
+            f"{drawn} drawn elements assemble in {len(reveals)} staged step(s) — "
+            f"fewer than {MOTION_FLOOR_REVEALS}. Wrap each teaching step in a "
+            '<g opacity="0"> with an <animate ... values="0;1" fill="freeze"/> and '
+            "increasing `begin`, so the diagram builds in the order it is explained",
+        ))
+
+    if not animations:
+        return findings
+
+    stranded = [a for a in animations if _starts_hidden(a) and not a.freeze and not a.repeats]
+    if stranded:
+        findings.append(Finding(
+            SD_MOTION,
+            "REVEAL_WITHOUT_FREEZE",
+            HARD,
+            f"{len(stranded)} reveal animation(s) start at opacity 0 with no "
+            'fill="freeze" and no indefinite repeat — SMIL reverts to the start '
+            "value when the animation ends, so these elements animate in and then "
+            'disappear for good. Add fill="freeze" to every reveal.',
+        ))
+
+    # Advisory: how long until the diagram is fully assembled.
+    ends = [
+        (a.begin or 0.0) + (a.dur or 0.0)
+        for a in animations
+        if not a.repeats and a.begin is not None
+    ]
+    if ends:
+        total = max(ends)
+        if total > MAX_REVEAL_SECONDS:
+            findings.append(Finding(
+                SD_MOTION,
+                "SLOW_REVEAL",
+                ADVISORY,
+                f"the build-up finishes at {total:.1f}s, past the "
+                f"{MAX_REVEAL_SECONDS:.0f}s budget — tighten the begin offsets so a "
+                "learner is not waiting for the diagram to assemble",
+            ))
+
+    return findings
 
 
 def _segment_intersects_box(seg: tuple[float, float, float, float], box: Box) -> bool:
@@ -1761,6 +2576,80 @@ def _owning_rect(text: Element, shapes: list[Element]) -> Element | None:
         if best is None or b.area < best.box.area:
             best = s
     return best
+
+
+def prose_runs(texts: list[Element]) -> list[list[Element]]:
+    """Stacks of <text> lines that are a hand-wrapped paragraph, not labels.
+
+    Groups by left edge and font size, then keeps maximal consecutive runs whose
+    line spacing is in the range hand-wrapped body copy occupies. See the
+    PROSE_RUN_* constants for why a per-label word cap cannot do this job, and
+    _VALUEY / _BULLET_START for the two arrangements that look identical and are
+    legitimate.
+
+    Measured before being wired up, across the 150-block corpus and the diagrams
+    that provoked it: 8 of 150 corpus blocks (14 runs), 0 on the three
+    pre-existing probe diagrams, 2 on the new one — exactly its two prose cards.
+    Judged by hand, ~10 of the 14 corpus runs are genuinely prose and the rest are
+    short-phrase legends, so precision is ~71% and this ships ADVISORY: rule 25's
+    bar for a hard finding is ≥90% on 10 hand-sampled instances, and a hard
+    finding that fires on a legend would burn attempts moving correct labels.
+
+    The low corpus incidence is itself the useful number. 5% means in-diagram
+    prose is NOT a corpus norm this has to tolerate — it is a defect the raised-card
+    idiom introduced, and the reviewer can be told so.
+
+    Known gap, stated rather than guessed at: grouping is on the LEFT edge, so a
+    centred paragraph (where each line's x1 differs by half its width) is missed.
+    Every instance measured is left-aligned, and inventing a centre-grouped variant
+    with nothing to measure it against is how false positives get written.
+    """
+    ordered = sorted(
+        (t for t in texts if not t.uncertain and t.label.strip()),
+        key=lambda t: (t.box.x1, t.font_size, t.box.y1),
+    )
+    runs: list[list[Element]] = []
+    group: list[Element] = []
+
+    def flush(column: list[Element]) -> None:
+        """Cut one x/size column into maximal evenly-spaced runs."""
+        column = sorted(column, key=lambda t: t.box.y1)
+        current: list[Element] = []
+        for line in column:
+            if current:
+                size = line.font_size or DEFAULT_FONT_SIZE
+                gap = line.box.y1 - current[-1].box.y1
+                if not (PROSE_LINE_SPACING_MIN * size <= gap <= PROSE_LINE_SPACING_MAX * size):
+                    _keep(current)
+                    current = []
+            current.append(line)
+        _keep(current)
+
+    def _keep(run: list[Element]) -> None:
+        if len(run) < PROSE_RUN_MIN_LINES:
+            return
+        if sum(len(line.label.split()) for line in run) < PROSE_RUN_MIN_WORDS:
+            return
+        # Half or more of the lines carrying a digit, '=' or ':' makes this a data
+        # table; a bullet or number prefix makes it a list. Either way the stack is
+        # structure, which is what this whole rule is asking for.
+        if sum(1 for line in run if _VALUEY.search(line.label)) * 2 >= len(run):
+            return
+        if sum(1 for line in run if _BULLET_START.match(line.label)) * 2 >= len(run):
+            return
+        runs.append(run)
+
+    for t in ordered:
+        if group and (
+            abs(t.box.x1 - group[0].box.x1) > PROSE_RUN_X_TOLERANCE
+            or abs(t.font_size - group[0].font_size) > PROSE_RUN_SIZE_TOLERANCE
+        ):
+            flush(group)
+            group = []
+        group.append(t)
+    if group:
+        flush(group)
+    return runs
 
 
 def craft_findings(svg_content: str, geo: Geometry | None = None) -> list[Finding]:
@@ -1914,6 +2803,113 @@ def craft_findings(svg_content: str, geo: Geometry | None = None) -> list[Findin
             "CONNECTOR_CROSSES_TEXT",
             SD_SPACING,
             f"{crossings} connector/label crossing(s) — route arrows around labels",
+        )
+
+    # 7) SD-SPACING (advisory) — an arrow so short it reads as a bare arrowhead.
+    stubby = _stubby_arrows(svg_content)
+    if stubby:
+        length, width = min(stubby)
+        add(
+            "STUBBY_ARROW",
+            SD_SPACING,
+            f"{len(stubby)} arrow(s) are shorter than {STUBBY_ARROW_RATIO:.0f}x their "
+            f"own stroke-width (shortest {length:.0f}px at stroke-width {width:.0f}) — "
+            "the marker is most of the line, so it reads as a floating arrowhead. "
+            "Lengthen the connector or drop the marker",
+        )
+
+    # 8) SD-DEPTH (advisory) — is there any tonal work at all?
+    if len(drawn_shapes) >= FLAT_FILL_MIN_SHAPES and _gradient_fill_count(svg_content) == 0:
+        add(
+            "FLAT_FILL_ONLY",
+            SD_DEPTH,
+            f"{len(drawn_shapes)} drawn shapes and not one gradient fill — every "
+            "surface is flat. Give the primary shapes a two-stop linearGradient and "
+            "the key surface a radialGradient sheen",
+        )
+
+    if not _HAS_XMLNS.search(svg_content):
+        add(
+            "MISSING_XMLNS",
+            SD_DEPTH,
+            'the root <svg> has no xmlns="http://www.w3.org/2000/svg" — it renders '
+            "inline but cannot be opened, exported or screenshotted as a file",
+        )
+
+    # 8b) SD-DEPTH (HARD) — a gradient stroke that paints nothing at all.
+    invisible = degenerate_gradient_strokes(svg_content)
+    if invisible:
+        tag, gid, axis = invisible[0]
+        flat = "horizontal" if axis == "y" else "vertical"
+        add(
+            "GRADIENT_STROKE_INVISIBLE",
+            SD_DEPTH,
+            f"{len(invisible)} stroke(s) reference a gradient along an axis the "
+            f"element has no extent in — a {flat} <{tag}> stroked with "
+            f"url(#{gid}), whose ramp runs in {axis}. The bounding box is flat that "
+            "way, so the gradient is degenerate and the element renders COMPLETELY "
+            "INVISIBLE. Stroke it with a flat palette colour instead — gradients "
+            "are for fills",
+            HARD,
+        )
+
+    # 9) SD-STRUCTURE (HARD) — which explanatory form is this?
+    #
+    #    SD-TYPE has listed ten archetypes with skeletons since the framework
+    #    landed and has always been ADVISORY, so nothing ever checked that a
+    #    diagram was one of them. The diagram that provoked this rule was a
+    #    labelled bathtub — not on the list, and not an explanatory form at all.
+    #    Rule 26 exactly: a rule stated in a prompt and enforced by nothing.
+    #
+    #    Hard, and precision is not a question: the declaration is either present
+    #    and names a known archetype or it does not. Both fixes the message names
+    #    are one line of markup, so it cannot trap the generator in an
+    #    unsatisfiable retry (rule 24). What it CANNOT check is whether the drawing
+    #    honours the archetype it claims — that judgement is the reviewer's, and it
+    #    is only possible at all because the claim is now written down.
+    declared = _ARCHETYPE_DECL.search(svg_content)
+    if declared is None:
+        add(
+            "ARCHETYPE_NOT_DECLARED",
+            SD_STRUCTURE,
+            "no archetype declared. Add `<!-- archetype: NAME -->` as the first "
+            "line inside <svg>, naming the SD-TYPE form this diagram is: "
+            + ", ".join(sorted(ARCHETYPES)),
+            HARD,
+        )
+    elif declared.group(1).strip().lower() not in ARCHETYPES:
+        add(
+            "ARCHETYPE_UNKNOWN",
+            SD_STRUCTURE,
+            f"declared archetype '{declared.group(1).strip()[:40]}' is not one of "
+            "the SD-TYPE forms. Use one of: " + ", ".join(sorted(ARCHETYPES)),
+            HARD,
+        )
+
+    # 10) SD-STRUCTURE (advisory) — paragraphs pasted into the figure.
+    runs = prose_runs(texts)
+    if runs:
+        worst = max(runs, key=lambda r: sum(len(line.label.split()) for line in r))
+        words = sum(len(line.label.split()) for line in worst)
+        add(
+            "PROSE_BLOCK",
+            SD_STRUCTURE,
+            f"{len(runs)} block(s) of wrapped prose inside the figure, worst "
+            f"{len(worst)} lines / {words} words: "
+            f"'{' '.join(line.label for line in worst)[:60]}' — a diagram labels, "
+            "it does not explain in sentences. Cut this to a heading and a quantity",
+        )
+
+    # 11) SD-STRUCTURE (advisory) — labels that are sentences.
+    wordy = [t for t in texts if len(t.label.split()) > LABEL_WORD_CAP]
+    if wordy:
+        worst_label = max(wordy, key=lambda t: len(t.label.split()))
+        add(
+            "LABEL_TOO_WORDY",
+            SD_STRUCTURE,
+            f"{len(wordy)} label(s) over {LABEL_WORD_CAP} words, worst "
+            f"{len(worst_label.label.split())}: '{worst_label.label[:48]}' — "
+            "name the thing, then give its number",
         )
 
     return findings

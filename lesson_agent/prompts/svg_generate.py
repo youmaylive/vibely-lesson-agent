@@ -10,6 +10,16 @@ carries an ID, and every rule that can be measured is measured by
 `svg_geometry.py`, which cites the same IDs back in its findings. Rules written
 into a prompt and never checked do not survive — the old inline "keep labels <= 20
 characters" was violated 208 times across 150 generated diagrams.
+
+Spec size is a running cost, not free prose (rule 32's fourth lesson): the whole
+file is re-sent on every generation attempt, up to 4 per diagram. Measured
+26 Aug 2026 after SD-DEPTH and SD-MOTION landed: **15,304 chars / ~3,826 tokens**,
+up from 10,258 / ~2,542. That is **+1,284** against a +900 ceiling I set myself and
+then accepted, because the overage was measured rather than argued: 4 diagrams x 4
+attempts x 1,284 tokens is ~20.5k input tokens, **$0.06 per lesson** and ~$3 across
+a 50-lesson course that already costs ~$64. Trimming the two cookbooks below this
+is a false economy — every idiom in them is copy-pasted into real output, and the
+alternative to a worked example is a diagram the sanitiser silently blanks.
 """
 
 import hashlib
@@ -164,6 +174,13 @@ Score it 1-10 on each dimension:
 - **Clarity** (1-10): Can a learner understand it without additional explanation?
 - **Labels** (1-10): Are elements properly labeled with concept-specific, correct terms?
 - **Accuracy** (1-10): Is the information correct and not misleading? Does it faithfully represent the concept?
+  **Check every label against the geometry it points at, in that direction.** No program can
+  do this — the drawing is well-formed either way — and it is the defect that has survived
+  most often here: a curve labelled "collapses to zero" that descends *away* from the zero
+  tick toward -70; an axis whose values increase downward while the caption says a value
+  rises; an arrow labelled "out" pointing in. For each labelled quantity, read the axis or
+  tick it is measured against and confirm the mark moves the way the words say. A single
+  inversion makes the figure teach the opposite of the lesson: cap Accuracy at 3.
 - **Craft** (1-10): Does this read as a designed figure or as a default flowchart? Is the
   shape vocabulary suited to the idea, rather than rounded rectangles by reflex?
   **1-3 = uniform rects and arrows only. 8-10 = the form of the drawing itself explains
@@ -171,6 +188,11 @@ Score it 1-10 on each dimension:
 - **Density** (1-10): Information per square pixel. Four boxes each holding one word scores
   3. Penalise emptiness AND clutter. A dense, well-labelled figure scores high; a paragraph
   of prose in a frame does not.
+- **Polish** (1-10): Does this look like a designed figure from a good textbook, or like
+  default output? Judge tonal depth (gradient-filled surfaces and offset shadows vs flat
+  colour), type hierarchy (a clear title, labels and captions at distinct sizes), rounded
+  corners, and consistent alignment. **1-3 = every fill is flat, one text size throughout.
+  8-10 = you would put this on a slide unedited.** Flat solid fills alone cap this at 4.
 {grounding_dim}
 **Overall score** = average of the scores above (round to nearest integer).
 {grounding_rule}
@@ -184,6 +206,7 @@ LABELS: [score]
 ACCURACY: [score]
 CRAFT: [score]
 DENSITY: [score]
+POLISH: [score]
 {grounding_field}OVERALL: [score]
 VERDICT: [PASS or FAIL]
 ISSUES: [comma-separated list of issues, or "none"]

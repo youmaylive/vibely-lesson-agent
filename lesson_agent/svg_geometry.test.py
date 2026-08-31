@@ -216,6 +216,15 @@ TARGET_CODES = {
     # regression in fresh output has no false positives on 150 real diagrams.
     "NON_ARIAL_FONT": 0,
     "TEXT_SPILL": 27,
+    # ADVISORY. 7 instances in 5 of 150 blocks — the pairs where a shape covers a
+    # contiguous run at a label's extremity while covering too little of its *area*
+    # for TEXT_SPILL's 0.25 threshold to see it. The rule exists because a centred
+    # band label with a glyph at each end read as "ll Membrane — ion channels clos"
+    # at a share of 0.061. Note what END_CLIP_INK_FLOOR buys: the end-clip geometry
+    # alone fires 9 times here, 7 of them one latch diagram's labels beside curved
+    # <ellipse> shapes whose bounding boxes overlap while their ink does not.
+    # Requiring real ink is what keeps this at 7 rather than 16.
+    "TEXT_END_CLIPPED": 7,
     "UNMEASURABLE_SUBTREE": 11,
     "SHAPE_OVERLAP": 7,
     "TEXT_OVERLAP": 6,
@@ -232,10 +241,43 @@ TARGET_CODES = {
 # regression tripwires, not retry triggers.
 TARGET_CRAFT = {
     "SHAPE_MONOTONY": 77,          # 51% of blocks are 100% rectangles: the SD-TYPE case
+    # 98% of the archive. This is the baseline the SD-DEPTH work exists to move,
+    # recorded as a number so "the diagrams look richer now" can be checked rather
+    # than believed: not one of 150 shipped diagrams has a single gradient fill.
+    "FLAT_FILL_ONLY": 147,
     "CONNECTOR_CROSSES_TEXT": 44,
+    "STUBBY_ARROW": 16,
     "TEXT_DOMINANCE": 6,
     "TINY_FONT": 5,
     "TEXT_OVERFLOWS_RECT": 4,      # HARD; all 4 confirmed by rendering
+    # Zero, and asserted for the same reason NON_ARIAL_FONT is: the rule fires on
+    # fresh output (the probe's third diagram had no namespace) and has no false
+    # positives on 150 real ones.
+    "MISSING_XMLNS": 0,
+    # SD-STRUCTURE, measured 2026-08-26 on the same 150 blocks.
+    #
+    # 150/150 is the expected number, not a defect in the rule: the archive
+    # predates SD-STRUCTURE, so no diagram in it has ever declared an archetype.
+    # This is spec-compliance telemetry in the same sense as MISSING_TEXT_ANCHOR's
+    # 223 — the number to watch is whether FRESH output declares one. If a real
+    # generation still logs ARCHETYPE_NOT_DECLARED after the spec landed, the
+    # prompt did not take and the rule should be demoted rather than retried
+    # against (it is HARD, so a systematic miss costs all 4 attempts per diagram).
+    "ARCHETYPE_NOT_DECLARED": 150,
+    "ARCHETYPE_UNKNOWN": 0,
+    # 12 runs across 6 of 150 blocks (4%). The low incidence is the useful part:
+    # in-diagram prose is NOT a corpus norm this has to tolerate, it is a defect
+    # the raised-card idiom introduced. ~9 of the 12 are genuinely prose.
+    "PROSE_BLOCK": 6,
+    # 91% of the archive. Fires almost everywhere today, so it carries little
+    # discriminating information and is honestly a regression tripwire, in the same
+    # standing as LOW_CANVAS_FILL. Watch it fall, not its absolute value.
+    "LABEL_TOO_WORDY": 136,
+    # Zero, and that is exactly what FLAT_FILL_ONLY's 147 predicts: the archive has
+    # no gradients at all, so it cannot have stroked one. The rule is here to guard
+    # the diagrams SD-DEPTH now asks for — the first three generated under it
+    # already contained one, and it made half of a two-curve comparison invisible.
+    "GRADIENT_STROKE_INVISIBLE": 0,
 }
 TARGET_CRAFT_FRESH = {
     "LONG_LINE": 32,
@@ -813,6 +855,82 @@ def _() -> None:
 
 
 # ---------------------------------------------------------------------------
+# TEXT_END_CLIPPED — words lost at a label's extremity
+# ---------------------------------------------------------------------------
+
+# The exact shape that provoked the rule: a centred band label with a glyph
+# sitting at each end. The label box is (380,290)-(620,303), so 240px over 35
+# characters — ~6.8px per character, and the 14px circles bury two of them.
+CLIP_LABEL = "Cell Membrane — ion channels closed"
+CLIP_TEXT = f'<text x="500" y="300" font-size="14" text-anchor="middle">{CLIP_LABEL}</text>'
+
+
+@case("end-clip: a glyph over a label's end is flagged although TEXT_SPILL cannot see it")
+def _() -> None:
+    # Measured on the real diagram, not reasoned: the covered ink is 8.7% of the
+    # label's area against DEFAULT_TEXT_SPILL = 0.25, so the gate reported clean
+    # while the student read "ll Membrane — ion channels clos". Area share is the
+    # wrong instrument; where the cover sits is the whole defect.
+    for side, cx in (("left", 388), ("right", 612)):
+        doc = svg(CLIP_TEXT + f'<circle cx="{cx}" cy="300" r="14" fill="#4a90d9"/>')
+        report = G.detect_overlaps(doc)
+        eq(codes(report), ["TEXT_END_CLIPPED"], f"a glyph on the {side} end")
+        finding = report.findings[0]
+        eq(finding.severity, G.ADVISORY, "advisory until the corpus can settle it")
+        eq(finding.rule_id, G.SD_SPACING, "rule cited")
+        true(side in finding.message, f"the message must name the {side} end: {finding.message}")
+    true(not report.has_hard, "an advisory finding must not fail the diagram")
+
+
+@case("end-clip: a shape biting the MIDDLE of a label is not an end clip")
+def _() -> None:
+    # Not rejected by the ink floor — this one covers 10.7% of the label, MORE
+    # than the true left/right cases above. It is rejected because the covered
+    # run is nowhere near an extremity, which is the only thing this rule is
+    # about. A mid-label collision is TEXT_SPILL's business, at its own
+    # threshold.
+    doc = svg(CLIP_TEXT + '<circle cx="500" cy="300" r="14" fill="#4a90d9"/>')
+    report = G.detect_overlaps(doc)
+    eq(codes(report), [], "a middle bite is a different defect")
+
+
+@case("end-clip: a sub-character graze at the end is a hairline, not a lost word")
+def _() -> None:
+    # END_CLIP_MIN_CHARS in isolation. Label box (462,288)-(538,304): 76px over
+    # 8 characters, so one character is 9.56px. Both fixtures clear the ink floor
+    # (9.8% and 12.0%), so the ONLY difference is whether a whole character is
+    # buried — which is the difference between an ugly touch and a missing word.
+    text = '<text x="500" y="300" font-size="16" text-anchor="middle">Membrane</text>'
+    graze = svg(text + '<rect x="529.6" y="290" width="60" height="20" fill="#4a90d9"/>')
+    eq(codes(G.detect_overlaps(graze)), [], "0.9 of a character must stay silent")
+    whole = svg(text + '<rect x="527.7" y="290" width="60" height="20" fill="#4a90d9"/>')
+    eq(codes(G.detect_overlaps(whole)), ["TEXT_END_CLIPPED"], "1.1 characters is a word")
+
+
+@case("end-clip: a curved shape whose BOX overlaps but whose ink does not")
+def _() -> None:
+    # The false-positive cluster that decided END_CLIP_INK_FLOOR, and the reason
+    # this case does not merely assert silence: the end-clip *geometry* passes
+    # here (15px of box overlap at the label's left edge, over two characters
+    # wide), so `_end_clipped` is asked with a forged share to prove the ink
+    # floor is what rejects it. Seven of the nine corpus instances are this
+    # shape — one latch diagram's labels beside <ellipse> outlines, ink shares
+    # 0.000-0.048. Same curved-hull artifact that made TEXT_OVERFLOWS_RECT 50%
+    # precise until it was restated (rule 25).
+    doc = svg(CLIP_TEXT + '<ellipse cx="350" cy="240" rx="45" ry="70" fill="none" stroke="#333"/>')
+    eq(codes(G.detect_overlaps(doc)), [], "a curve's bounding box is not its ink")
+    geo = G.element_boxes(doc)
+    t, s = geo.texts[0], geo.shapes[0]
+    real = G.region_overlap_area(t, s) / max(1.0, t.box.area)
+    true(real < G.END_CLIP_INK_FLOOR, f"the ink share must be below the floor, got {real:.3f}")
+    true(
+        G._end_clipped(t, s, G.END_CLIP_INK_FLOOR + 0.01),
+        "the geometry alone accepts this pair — only the ink floor rejects it, so "
+        "the floor is load-bearing rather than decorative",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Fail-loud behaviour (rule 21)
 # ---------------------------------------------------------------------------
 
@@ -1242,6 +1360,622 @@ def _() -> None:
     eq(missing, [], "spec rules with no constant in svg_geometry")
 
 
+# ---------------------------------------------------------------------------
+# SD-DEPTH — gradients, elevation, namespace
+# ---------------------------------------------------------------------------
+
+GRADS = (
+    "<defs>"
+    '<linearGradient id="gPrimary" x1="0" y1="0" x2="0" y2="1">'
+    '<stop offset="0" stop-color="#5b8fc7"/><stop offset="1" stop-color="#3d6b99"/>'
+    "</linearGradient>"
+    '<radialGradient id="gSheen" cx="0.5" cy="0.3" r="0.75">'
+    '<stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>'
+    '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>'
+    "</radialGradient>"
+    "</defs>"
+)
+
+
+def toned_card(x: float, y: float, w: float, label: str) -> str:
+    """The spec's three-rect raised card: shadow, gradient fill, sheen."""
+    return (
+        f'<rect x="{x}" y="{y + 6}" width="{w}" height="60" rx="14" fill="#22303f" opacity="0.10"/>'
+        f'<rect x="{x}" y="{y}" width="{w}" height="60" rx="14" fill="url(#gPrimary)"/>'
+        f'<rect x="{x}" y="{y}" width="{w}" height="60" rx="14" fill="url(#gSheen)"/>'
+        f'<text x="{x + w / 2}" y="{y + 34}" text-anchor="middle" font-size="16">{label}</text>'
+    )
+
+
+def palette(svg_text: str) -> set[str]:
+    if not hasattr(G, "_fill_palette"):
+        raise Pending("svg_geometry has no _fill_palette() yet")
+    return G._fill_palette(svg_text)
+
+
+@case("depth: a gradient fill resolves to its stop colours")
+def _() -> None:
+    # The whole point of the change. Before this, `url(...)` was skipped outright,
+    # so a toned diagram counted 0-2 fills.
+    doc = svg(GRADS + '<rect x="60" y="100" width="200" height="60" fill="url(#gPrimary)"/>')
+    eq(palette(doc), {"#5b8fc7", "#3d6b99"}, "resolved gradient stops")
+
+
+@case("depth: a gradient id is matched case-sensitively")
+def _() -> None:
+    # SVG ids are case-sensitive, so lowercasing the fill value before looking the
+    # id up would resolve `url(#gPrimary)` against a gradient named `gprimary`.
+    # Self-caught before it ran; pinned so it cannot come back.
+    wrong = svg(
+        '<defs><linearGradient id="gprimary"><stop stop-color="#111111"/>'
+        "</linearGradient></defs>"
+        '<rect x="60" y="100" width="200" height="60" fill="url(#gPrimary)"/>'
+    )
+    eq(palette(wrong), set(), "matched a differently-cased id")
+    right = svg(
+        '<defs><linearGradient id="gPrimary"><stop stop-color="#111111"/>'
+        "</linearGradient></defs>"
+        '<rect x="60" y="100" width="200" height="60" fill="url(#gPrimary)"/>'
+    )
+    eq(palette(right), {"#111111"}, "missed an exactly-cased id")
+
+
+@case("depth: a gradient inherits stops through href")
+def _() -> None:
+    # `<linearGradient id="b" href="#a"/>` is the idiom for "same ramp, other
+    # direction". Both spellings, and both forms — with a body and self-closing,
+    # because the definition regex only sees the first.
+    for href in ('href="#a"', 'xlink:href="#a"'):
+        doc = svg(
+            '<defs><linearGradient id="a"><stop stop-color="#aabbcc"/>'
+            "<stop stop-color=\"#112233\"/></linearGradient>"
+            f'<linearGradient id="b" x1="0" y1="0" x2="1" y2="0" {href}/></defs>'
+            '<rect x="60" y="100" width="200" height="60" fill="url(#b)"/>'
+        )
+        eq(palette(doc), {"#aabbcc", "#112233"}, f"inherited stops via {href}")
+
+
+@case("depth: a fill referencing an undefined gradient contributes nothing")
+def _() -> None:
+    # Not a colour we can invent. A typo'd or pattern reference is unknown paint,
+    # and guessing at it would be worse than counting nothing.
+    doc = svg('<rect x="60" y="100" width="200" height="60" fill="url(#nope)"/>')
+    eq(palette(doc), set(), "invented a colour for an undefined reference")
+
+
+@case("depth: a toned diagram is NOT PALETTE_MONOTONY")
+def _() -> None:
+    # Rule 24's trap, pre-empted. PALETTE_MONOTONY reaches the LLM reviewer as a
+    # "measured fact" and is scored under CRAFT — so a palette check that cannot
+    # see through `url(#g)` would make the cheap check tell the expensive judge to
+    # mark down the exact tonal work the spec now demands.
+    body = GRADS + "".join(toned_card(60 + 220 * i, 100, 180, f"Step {i}") for i in range(4))
+    seen = craft_codes(svg(body))
+    true("PALETTE_MONOTONY" not in seen, f"flagged a gradient-toned diagram: {seen}")
+
+
+@case("depth: flat fills on 4+ shapes are FLAT_FILL_ONLY, advisory")
+def _() -> None:
+    body = "".join(card(60 + 220 * i, 100, 180, f"Step {i}") for i in range(4))
+    doc = svg(body)
+    true("FLAT_FILL_ONLY" in craft_codes(doc), "expected FLAT_FILL_ONLY")
+    eq(craft_severity(doc, "FLAT_FILL_ONLY"), G.ADVISORY, "FLAT_FILL_ONLY severity")
+    for f in G.craft_findings(doc):
+        if f.code == "FLAT_FILL_ONLY":
+            eq(f.rule_id, G.SD_DEPTH, "FLAT_FILL_ONLY rule")
+
+
+@case("depth: one gradient fill clears FLAT_FILL_ONLY")
+def _() -> None:
+    body = (
+        GRADS
+        + toned_card(60, 100, 180, "Toned")
+        + "".join(card(300 + 220 * i, 100, 180, f"Step {i}") for i in range(3))
+    )
+    true("FLAT_FILL_ONLY" not in craft_codes(svg(body)), "flagged a diagram with a gradient")
+
+
+@case("depth: a three-shape diagram needs no tonal work")
+def _() -> None:
+    # Below FLAT_FILL_MIN_SHAPES. A three-box comparison is legitimately flat, and
+    # firing here would make the advisory noise on the simplest correct diagrams.
+    body = "".join(card(60 + 220 * i, 100, 180, f"Step {i}") for i in range(3))
+    true("FLAT_FILL_ONLY" not in craft_codes(svg(body)), "flagged a 3-shape diagram")
+
+
+@case("depth: a missing xmlns is reported, a present one is not")
+def _() -> None:
+    # `svg()` always writes the namespace, so this one builds the root by hand.
+    body = "".join(card(60 + 220 * i, 100, 180, f"Step {i}") for i in range(4))
+    bare = f'<svg viewBox="0 0 1000 700" font-family="Arial, sans-serif">{body}</svg>'
+    true("MISSING_XMLNS" in craft_codes(bare), "missed a document with no namespace")
+    true("MISSING_XMLNS" not in craft_codes(svg(body)), "flagged a namespaced document")
+
+
+@case("depth: a namespace on an inner node does not make the document standalone")
+def _() -> None:
+    body = '<g xmlns="http://www.w3.org/2000/svg">' + card(60, 100, 180, "Inner") + "</g>"
+    bare = f'<svg viewBox="0 0 1000 700" font-family="Arial, sans-serif">{body}</svg>'
+    true("MISSING_XMLNS" in craft_codes(bare), "an inner xmlns satisfied the root check")
+
+
+# ---------------------------------------------------------------------------
+# SD-SPACING — stubby arrows
+# ---------------------------------------------------------------------------
+
+
+@case("craft: a 30px arrow at stroke-width 3 is STUBBY_ARROW")
+def _() -> None:
+    # The probe diagram's actual defect. It was first written up as "two floating
+    # arrowheads with no connector line" from looking at the render; the source says
+    # they are real 30px lines at stroke-width 3, so a zero-length rule would never
+    # have fired. Rule 25: measure the thing.
+    doc = svg(
+        card(60, 100, 180, "A")
+        + '<line x1="400" y1="300" x2="430" y2="300" stroke="#3d6b99" stroke-width="3" '
+        'marker-end="url(#arrow)"/>'
+    )
+    true("STUBBY_ARROW" in craft_codes(doc), "expected STUBBY_ARROW")
+    eq(craft_severity(doc, "STUBBY_ARROW"), G.ADVISORY, "STUBBY_ARROW severity")
+
+
+@case("craft: a full-length arrow is not stubby")
+def _() -> None:
+    doc = svg(
+        card(60, 100, 180, "A")
+        + '<line x1="300" y1="300" x2="700" y2="300" stroke="#3d6b99" stroke-width="3" '
+        'marker-end="url(#arrow)"/>'
+    )
+    true("STUBBY_ARROW" not in craft_codes(doc), "flagged a 400px arrow")
+
+
+@case("craft: the ratio is against the line's own stroke-width")
+def _() -> None:
+    # Scale-invariant on purpose: the default markerUnits="strokeWidth" grows the
+    # head with the stroke, so what matters is length/stroke-width, not px. A 20px
+    # hairline is a fine short connector; the same 20px at stroke-width 6 is a head.
+    hairline = '<line x1="300" y1="300" x2="320" y2="300" stroke="#666" marker-end="url(#a)"/>'
+    fat = (
+        '<line x1="300" y1="300" x2="320" y2="300" stroke="#666" stroke-width="6" '
+        'marker-end="url(#a)"/>'
+    )
+    base = card(60, 100, 180, "A")
+    true("STUBBY_ARROW" not in craft_codes(svg(base + hairline)), "flagged a 20px hairline")
+    true("STUBBY_ARROW" in craft_codes(svg(base + fat)), "missed 20px at stroke-width 6")
+
+
+@case("craft: a short line with no marker is not an arrow at all")
+def _() -> None:
+    doc = svg(
+        card(60, 100, 180, "A")
+        + '<line x1="400" y1="300" x2="430" y2="300" stroke="#666" stroke-width="3"/>'
+    )
+    true("STUBBY_ARROW" not in craft_codes(doc), "flagged a markerless tick")
+
+
+# ---------------------------------------------------------------------------
+# SD-MOTION
+# ---------------------------------------------------------------------------
+
+
+def motion_codes(svg_text: str) -> list[str]:
+    if not hasattr(G, "motion_findings"):
+        raise Pending("svg_geometry has no motion_findings() yet")
+    return [f.code for f in G.motion_findings(svg_text)]
+
+
+REVEAL = (
+    '<g opacity="0">'
+    '<animate attributeName="opacity" values="0;1" dur="0.5s" begin="{begin}"{freeze}/>'
+    '<rect x="{x}" y="100" width="180" height="60" rx="14" fill="#3d6b99"/>'
+    "</g>"
+)
+
+
+@case("motion: a document with no SMIL has no motion findings")
+def _() -> None:
+    # ...as long as it is small enough that there is nothing to stage. A *big*
+    # static diagram is NO_BUILD_UP, below.
+    eq(motion_codes(svg(card(60, 100, 180, "Static"))), [], "findings on a static document")
+
+
+@case("motion: a large diagram with no build-up is flagged")
+def _() -> None:
+    # The gap this closes: `motion_findings` used to return [] the moment there was
+    # no SMIL, so a wholly static diagram was the one case it could say nothing
+    # about — and the spec's build-up idiom was enforced by nothing (rule 26).
+    # Measured regression that prompted it: the three diagrams generated right
+    # after SD-STRUCTURE landed carried 3, 1 and 5 animations against 9, 8 and 9
+    # before it, and every gate was silent.
+    doc = svg("".join(f'<rect x="{60 + i * 90}" y="120" width="80" height="60" fill="#3d6b99"/>'
+                      for i in range(8)))
+    found = [f for f in G.motion_findings(doc) if f.code == "NO_BUILD_UP"]
+    eq(len(found), 1, "a static 8-shape diagram was not flagged")
+    eq(found[0].severity, G.ADVISORY, "NO_BUILD_UP severity")
+    eq(found[0].rule_id, G.SD_MOTION, "NO_BUILD_UP rule")
+
+
+@case("motion: three staged reveals clear the floor")
+def _() -> None:
+    # The satisfiable direction. A gate that cannot be met is as bad as one that
+    # never fires, and this one has to be reachable with the spec's own idiom.
+    body = "".join(REVEAL.format(begin=f"{0.4 * i:.1f}s", freeze=' fill="freeze"', x=60 + i * 200)
+                   for i in range(3))
+    eq(motion_codes(svg(body)), [], f"a 3-step build-up was flagged: {motion_codes(svg(body))}")
+
+
+@case("motion: an ambient loop is not a build step")
+def _() -> None:
+    # `repeatCount="indefinite"` is emphasis, not sequencing — the spec allows
+    # exactly one per diagram. Counting it toward the floor would let a single
+    # pulsing dot satisfy "builds itself in teaching order".
+    pulse = ('<circle cx="600" cy="300" r="10" fill="#c1453b">'
+             '<animate attributeName="r" values="10;14;10" dur="2.2s" begin="0s" '
+             'repeatCount="indefinite"/></circle>')
+    doc = svg(pulse + "".join(
+        f'<rect x="{60 + i * 90}" y="120" width="80" height="60" fill="#3d6b99"/>' for i in range(8)))
+    true("NO_BUILD_UP" in motion_codes(doc), "an ambient pulse satisfied the build-up floor")
+
+
+@case("motion: a frozen reveal is clean")
+def _() -> None:
+    doc = svg(REVEAL.format(begin="0.8s", freeze=' fill="freeze"', x=60))
+    eq(motion_codes(doc), [], "flagged a correct reveal")
+
+
+@case("motion: a reveal with no freeze is HARD")
+def _() -> None:
+    # The one hard motion rule, and hard for SD-ANCHOR's reason: not that it looks
+    # wrong, but that it provably does not render. SMIL reverts to the start value
+    # when the animation ends, so an opacity-0 reveal animates in and then vanishes
+    # permanently.
+    doc = svg(REVEAL.format(begin="0.8s", freeze="", x=60))
+    codes_seen = motion_codes(doc)
+    true("REVEAL_WITHOUT_FREEZE" in codes_seen, f"missed a stranded reveal: {codes_seen}")
+    found = [f for f in G.motion_findings(doc) if f.code == "REVEAL_WITHOUT_FREEZE"]
+    eq(found[0].severity, G.HARD, "REVEAL_WITHOUT_FREEZE severity")
+    eq(found[0].rule_id, G.SD_MOTION, "REVEAL_WITHOUT_FREEZE rule")
+
+
+@case("motion: the start state can come from the parent, not the values list")
+def _() -> None:
+    # `<g opacity="0"><animate attributeName="opacity" .../></g>` with no `values`
+    # is still a reveal — the hidden start state is on the parent.
+    doc = svg(
+        '<g opacity="0"><animate attributeName="opacity" dur="0.5s" begin="0.8s"/>'
+        '<rect x="60" y="100" width="180" height="60" fill="#3d6b99"/></g>'
+    )
+    true("REVEAL_WITHOUT_FREEZE" in motion_codes(doc), "missed a parent-hidden reveal")
+
+
+@case("motion: an indefinite loop needs no freeze")
+def _() -> None:
+    # It never ends, so it never reverts. The ambient pulse the spec allows.
+    doc = svg(
+        '<circle cx="600" cy="300" r="10" fill="#c1453b">'
+        '<animate attributeName="opacity" values="0;1;0" dur="2.2s" begin="0s" '
+        'repeatCount="indefinite"/></circle>'
+    )
+    eq(motion_codes(doc), [], "flagged an ambient loop")
+
+
+@case("motion: a non-opacity animation is not a reveal")
+def _() -> None:
+    # `values="0;1"` on `r` starts small, not absent — dropping the freeze there is
+    # a design choice, not a disappearing element. Only the opacity family strands.
+    doc = svg(
+        '<circle cx="600" cy="300" r="0" fill="#c1453b">'
+        '<animate attributeName="r" values="0;12" dur="0.6s" begin="0.4s"/></circle>'
+    )
+    true("REVEAL_WITHOUT_FREEZE" not in motion_codes(doc), "treated an r animation as a reveal")
+
+
+@case("motion: a build past 4s is SLOW_REVEAL, advisory")
+def _() -> None:
+    doc = svg(
+        REVEAL.format(begin="0.4s", freeze=' fill="freeze"', x=60)
+        + REVEAL.format(begin="4.2s", freeze=' fill="freeze"', x=300)
+    )
+    codes_seen = motion_codes(doc)
+    true("SLOW_REVEAL" in codes_seen, f"missed a slow build: {codes_seen}")
+    found = [f for f in G.motion_findings(doc) if f.code == "SLOW_REVEAL"]
+    eq(found[0].severity, G.ADVISORY, "SLOW_REVEAL severity")
+    true("4.7" in found[0].message, f"end time not reported: {found[0].message}")
+
+
+@case("motion: a build inside the budget is not flagged")
+def _() -> None:
+    doc = svg(
+        REVEAL.format(begin="0.4s", freeze=' fill="freeze"', x=60)
+        + REVEAL.format(begin="2.8s", freeze=' fill="freeze"', x=300)
+    )
+    eq(motion_codes(doc), [], "flagged a 3.3s build")
+
+
+@case("motion: an indefinite loop does not count toward the build time")
+def _() -> None:
+    # A 2.2s pulse beginning at 3s ends at 5.2s on paper, but it never ends — the
+    # diagram was fully assembled at 0.9s. Counting it would report every animated
+    # diagram as slow.
+    doc = svg(
+        REVEAL.format(begin="0.4s", freeze=' fill="freeze"', x=60)
+        + '<circle cx="600" cy="300" r="10" fill="#c1453b">'
+        '<animate attributeName="r" values="10;14;10" dur="2.2s" begin="3s" '
+        'repeatCount="indefinite"/></circle>'
+    )
+    eq(motion_codes(doc), [], "an ambient loop counted as build time")
+
+
+@case("motion: the clock parser reads offsets and refuses everything else")
+def _() -> None:
+    if not hasattr(G, "_clock_seconds"):
+        raise Pending("svg_geometry has no _clock_seconds() yet")
+    eq(G._clock_seconds("0s"), 0.0, "0s")
+    eq(G._clock_seconds("1.5s"), 1.5, "a decimal must not be mistaken for a syncbase")
+    eq(G._clock_seconds("900ms"), 0.9, "milliseconds")
+    eq(G._clock_seconds("0.4"), 0.4, "a bare number is seconds")
+    # The six non-offset forms of SMIL's `begin`. None of them can be placed on a
+    # timeline here, and the parser gate rejects them outright — but a checker that
+    # half-parsed "00:03" as 0 would call a 3-second reveal instant.
+    for raw in ("a.end+2s", "btn.click", "l.repeat(2)", "accessKey(s)", "indefinite", "00:03"):
+        eq(G._clock_seconds(raw), None, f"accepted {raw!r} as an offset")
+
+
+@case("motion: SMIL nested two groups deep is still found")
+def _() -> None:
+    doc = svg(
+        '<g transform="translate(20,20)"><g opacity="0">'
+        '<animate attributeName="opacity" values="0;1" dur="0.5s" begin="0.8s"/>'
+        '<rect x="60" y="100" width="180" height="60" fill="#3d6b99"/></g></g>'
+    )
+    true("REVEAL_WITHOUT_FREEZE" in motion_codes(doc), "missed a nested reveal")
+
+
+@case("motion: malformed input yields no motion findings, not a crash")
+def _() -> None:
+    eq(motion_codes("<svg><animate"), [], "motion findings on unparseable input")
+
+
+@case("motion: SMIL elements draw nothing and do not move the bounds")
+def _() -> None:
+    # `animateMotion`'s `path` attribute is the sharp case: it carries a `d`-shaped
+    # value that is a trajectory, not a stroke. Descending into it would add
+    # phantom geometry — and `path` is not even a geometry attribute of the parent.
+    plain = svg('<rect x="60" y="100" width="180" height="60" fill="#3d6b99"/>')
+    animated = svg(
+        '<rect x="60" y="100" width="180" height="60" fill="#3d6b99">'
+        '<animateMotion path="M 0 0 L 900 600" dur="2s" begin="0s" fill="freeze"/>'
+        "</rect>"
+    )
+    before = G.element_boxes(plain)
+    after = G.element_boxes(animated)
+    eq(len(after.connectors), 0, "the animateMotion trajectory was measured as a stroke")
+    eq(
+        [s.box.as_tuple() for s in after.shapes],
+        [s.box.as_tuple() for s in before.shapes],
+        "an animateMotion child changed its parent's measured box",
+    )
+
+
+def staged_share(svg_text: str) -> tuple[int, int]:
+    if not hasattr(G, "staged_ink"):
+        raise Pending("svg_geometry has no staged_ink() yet")
+    return G.staged_ink(svg_text)
+
+
+# One teaching step done the way the spec asks: the shape, its label and its
+# connector inside a single opacity-0 group. 3 drawn elements, all staged.
+def step(i: int, begin: str) -> str:
+    y = 120 + i * 90
+    return (
+        f'<g opacity="0"><animate attributeName="opacity" values="0;1" dur="0.4s" '
+        f'begin="{begin}" fill="freeze"/>'
+        f'<rect x="60" y="{y}" width="200" height="60" rx="12" fill="#3d6b99"/>'
+        f'<text x="160" y="{y + 34}" text-anchor="middle" font-size="15">step {i}</text>'
+        f'<path d="M270 {y + 30} L420 {y + 30}" fill="none" stroke="#3d6b99"/>'
+        "</g>"
+    )
+
+
+@case("motion: a group reveal stages its whole subtree")
+def _() -> None:
+    # The credit has to flow DOWN — the <g> is what carries the <animate>, but it is
+    # the rect, the text and the path inside it that the learner sees appear.
+    staged, total = staged_share(svg(step(0, "0.4s")))
+    eq(total, 3, "the three drawn elements in one step were not all counted")
+    eq(staged, 3, "a group reveal did not stage the shapes inside it")
+
+
+@case("motion: a draw-on connector stages itself")
+def _() -> None:
+    doc = svg(
+        '<path d="M120 200 L420 200" pathLength="100" fill="none" stroke="#3d6b99" '
+        'stroke-dasharray="100" stroke-dashoffset="100">'
+        '<animate attributeName="stroke-dashoffset" values="100;0" dur="0.8s" '
+        'begin="0.3s" fill="freeze"/></path>'
+    )
+    eq(staged_share(doc), (1, 1), "stroke-dashoffset was not counted as staging")
+
+
+@case("motion: an ambient pulse stages nothing")
+def _() -> None:
+    # Same shape, same <animate> tag, different intent. `r` on a loop is emphasis;
+    # crediting it would let one pulsing dot claim the whole diagram is staged.
+    doc = svg(
+        '<circle cx="600" cy="300" r="10" fill="#c1453b">'
+        '<animate attributeName="r" values="10;14;10" dur="2.2s" begin="0s" '
+        'repeatCount="indefinite"/></circle>'
+    )
+    eq(staged_share(doc), (0, 1), "an indefinite pulse was counted as a staged reveal")
+
+
+@case("motion: decoration on a complete frame is STATIC_STRUCTURE")
+def _() -> None:
+    # The exact shape found by rendering the real output and scrubbing the SMIL
+    # timeline to t=0: eight staged reveals, and the title, both panels and the
+    # footer already on screen before any of them fires. The reveal COUNT is healthy,
+    # which is why a count alone could not see this.
+    frame = "".join(
+        f'<rect x="60" y="{60 + i * 60}" width="880" height="40" fill="#e5e9ed"/>'
+        f'<text x="500" y="{88 + i * 60}" text-anchor="middle" font-size="15">panel {i}</text>'
+        for i in range(6)
+    )
+    chips = "".join(
+        f'<g opacity="0"><animate attributeName="opacity" values="0;1" dur="0.4s" '
+        f'begin="{0.3 + i * 0.5}s" fill="freeze"/>'
+        f'<circle cx="{200 + i * 80}" cy="450" r="14" fill="#3d6b99"/></g>'
+        for i in range(3)
+    )
+    doc = svg(frame + chips)
+    staged, total = staged_share(doc)
+    eq((staged, total), (3, 15), "the staged/total split is not what the fixture draws")
+    codes = motion_codes(doc)
+    true("STATIC_STRUCTURE" in codes, f"20% staged was not flagged: {codes}")
+    true("NO_BUILD_UP" not in codes, "three reveals should clear the count floor")
+
+
+@case("motion: staging the structure clears the share floor")
+def _() -> None:
+    # A gate that cannot be satisfied is as bad as one that never fires — and this
+    # bar is one the generator has already cleared unaided (61% and 59% on two real
+    # diagrams), not an aspiration.
+    doc = svg(
+        '<rect x="0" y="0" width="1000" height="700" fill="#f8f9fa"/>'
+        '<text x="500" y="52" text-anchor="middle" font-size="22">Title</text>'
+        + "".join(step(i, f"{0.3 + i * 0.5}s") for i in range(4))
+    )
+    staged, total = staged_share(doc)
+    true(staged / total >= G.MOTION_FLOOR_STAGED_SHARE,
+         f"the four-step fixture stages only {staged}/{total}")
+    eq([c for c in motion_codes(doc) if c in {"STATIC_STRUCTURE", "NO_BUILD_UP"}], [],
+       "a properly staged build was flagged")
+
+
+@case("motion: the two build findings never fire together — the HARD one wins")
+def _() -> None:
+    # Retry feedback is repeated per finding, so the same complaint twice is a real
+    # token cost (rule 32's fourth lesson). One animation on a large diagram trips both
+    # the count and the share; only one message goes back, and it must be the hard one,
+    # because that is the one the fix loop acts on (rule 24).
+    doc = svg(
+        "".join(f'<rect x="{60 + i * 80}" y="120" width="70" height="50" fill="#3d6b99"/>'
+                for i in range(12))
+        + '<g opacity="0"><animate attributeName="opacity" values="0;1" dur="0.4s" '
+          'begin="0.3s" fill="freeze"/><circle cx="500" cy="400" r="12" fill="#c1453b"/></g>'
+    )
+    codes = motion_codes(doc)
+    true("STATIC_STRUCTURE" in codes, f"1 of 13 staged was not flagged: {codes}")
+    true("NO_BUILD_UP" not in codes, "both build findings fired at once")
+
+
+@case("motion: STATIC_STRUCTURE is HARD, so the fix loop sees it")
+def _() -> None:
+    # Your decision for this run. It matters mechanically, not just as a label:
+    # `_geometry_check` in svg_agent.py routes only HARD findings into the fixable set,
+    # so as ADVISORY this went to the reviewer's score and never to a retry.
+    doc = svg(
+        "".join(f'<rect x="{60 + i * 70}" y="{120 + (i % 3) * 90}" width="60" '
+                f'height="50" fill="#3d6b99"/>' for i in range(12))
+        + '<g opacity="0"><animate attributeName="opacity" values="0;1" dur="0.4s" '
+          'begin="0.3s" fill="freeze"/><circle cx="500" cy="600" r="12" fill="#c1453b"/></g>'
+    )
+    static = [f for f in G.motion_findings(doc) if f.code == "STATIC_STRUCTURE"]
+    eq(len(static), 1, "STATIC_STRUCTURE did not fire on a 1-of-13 fixture")
+    eq(static[0].severity, G.HARD, "STATIC_STRUCTURE severity")
+    eq(static[0].rule_id, G.SD_MOTION, "rule id")
+    # The count rule stays advisory — "cut a step" and "stage the structure" are not the
+    # same instruction, and only the second is mechanically complete.
+    others = [f for f in G.motion_findings(doc) if f.code == "NO_BUILD_UP"]
+    true(all(f.severity == G.ADVISORY for f in others), "NO_BUILD_UP went hard too")
+
+
+@case("motion: a diagram with NO animation at all is hard, not advisory")
+def _() -> None:
+    # The hole the severity flip opened, and the reason the suppression had to change
+    # direction. Zero animations trips the count gate; under the old order that
+    # suppressed the share finding, so the *worst* case would have been the one case
+    # producing no hard finding at all.
+    doc = svg(
+        "".join(f'<rect x="{60 + i * 70}" y="{120 + (i % 3) * 90}" width="60" '
+                f'height="50" fill="#3d6b99"/>' for i in range(14))
+    )
+    findings = G.motion_findings(doc)
+    codes = [f.code for f in findings]
+    true("STATIC_STRUCTURE" in codes, f"a wholly static diagram was not flagged: {codes}")
+    true(any(f.severity == G.HARD for f in findings), "and it was not hard")
+    eq(staged_share(doc), (0, 14), "the fixture stages nothing")
+
+
+@case("motion: too small to share-check still gets the advisory count")
+def _() -> None:
+    # The one case the hard rule stays silent on, by design: below
+    # MOTION_SHARE_MIN_DRAWN the ratio is noise. NO_BUILD_UP survives there, which is
+    # why the suppression is one-directional rather than a merge of the two rules.
+    doc = svg(
+        "".join(f'<rect x="{60 + i * 80}" y="120" width="70" height="50" fill="#3d6b99"/>'
+                for i in range(7))
+    )
+    staged, total = staged_share(doc)
+    true(total < G.MOTION_SHARE_MIN_DRAWN, f"fixture drew {total}, wanted under the floor")
+    codes = motion_codes(doc)
+    true("NO_BUILD_UP" in codes, f"7 static shapes got no build finding: {codes}")
+    true("STATIC_STRUCTURE" not in codes, "a 7-element diagram was share-checked")
+
+
+@case("motion: a small diagram is not asked about its staged share")
+def _() -> None:
+    # Below MOTION_SHARE_MIN_DRAWN the ratio is noise: 2 of 6 is 33%, and there is
+    # no build order to get wrong in six shapes.
+    doc = svg(
+        "".join(f'<rect x="{60 + i * 80}" y="120" width="70" height="50" fill="#3d6b99"/>'
+                for i in range(6))
+        + "".join(
+            f'<g opacity="0"><animate attributeName="opacity" values="0;1" dur="0.4s" '
+            f'begin="{0.3 + i * 0.4}s" fill="freeze"/>'
+            f'<circle cx="{300 + i * 60}" cy="400" r="12" fill="#c1453b"/></g>'
+            for i in range(3)
+        )
+    )
+    staged, total = staged_share(doc)
+    true(total < G.MOTION_SHARE_MIN_DRAWN, f"fixture drew {total}, expected under the floor")
+    true("STATIC_STRUCTURE" not in motion_codes(doc), "a 9-element diagram was share-checked")
+
+
+@case("motion: staged_ink survives malformed input")
+def _() -> None:
+    eq(staged_share("<svg><g opacity=\"0\""), (0, 0), "staged_ink raised on bad XML")
+
+
+@case("motion: <defs> content is not counted as drawn ink")
+def _() -> None:
+    # A gradient's <stop>s and a <marker>'s arrowhead <path> are definitions. Counting
+    # the marker path as unstaged ink would push every diagram's share down for
+    # drawing arrowheads at all.
+    defs = (
+        '<defs><marker id="arrow" markerWidth="10" markerHeight="10">'
+        '<path d="M0 0 L10 5 L0 10 z" fill="#3d6b99"/></marker>'
+        '<linearGradient id="g"><stop offset="0" stop-color="#fff"/></linearGradient></defs>'
+    )
+    eq(staged_share(svg(defs + step(0, "0.3s"))), staged_share(svg(step(0, "0.3s"))),
+       "<defs> content was counted as drawn ink")
+
+
+@case("motion: the spec states the share the checker measures")
+def _() -> None:
+    # Rule 26: a number the gate enforces and the spec does not state is a rule the
+    # generator cannot follow. "at least half" must survive a reword of the spec.
+    spec_path = Path(__file__).resolve().parent / "prompts" / "svg_design_spec.md"
+    if not spec_path.exists():
+        raise Pending("prompts/svg_design_spec.md does not exist yet")
+    text = spec_path.read_text(encoding="utf-8")
+    section = text.split("## SD-MOTION", 1)
+    eq(len(section), 2, "no SD-MOTION section in the spec")
+    body = section[1].split("\n## ", 1)[0]
+    true("half the drawn elements" in body,
+         "the spec does not state the staged-share floor the checker enforces")
+    true("STATIC_STRUCTURE" in body, "SD-MOTION does not list its own finding code")
+
+
 @case("corpus: craft finding counts hold")
 def _() -> None:
     counts: dict[str, int] = {}
@@ -1257,17 +1991,26 @@ def _() -> None:
         eq(fresh_counts.get(code, 0), want, f"craft {code} instances (fresh canvas)")
 
 
-@case("corpus: only TEXT_OVERFLOWS_RECT is a hard craft finding")
+@case("corpus: which craft findings are hard is a deliberate list")
 def _() -> None:
     # A false HARD finding costs a full generate+review cycle and corrupts the
     # retry loop's ranking, so promotion past the 90%-precision bar is deliberate
     # and this pins which codes have cleared it.
+    #
+    # The two clear it on different grounds, and the difference is the point.
+    # TEXT_OVERFLOWS_RECT was promoted by *rendering* 8 instances and confirming
+    # 4/4 on the narrowed form (rule 25). ARCHETYPE_NOT_DECLARED needs no such
+    # measurement because it is definitional — the declaration is either there and
+    # names a known form or it is not — and both fixes its message names are one
+    # line of markup. Precision-by-construction is a valid route past the bar;
+    # precision-by-assumption is not.
     hard_codes = set()
     for _, _, block in corpus():
         for f in G.craft_findings(block):
             if f.severity == G.HARD:
                 hard_codes.add(f.code)
-    eq(sorted(hard_codes), ["TEXT_OVERFLOWS_RECT"], "hard craft codes")
+    eq(sorted(hard_codes), ["ARCHETYPE_NOT_DECLARED", "TEXT_OVERFLOWS_RECT"],
+       "hard craft codes")
 
 
 @case("corpus: the canvas advisories collapse on a correct canvas")
@@ -1358,6 +2101,442 @@ def _() -> None:
             again = [str(f) for f in G.detect_overlaps(block).findings]
             again += [str(f) for f in G.craft_findings(block)]
             eq(again, first, f"{name} findings differ between runs")
+
+
+# ---------------------------------------------------------------------------
+# Crossing bands and coincident overlays (the two exemptions)
+# ---------------------------------------------------------------------------
+
+# A transmembrane protein through a membrane band: mutual perpendicular
+# containment. The lap IS the drawing. Neither of the older exemptions can reach
+# it — the pump is 27% inside the band (under NESTING_SHARE's 45%) and its centre
+# is 65 units from the nearest band edge (past EDGE_MOUNT_TOLERANCE's 8).
+BAND = '<rect x="70" y="330" width="860" height="70" fill="#cfd8e3"/>'
+PUMP = '<rect x="434" y="222" width="132" height="264" rx="14" fill="#3d6b99"/>'
+
+
+@case("crossing: a band and the thing crossing it is not a collision")
+def _() -> None:
+    true("SHAPE_OVERLAP" not in codes(G.detect_overlaps(svg(BAND + PUMP))),
+         "a transmembrane shape was reported as overlapping its own membrane")
+
+
+@case("crossing: order does not matter")
+def _() -> None:
+    eq(codes(G.detect_overlaps(svg(PUMP + BAND))),
+       codes(G.detect_overlaps(svg(BAND + PUMP))),
+       "the exemption depends on document order")
+
+
+@case("crossing: a diagonal straddle is still a collision")
+def _() -> None:
+    # The exemption is deliberately strict: BOTH spans must be full containments.
+    # This pair overlaps by a corner in each axis, which is a real collision.
+    #
+    # The coordinates are not arbitrary. The first version of this fixture put the
+    # two 300x300 rects at 100,100 and 250,250 and passed for the wrong reason —
+    # 250,250 is exactly the smaller shape's centre, so `_mounted_on_edge`
+    # exempted it and `_crossing_bands` was never consulted. A case that fails for
+    # the wrong reason has stopped testing what its name says.
+    a = '<rect x="100" y="100" width="300" height="300" fill="#3d6b99"/>'
+    b = '<rect x="300" y="300" width="300" height="300" fill="#c1453b"/>'
+    true("SHAPE_OVERLAP" in codes(G.detect_overlaps(svg(a + b))),
+         "a diagonal straddle was exempted as a crossing")
+
+
+@case("crossing: a band overlapped without being spanned is a collision")
+def _() -> None:
+    # A wide band and a box that dips into it. The band spans the box in x, but
+    # the box does not span the band in y — so it is not a "+" and not exempt.
+    # This is the near-miss the exemption has to distinguish from the pump.
+    a = '<rect x="70" y="300" width="860" height="120" fill="#3d6b99"/>'
+    b = '<rect x="100" y="360" width="300" height="200" fill="#c1453b"/>'
+    true("SHAPE_OVERLAP" in codes(G.detect_overlaps(svg(a + b))),
+         "a partial dip into a band was exempted as a crossing")
+
+
+# The full SD-DEPTH raised-card idiom: offset shadow, gradient card, sheen at the
+# identical box.
+DEPTH_CARD = (
+    '<rect x="206" y="206" width="300" height="140" rx="14" fill="#22303f" opacity="0.10"/>'
+    '<rect x="200" y="200" width="300" height="140" rx="14" fill="url(#gPrimary)"/>'
+    '<rect x="200" y="200" width="300" height="140" rx="14" fill="url(#gSheen)"/>'
+)
+
+
+@case("coincident: the depth idiom measures as ONE shape, not three")
+def _() -> None:
+    # Measured, and it corrects what this fixture first assumed: only TWO of the
+    # three rects ever reach the pairing stage, because the elevation shadow is
+    # translucent enough to be a wash already (opacity 0.10 vs WASH_MAX_OPACITY
+    # 0.25). The sheen is the layer that needed the new dedup — it is opaque, at
+    # the identical box, and doubled every finding the card took part in.
+    shapes = G.element_boxes(svg(DEPTH_CARD)).shapes
+    eq(len(shapes), 3, "the walker should still see all three rects")
+    eq(sum(1 for s in shapes if s.is_wash), 1, "the elevation shadow is not a wash")
+    pairable = [s for s in shapes if G._pairable(s)]
+    eq(len(pairable), 2, "shadow excluded, card and sheen remain")
+    eq(len(G.drop_coincident_overlays(pairable)), 1, "sheen not collapsed into the card")
+
+
+@case("coincident: the FIRST box is the one kept")
+def _() -> None:
+    # Order-stable, so a reported box belongs to the card rather than to its
+    # highlight — and two runs over one diagram agree.
+    a = '<rect x="100" y="100" width="200" height="80" fill="#3d6b99"/>'
+    b = '<rect x="100" y="100" width="200" height="80" fill="url(#gSheen)"/>'
+    shapes = [s for s in G.element_boxes(svg(a + b)).shapes if G._pairable(s)]
+    kept = G.drop_coincident_overlays(shapes)
+    eq(len(kept), 1, "coincident pair not collapsed")
+    true(kept[0] is shapes[0], "the second box was kept, not the first")
+
+
+@case("coincident: a shape offset by more than the tolerance is kept")
+def _() -> None:
+    # 6px is 6x COINCIDENT_TOLERANCE. Two opaque cards that near-miss must both
+    # survive — a dedup that swallowed them would hide real collisions.
+    a = '<rect x="100" y="100" width="200" height="80" fill="#3d6b99"/>'
+    b = '<rect x="106" y="106" width="200" height="80" fill="#c1453b"/>'
+    shapes = [s for s in G.element_boxes(svg(a + b)).shapes if G._pairable(s)]
+    eq(len(G.drop_coincident_overlays(shapes)), 2, "a near-miss pair was collapsed")
+
+
+@case("coincident: the dedup does not hide a real collision")
+def _() -> None:
+    # The whole risk of a dedup: it must remove duplicate REPORTS, never a shape
+    # whose overlap with a third object is genuine.
+    doc = svg(DEPTH_CARD + '<rect x="420" y="260" width="300" height="140" fill="#c1453b"/>')
+    eq(codes(G.detect_overlaps(doc)).count("SHAPE_OVERLAP"), 1,
+       "the card/intruder collision should be reported exactly once")
+
+
+# ---------------------------------------------------------------------------
+# SD-STRUCTURE
+# ---------------------------------------------------------------------------
+
+PLAIN = '<rect x="60" y="120" width="200" height="100" rx="12" fill="#3d6b99"/>'
+
+
+def decl(name: str, body: str = PLAIN) -> str:
+    return svg(f"<!-- archetype: {name} -->{body}")
+
+
+@case("structure: a declared archetype is clean")
+def _() -> None:
+    got = craft_codes(decl("comparison-columns"))
+    true("ARCHETYPE_NOT_DECLARED" not in got and "ARCHETYPE_UNKNOWN" not in got,
+         f"a correctly declared archetype was flagged: {got}")
+
+
+@case("structure: every archetype name in the spec is accepted")
+def _() -> None:
+    # A hyphen in the name is the case that matters. The first version of the
+    # declaration regex used `[^->]`, which excludes '-' — so it matched NONE of
+    # the ten names and would have reported ARCHETYPE_NOT_DECLARED on a perfectly
+    # declared diagram. A gate that cannot be satisfied is as bad as one that
+    # never fires, and only running it finds this.
+    for name in sorted(G.ARCHETYPES):
+        got = craft_codes(decl(name))
+        true("ARCHETYPE_NOT_DECLARED" not in got, f"'{name}' read as undeclared")
+        true("ARCHETYPE_UNKNOWN" not in got, f"'{name}' read as unknown")
+
+
+@case("structure: a missing declaration is HARD")
+def _() -> None:
+    true("ARCHETYPE_NOT_DECLARED" in craft_codes(svg(PLAIN)), "no finding without a declaration")
+    eq(craft_severity(svg(PLAIN), "ARCHETYPE_NOT_DECLARED"), G.HARD,
+       "ARCHETYPE_NOT_DECLARED severity")
+
+
+@case("structure: an unknown archetype name is HARD")
+def _() -> None:
+    # The diagram that provoked this rule was a labelled bathtub. Naming the
+    # object instead of the explanatory form is the exact failure.
+    got = craft_codes(decl("bathtub"))
+    true("ARCHETYPE_UNKNOWN" in got, f"an invented archetype passed: {got}")
+    true("ARCHETYPE_NOT_DECLARED" not in got, "both archetype codes fired at once")
+    eq(craft_severity(decl("bathtub"), "ARCHETYPE_UNKNOWN"), G.HARD, "severity")
+
+
+@case("structure: the declaration tolerates case and whitespace")
+def _() -> None:
+    for raw in ("<!--archetype:cycle-->", "<!--  ARCHETYPE :  Cycle  -->"):
+        got = craft_codes(svg(raw + PLAIN))
+        true("ARCHETYPE_NOT_DECLARED" not in got and "ARCHETYPE_UNKNOWN" not in got,
+             f"{raw!r} was not accepted: {got}")
+
+
+@case("structure: the archetype list agrees with the spec's SD-TYPE table")
+def _() -> None:
+    # Rule 23's shape: the names live in two files — this module and the prompt
+    # the generator reads. If they drift, the gate rejects a name the spec told
+    # the model to use, which is unsatisfiable from inside the loop.
+    spec = Path(__file__).resolve().parent / "prompts" / "svg_design_spec.md"
+    if not spec.exists():
+        raise Skip(f"design spec not found at {spec}")
+    text = spec.read_text(encoding="utf-8")
+    for name in sorted(G.ARCHETYPES):
+        true(f"`{name}`" in text, f"archetype '{name}' is not named in the spec")
+    # ...and the other direction: a type in the spec's table that the gate would
+    # reject. Scoped to the SD-TYPE section, because "a backticked name at the
+    # start of a `|` row" is not unique to it — SD-PALETTE's role table has the
+    # same shape, and an unscoped match reported that the spec "offers `ink`".
+    section = text.split("## SD-TYPE", 1)
+    eq(len(section), 2, "no SD-TYPE section in the spec")
+    table = re.findall(r"^\| `([a-z-]+)` \|", section[1].split("\n## ", 1)[0], re.MULTILINE)
+    eq(len(table), len(G.ARCHETYPES), "the SD-TYPE table and ARCHETYPES differ in length")
+    for name in table:
+        true(name in G.ARCHETYPES, f"the spec offers '{name}' but the gate rejects it")
+
+
+# ---------------------------------------------------------------------------
+# SD-DEPTH: a gradient stroke that paints nothing
+#
+# Every expectation below was checked against a real Chrome render of the same
+# three lines before it was written down (rule 25). A/B/C are that render: the
+# horizontal path stroked with a vertical ramp came out BLANK, the flat-stroked
+# copy of it drew, and the sloped one drew.
+# ---------------------------------------------------------------------------
+
+VGRAD = ('<defs><linearGradient id="gPrimary" x1="0" y1="0" x2="0" y2="1">'
+         '<stop offset="0" stop-color="#5b8fc7"/>'
+         '<stop offset="1" stop-color="#3d6b99"/></linearGradient></defs>')
+HGRAD = ('<defs><linearGradient id="gFlat">'  # no coords: SVG defaults to horizontal
+         '<stop offset="0" stop-color="#5b8fc7"/>'
+         '<stop offset="1" stop-color="#3d6b99"/></linearGradient></defs>')
+
+
+@case("depth: a horizontal line stroked with a vertical gradient is HARD")
+def _() -> None:
+    # Rendered blank. This is the defect that shipped: the "real neuron holds at
+    # -70 mV" line — half of a two-curve comparison — was simply not on the page,
+    # and every other gate said the diagram was clean.
+    doc = svg(VGRAD + '<path d="M120 470 L920 470" fill="none" stroke="url(#gPrimary)" stroke-width="5"/>')
+    hard = [f.code for f in G.craft_findings(doc) if f.severity == G.HARD]
+    true("GRADIENT_STROKE_INVISIBLE" in hard, f"not flagged: {hard}")
+
+
+@case("depth: the same line with a flat stroke is clean")
+def _() -> None:
+    # Rendered normally, and it is the fix the retry message names — so a gate
+    # that flagged it too would be unsatisfiable.
+    doc = svg(VGRAD + '<path d="M120 470 L920 470" fill="none" stroke="#3d6b99" stroke-width="5"/>')
+    eq(G.degenerate_gradient_strokes(doc), [], "a flat stroke was flagged")
+
+
+@case("depth: a sloped line with a vertical gradient is clean")
+def _() -> None:
+    # Rendered normally: the box has height, so the ramp has somewhere to run.
+    # The rule is about extent along the ramp's axis, not about gradient strokes
+    # being forbidden geometry.
+    doc = svg(VGRAD + '<path d="M20 210 L380 250" fill="none" stroke="url(#gPrimary)"/>')
+    eq(G.degenerate_gradient_strokes(doc), [], "a sloped line was flagged")
+
+
+@case("depth: a vertical line dies on a HORIZONTAL ramp, and that is the default")
+def _() -> None:
+    # The mirror case, and the reason `_gradient_axes` implements SVG's defaults
+    # rather than assuming vertical: `<linearGradient id="g">` with no coordinates
+    # at all is x1=0% x2=100%, i.e. horizontal. A `<line>` drawn straight down and
+    # stroked with it is invisible for the same reason.
+    doc = svg(HGRAD + '<line x1="450" y1="120" x2="450" y2="600" stroke="url(#gFlat)"/>')
+    eq([a for _, _, a in G.degenerate_gradient_strokes(doc)], ["x"], "axis not reported as x")
+    # ...and the same line stroked with the VERTICAL ramp is fine.
+    ok = svg(VGRAD + '<line x1="450" y1="120" x2="450" y2="600" stroke="url(#gPrimary)"/>')
+    eq(G.degenerate_gradient_strokes(ok), [], "a vertical line on a vertical ramp was flagged")
+
+
+@case("depth: shapes with area are never flagged")
+def _() -> None:
+    # rect/circle/ellipse always have extent in both axes, so a gradient stroke on
+    # them paints. They are absent from _STROKEABLE rather than filtered late.
+    doc = svg(VGRAD
+              + '<rect x="60" y="120" width="200" height="100" fill="none" stroke="url(#gPrimary)"/>'
+              + '<circle cx="500" cy="300" r="40" fill="none" stroke="url(#gPrimary)"/>')
+    eq(G.degenerate_gradient_strokes(doc), [], "a shape with area was flagged")
+
+
+@case("depth: a radial or userSpaceOnUse ramp does not depend on the box")
+def _() -> None:
+    # Neither collapses on a flat bbox, so neither is a defect — and treating them
+    # as one would flag the sheen idiom the spec mandates.
+    radial = ('<defs><radialGradient id="gR"><stop offset="0" stop-color="#fff"/>'
+              '<stop offset="1" stop-color="#3d6b99"/></radialGradient></defs>')
+    user = ('<defs><linearGradient id="gU" gradientUnits="userSpaceOnUse" '
+            'x1="0" y1="0" x2="0" y2="700"><stop offset="0" stop-color="#5b8fc7"/>'
+            '<stop offset="1" stop-color="#3d6b99"/></linearGradient></defs>')
+    line = '<path d="M120 470 L920 470" fill="none" stroke="url(#%s)"/>'
+    eq(G.degenerate_gradient_strokes(svg(radial + line % "gR")), [], "a radial ramp was flagged")
+    eq(G.degenerate_gradient_strokes(svg(user + line % "gU")), [], "userSpaceOnUse was flagged")
+
+
+@case("depth: an undefined gradient reference is not this rule's business")
+def _() -> None:
+    # A dangling `url(#typo)` is a different defect and the render is
+    # implementation-defined. Silence here keeps this finding's message true:
+    # it says the ramp is degenerate, and about a missing gradient it knows
+    # nothing (rule 24 — the message must name a fix that works).
+    doc = svg('<path d="M120 470 L920 470" fill="none" stroke="url(#nosuch)"/>')
+    eq(G.degenerate_gradient_strokes(doc), [], "a dangling reference was flagged")
+
+
+@case("depth: a gradient FILL on a flat line is not flagged")
+def _() -> None:
+    # `fill` on a zero-height path paints nothing anyway (there is no interior),
+    # and the spec's whole SD-DEPTH push is gradient fills. Flagging the fill
+    # attribute here would fight the rule it sits under.
+    doc = svg(VGRAD + '<path d="M120 470 L920 470" fill="url(#gPrimary)" stroke="#3d6b99"/>')
+    eq(G.degenerate_gradient_strokes(doc), [], "a gradient fill was flagged")
+
+
+@case("depth: the fix text tells you to REMOVE the gradient, not add one")
+def _() -> None:
+    # SD-DEPTH now carries one advisory that says "add gradients" and one hard code
+    # that means "this gradient deleted your line". A single entry naming only the
+    # advisory fix would send a model whose line is invisible *because* of a
+    # gradient to add more of them — rule 24's unfixable-feedback trap, arrived at
+    # from a new direction.
+    src = Path(__file__).resolve().parent / "svg_agent.py"
+    if not src.exists():
+        raise Skip(f"svg_agent.py not found at {src}")
+    body = src.read_text(encoding="utf-8").split("SD_DEPTH: (", 1)
+    eq(len(body), 2, "no SD_DEPTH fix text in svg_agent.py")
+    fix = body[1].split("),", 1)[0].lower()
+    true("stroke" in fix, "the SD_DEPTH fix text never mentions strokes")
+    true("flat" in fix, "the SD_DEPTH fix text does not name the flat-hex fix")
+
+
+@case("structure: every hard rule has its own fix text")
+def _() -> None:
+    # `_geometry_feedback` looks the fix up with `.get(..., generic)`, so a hard
+    # rule added without an entry degrades silently to "Fix the geometry this
+    # describes" — precision lost with no signal, which is the shape of rule 27's
+    # computed-then-discarded defect. svg_agent cannot be imported (it builds a
+    # Bedrock client at import time), so this reads the source.
+    src = Path(__file__).resolve().parent / "svg_agent.py"
+    if not src.exists():
+        raise Skip(f"svg_agent.py not found at {src}")
+    text = src.read_text(encoding="utf-8")
+    body = text.split("_FIX_BY_RULE = {", 1)
+    eq(len(body), 2, "no _FIX_BY_RULE map in svg_agent.py")
+    keys = set(re.findall(r"^\s{4}(SD_[A-Z_]+):", body[1], re.MULTILINE))
+    for rule in ("SD_STRUCTURE", "SD_SPACING", "SD_TEXT_FIT", "SD_ANCHOR", "SD_FONT",
+                 "SD_CANVAS", "SD_MEASURABLE", "SD_MOTION", "SD_DEPTH"):
+        true(rule in keys, f"{rule} can produce a HARD finding with no fix text")
+
+
+def stack(lines: list[str], x: float = 100, y: float = 120,
+          size: float = 14, step: float = 20) -> str:
+    """A left-aligned run of <text> lines — the shape of hand-wrapped prose."""
+    return "".join(
+        f'<text x="{x}" y="{y + i * step}" text-anchor="start" font-size="{size}">{t}</text>'
+        for i, t in enumerate(lines)
+    )
+
+
+PARAGRAPH = [
+    "You can hold the level",
+    "constant forever if the",
+    "faucet runs at exactly",
+    "the rate the drain empties",
+]
+
+
+@case("prose: a wrapped paragraph is flagged")
+def _() -> None:
+    got = craft_codes(decl("quantity-plot", stack(PARAGRAPH)))
+    true("PROSE_BLOCK" in got, f"a 4-line paragraph was not flagged: {got}")
+
+
+@case("prose: PROSE_BLOCK is advisory")
+def _() -> None:
+    # ~71% precision on the 12 corpus instances (the rest are short-phrase
+    # legends), against rule 25's 90% bar for a hard finding. A hard finding that
+    # fires on a legend would spend attempts moving correct labels.
+    eq(craft_severity(decl("quantity-plot", stack(PARAGRAPH)), "PROSE_BLOCK"),
+       G.ADVISORY, "PROSE_BLOCK severity")
+
+
+@case("prose: an element-level word cap cannot see it")
+def _() -> None:
+    # The whole reason this rule measures arrangement instead of length: every
+    # line of that paragraph is 4-5 words, comfortably under LABEL_WORD_CAP.
+    for line in PARAGRAPH:
+        true(len(line.split()) <= G.LABEL_WORD_CAP,
+             f"fixture line is already over the word cap: {line!r}")
+
+
+@case("prose: two lines are not a paragraph")
+def _() -> None:
+    true("PROSE_BLOCK" not in craft_codes(decl("cycle", stack(PARAGRAPH[:2]))),
+         "two lines were read as prose")
+
+
+@case("prose: three short lines are under the word floor")
+def _() -> None:
+    got = craft_codes(decl("cycle", stack(["one two", "three four", "five six"])))
+    true("PROSE_BLOCK" not in got, f"6 words were read as prose: {got}")
+
+
+@case("prose: widely spaced labels are separate labels")
+def _() -> None:
+    # 60px apart at 14px is 4.3x the font size, past PROSE_LINE_SPACING_MAX. A
+    # column of labels down the left of a comparison grid must not read as prose.
+    got = craft_codes(decl("comparison-columns", stack(PARAGRAPH, step=60)))
+    true("PROSE_BLOCK" not in got, f"a spaced label column was read as prose: {got}")
+
+
+@case("prose: a key/value table is not prose")
+def _() -> None:
+    # Measured, not anticipated: the first prototype flagged exactly this — the
+    # probe diagram's own axis panel — and a data table is the most
+    # information-dense thing a diagram can carry, i.e. the opposite of the defect.
+    got = craft_codes(decl("quantity-plot", stack([
+        "sodium_inside = 10", "sodium_outside = 140", "ratio = 14", "resting = -70 mV",
+    ])))
+    true("PROSE_BLOCK" not in got, f"a value table was read as prose: {got}")
+
+
+@case("prose: a bullet list is not prose")
+def _() -> None:
+    # 2 of the 14 instances the first prototype reported on the corpus.
+    got = craft_codes(decl("part-whole", stack([
+        "• Heartburn", "• Constipation", "• Varicose veins",
+        "• Leg cramps at night",
+    ])))
+    true("PROSE_BLOCK" not in got, f"a bullet list was read as prose: {got}")
+
+
+@case("prose: a numbered list is not prose")
+def _() -> None:
+    got = craft_codes(decl("decision-tree", stack([
+        "1. open the valve", "2. wait for level", "3. close the valve", "4. read the gauge",
+    ])))
+    true("PROSE_BLOCK" not in got, f"a numbered list was read as prose: {got}")
+
+
+@case("prose: two columns of prose are two findings")
+def _() -> None:
+    doc = decl("comparison-columns", stack(PARAGRAPH, x=100) + stack(PARAGRAPH, x=520))
+    runs = G.prose_runs([t for t in G.element_boxes(doc).texts if not t.uncertain])
+    eq(len(runs), 2, "prose runs in separate columns were merged or dropped")
+
+
+@case("prose: one run is reported once, not once per nested sub-run")
+def _() -> None:
+    doc = decl("cycle", stack(PARAGRAPH + ["and it stays there"]))
+    runs = G.prose_runs([t for t in G.element_boxes(doc).texts if not t.uncertain])
+    eq(len(runs), 1, "a single 5-line paragraph produced more than one run")
+    eq(len(runs[0]), 5, "the run is not maximal")
+
+
+@case("structure: a 6-word label is fine and a 7-word one is flagged")
+def _() -> None:
+    six = decl("cycle", stack(["one two three four five six"]))
+    true("LABEL_TOO_WORDY" not in craft_codes(six), "a 6-word label was flagged")
+    seven = decl("cycle", stack(["one two three four five six seven"]))
+    true("LABEL_TOO_WORDY" in craft_codes(seven), "a 7-word label was not flagged")
+    eq(craft_severity(seven, "LABEL_TOO_WORDY"), G.ADVISORY, "LABEL_TOO_WORDY severity")
 
 
 # ---------------------------------------------------------------------------

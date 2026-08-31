@@ -48,6 +48,66 @@ diagram. Half of previously generated diagrams were 100% rectangles — that is 
 this rule exists to prevent. → advisory check `SHAPE_MONOTONY` fires when ≥85% of shapes are
 one kind.
 
+## SD-STRUCTURE — declare the form, then fill fixed zones (measured)
+
+Diagrams were rejected as "overlapping, not informative, not useful". The cause was not
+taste: they were labelled *pictures* with paragraphs beside them, placed at freely chosen
+coordinates. Three rules, and the first is checked by the program.
+
+**1. Declare the archetype.** The first line inside `<svg>` is a comment naming the SD-TYPE
+you picked. It is stripped before the learner sees it — it exists so the choice is a decision
+you made rather than a shape you drifted into.
+
+```xml
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
+  <!-- archetype: comparison-columns -->
+```
+
+A name not in the SD-TYPE table is rejected. When the lesson's subject is an object — a
+bathtub, a battery, a pump — you must still pick the *explanatory* form: `before-after` for a
+change of state, `comparison-columns` for two regimes, `quantity-plot` for a value over time.
+Draw the explanation, not the object.
+
+**2. Place into zones, never at coordinates you chose.** Take these numbers as given.
+
+`viewBox="0 0 1000 700"` — title `y 40-96`, body `y 120-600`, footer `y 620-660`, everything
+inside `x 40-960`:
+
+| grid | cell extents |
+|---|---|
+| 2 columns | `x 60-490`, `x 510-940` |
+| 3 columns | `x 60-340`, `x 356-644`, `x 660-940` |
+| 4 rows | `y 120-230`, `y 240-350`, `y 360-470`, `y 480-590` |
+
+`viewBox="0 0 900 900"` (radial types) — title `y 40-96`, centre `(450, 500)`, ring radius
+`300`, node boxes `170x74` centred on the ring, hub box `260x120` at the centre.
+
+What the grid buys you is that collisions become impossible rather than unlikely, provided:
+
+- Every shape and every label sits **inside one cell**. Nothing straddles a gutter; only a
+  connector may cross one.
+- **12px inner padding**: text starts at `cell_x1 + 12`, first baseline at `cell_y1 + 28`.
+- **Character budget per cell**, already computed with the SD-TEXT-FIT formula so you do not
+  have to: at `font-size="15"` a 2-column cell holds **49** characters, a 3-column cell
+  **31**, the full width **106**. At `font-size="22"`: **33**, **21**, **72**.
+- At most **3 lines** per cell, at 22px line spacing.
+
+**3. Labels, not sentences.** At most **6 words** per `<text>`, and no full stops. A stack of
+three or more left-aligned lines at one font size is a paragraph — that belongs in the lesson
+body, never in the figure.
+
+Write the **quantity** instead of the sentence. Every diagram carries at least two numbers or
+identifiers taken verbatim from the excerpt; they are the reason the figure is worth looking
+at rather than reading past:
+
+| instead of | write |
+|---|---|
+| "The pump moves three sodium ions out and two potassium ions in, so the cell loses one positive charge each cycle." | `Na+ out 3` / `K+ in 2` / `net -1 per cycle` |
+| "Without the pump the voltage collapses to zero over several minutes." | `pump off` / `0 mV in ~minutes` |
+
+→ `ARCHETYPE_NOT_DECLARED`, `ARCHETYPE_UNKNOWN` (hard); `PROSE_BLOCK`, `LABEL_TOO_WORDY`
+(advisory).
+
 ## SD-CANVAS — fill the frame you declared (measured)
 
 - Declare exactly one of: `viewBox="0 0 1000 700"` (landscape — most types) or
@@ -139,7 +199,8 @@ within that or your diagram ships unverified:
 - No `<use>`, no `foreignObject`.
 - Group with `<g transform="translate(dx,dy)">` **only**. Never `rotate`, `scale`, `matrix`,
   or `skew`.
-- `<marker>` for arrowheads is fine.
+- `<marker>` for arrowheads is fine. So are `<defs>`, gradients, and the SD-MOTION
+  `<animate>` elements — the checker skips all of them.
 
 → `UNMEASURABLE_SUBTREE` (advisory — it reports how much of your drawing could not be
 checked).
@@ -173,31 +234,162 @@ Text on a filled shape is `#ffffff`; text on `surface` is the palette's `ink`.
 
 → `PALETTE_MONOTONY` (advisory).
 
+## SD-DEPTH — flat fills look unfinished; use gradients and elevation (measured)
+
+Solid colours read as a placeholder. Every surface that matters gets a **two-stop gradient**;
+every card above the page gets a **shadow copy**. Define gradients once in `<defs>`, running
+from a lighter tint to the palette colour itself:
+
+```xml
+<defs>
+  <linearGradient id="gPrimary" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#5b8fc7"/><stop offset="1" stop-color="#3d6b99"/>
+  </linearGradient>
+  <linearGradient id="gSurface" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f4f6f8"/>
+  </linearGradient>
+  <radialGradient id="gSheen" cx="0.5" cy="0.3" r="0.75">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+```
+
+A raised card is **three rects in this order** — shadow, fill, sheen:
+
+```xml
+<rect x="80" y="126" width="260" height="120" rx="14" fill="#22303f" opacity="0.10"/>
+<rect x="80" y="120" width="260" height="120" rx="14" fill="url(#gPrimary)"/>
+<rect x="80" y="120" width="260" height="120" rx="14" fill="url(#gSheen)"/>
+```
+
+The shadow is the same shape offset `+6y` in the palette's `ink` at `opacity="0.10"`. There is
+no `<filter>` available — `feDropShadow` is stripped before the learner sees it, so this is
+the only shadow that survives.
+
+**Gradients go on `fill`, NEVER on `stroke`.** A gradient's ramp is measured across the
+element's bounding box, so a `stroke="url(#gPrimary)"` on a **horizontal** line — whose box has
+zero height — is degenerate and the line renders **completely invisible**. This was measured in
+the browser, not reasoned: a horizontal path stroked with the vertical `gPrimary` above came out
+blank while the same path with a flat stroke drew normally. Axes, connectors, plotted curves and
+rules all take a flat palette hex:
+
+```xml
+<path d="M120 470 L920 470" fill="none" stroke="#3d6b99" stroke-width="5"/>   <!-- correct -->
+<path d="M120 470 L920 470" fill="none" stroke="url(#gPrimary)"/>             <!-- INVISIBLE -->
+```
+
+Also:
+
+- Vertical gradients only for surfaces, so the light stays consistent.
+- Both stops are **one role and a lighter tint of it** — never primary→warn, which means
+  nothing.
+- `rx="12"`+ on every card. Sharp corners read as unstyled. No shadows on axes or connectors.
+- Lay a `url(#gSurface)` rect over the whole canvas first.
+- Gradient stops count as your palette, so this satisfies SD-PALETTE rather than fighting it.
+
+→ `GRADIENT_STROKE_INVISIBLE` (hard); `FLAT_FILL_ONLY` (advisory — no gradient fill anywhere on
+a diagram of 4+ shapes), `MISSING_XMLNS` (advisory).
+
+## SD-MOTION — animate the build-up, freeze the result (measured)
+
+The diagram may assemble itself in teaching order, using **SMIL** — `<animate>` nested inside
+the shape it animates. There is no CSS here: `<style>` and `style=` are stripped, so
+`@keyframes` is silently dropped.
+
+**Stage the structure, not the trimmings.** This is the rule that decides whether the diagram
+reads as animated at all. Each teaching step's **shape, its label and its connector go inside one
+`<g opacity="0">`** — not just the chips and arrows laid on top of a frame that was already
+complete. A figure whose title, panels, cards and captions are all on screen at `t=0` looks static
+no matter how many small things fade in, and this is measured: **at least half the drawn elements
+must sit inside a staged reveal, and that is a hard failure — the diagram is rejected and sent
+back.** Only the background wash and the title are exempt.
+
+**Four absolute rules. Breaking the first makes the diagram vanish.**
+
+1. **`fill="freeze"` on every reveal.** Without it SMIL snaps the element back to its start
+   value the instant the animation ends — a shape revealed from `opacity="0"` animates in and
+   then **disappears permanently**. This is checked and it is a hard failure.
+2. **Use `values="0;1"`, never `from="0" to="1"`.** `from` and `to` are removed by the
+   sanitiser that runs before rendering; `values` survives.
+3. **`begin` is a plain time offset — `"0s"`, `"1.2s"`, `"800ms"`.** Nothing else is
+   permitted: no `begin="other.end"`, no `"btn.click"`, no `"indefinite"`. A diagram using
+   those is rejected outright.
+4. **The whole build finishes within 4 seconds**, and the frozen end state is the complete
+   diagram. A learner who scrolls back must see everything without waiting.
+
+Three idioms. Draw-on connector — `pathLength="100"` makes the dash arithmetic exact whatever
+the real path length is, so you never compute it:
+
+```xml
+<path d="M120 200 C 220 200 240 300 340 300" pathLength="100"
+      fill="none" stroke="#3d6b99" stroke-width="3" marker-end="url(#arrow)"
+      stroke-dasharray="100" stroke-dashoffset="100">
+  <animate attributeName="stroke-dashoffset" values="100;0" dur="0.8s"
+           begin="1.2s" fill="freeze"/>
+</path>
+```
+
+Staggered reveal — one group per teaching step, `begin` increasing by ~0.4s:
+
+```xml
+<g opacity="0">
+  <animate attributeName="opacity" values="0;1" dur="0.5s" begin="0.8s" fill="freeze"/>
+  ... the card and its label ...
+</g>
+```
+
+**One** ambient loop per diagram, on the single element the lesson is actually about — a
+pulsing node, never a moving layout:
+
+```xml
+<circle cx="600" cy="300" r="10" fill="url(#gWarn)">
+  <animate attributeName="r" values="10;14;10" dur="2.2s" begin="0s"
+           repeatCount="indefinite"/>
+</circle>
+```
+
+Animate only `opacity`, `stroke-dashoffset`, `r`, `cx`, `cy`, `x`, `y`, `width`, `height`,
+`transform`, `stop-color`, `offset`. Never animate a value that carries meaning (a bar's
+height, a point's `cx` on an axis) — motion is emphasis, not data. And never make motion the
+only way to read the diagram: a learner with reduced-motion settings still sees SMIL, so the
+frozen state must carry the whole meaning.
+
+→ `REVEAL_WITHOUT_FREEZE`, `STATIC_STRUCTURE` (hard); `NO_BUILD_UP`, `SLOW_REVEAL` (advisory).
+
 ## SD-DENSITY — earn the space (advisory)
 
 - Every shape carries a **specific** label drawn from the excerpt. No "Step 1", no unlabelled
   boxes.
 - Prefer **8 well-labelled elements over 4 vague ones**. A diagram of four boxes each holding
   one word teaches nothing.
-- But do not turn the diagram into prose: if text covers more area than the shapes, you have
-  written a paragraph in a frame. Move the words into the lesson and let the drawing show the
-  structure.
-- Add a title at the top (`font-size="22"`, bold) and use `rx="8"` on rectangles.
+- But if text covers more area than the shapes, you have written a paragraph in a frame
+  (SD-STRUCTURE rule 3).
+- Add a title at the top (`font-size="22"`, bold) and use `rx="12"` on rectangles (SD-DEPTH).
+- An arrow must be **at least 12× its own stroke-width long**. A 30px arrow at
+  `stroke-width="3"` is mostly arrowhead and reads as a floating glyph, not a connector.
 
-→ `TEXT_DOMINANCE` (advisory).
+→ `TEXT_DOMINANCE`, `STUBBY_ARROW` (advisory).
 
 ---
 
 ## What gets rejected
 
 - Any value or example not in the LESSON EXCERPT (SD-GROUNDING)
+- No `<!-- archetype: NAME -->` inside `<svg>`, or a name not in the SD-TYPE table
+  (SD-STRUCTURE)
 - A label wider than the box drawn around it (SD-TEXT-FIT)
 - A `<text>` with no stated `text-anchor` anywhere in its ancestry (SD-ANCHOR)
 - A diagram with no `font-family="Arial, sans-serif"` on its root `<svg>` (SD-FONT)
+- A gradient on a `stroke` — the element renders invisible (SD-DEPTH)
 - Overlapping text, or a label lying across a shape it does not belong to (SD-SPACING)
 - Geometry drawn outside the declared canvas (SD-CANVAS)
+- A reveal `<animate>` with no `fill="freeze"` — it makes the shape disappear (SD-MOTION)
+- A `begin` that is not a plain time offset (SD-MOTION)
 
 ## Output
 
 Return ONLY the raw `<svg>...</svg>` — no markdown, no code fences, no explanation.
+The root tag carries `xmlns="http://www.w3.org/2000/svg"`, the `viewBox`, and
+`font-family="Arial, sans-serif"`.
 Valid XML: close every tag, quote every value, and never repeat an attribute on one element.
