@@ -13,4 +13,11 @@ dependencies = [
     # which is why this only ever failed in prod.
     "anthropic[bedrock]>=0.120.2",
     "claude-agent-sdk>=0.1.34",
+    # `openrouter.py` imports httpx directly. It is already installed transitively —
+    # anthropic depends on it — but a dependency that is only transitively present is a
+    # dependency nobody is holding: anthropic is free to drop or major-bump it, and the
+    # break would surface as "no cover was generated" inside a worker rather than as a
+    # resolution error at build time. Same shape as rule 22 (a gate's deps must be real
+    # deps). No new download: the resolver already has it in uv.lock.
+    "httpx>=0.28.1",
 ]

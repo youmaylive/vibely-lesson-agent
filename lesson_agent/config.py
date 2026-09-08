@@ -37,6 +37,67 @@ MLAI_FORMAT_GUIDE = Path(__file__).resolve().parent / "prompts" / "mlai_format_g
 # above) so the spec can be revised without touching prompt code.
 SVG_DESIGN_SPEC = Path(__file__).resolve().parent / "prompts" / "svg_design_spec.md"
 
+# The course-cover brief, in two halves loaded from disk like the specs above.
+#
+# THUMBNAIL_SKILL is a VERBATIM vendored third-party skill — `youtube-thumbnail-design`
+# from github.com/qu-skills/skills, installed with `npx skills add`. Do not edit it;
+# see PROVENANCE.md beside it for the commit, the digest and the re-install line. It
+# targets YouTube and about half of it is unusable here (5 of its 12 sections, 52% of
+# their characters — measured, not estimated) — it drives an `inference.sh`
+# CLI (`belt app run`) we do not have, and its Face Expression Psychology section is
+# tuned for reaction-video CTR — so `thumbnail_agent.load_skill()` whitelists the design
+# sections by heading and strips every fenced block before the text reaches a prompt.
+# Each drop has its recorded reason in `_SKILL_DROP`. That loader RAISES if a
+# whitelisted heading is missing, so an upstream rename fails loudly instead of
+# shipping a brief with the colour rules silently absent (rule 26).
+#
+# THUMBNAIL_SPEC is ours: only the deltas the skill cannot know — that the cover is
+# painted by an image model through OpenRouter (`openrouter.py`), the two rules that
+# invert for a course (the title IS the payload, and it is read back off the pixels by a
+# vision model), the palette table, and the exact values `thumbnail_agent` enforces.
+# Split in two so re-installing upstream is a copy, not a merge.
+#
+# Both halves reach the model through `thumbnail_agent._DESIGN`, which is built at
+# IMPORT time — so a spec file that has been moved or made unreadable breaks the module
+# rather than degrading the brief. This comment said "we author SVG rather than diffuse
+# pixels" until the pivot; the premise it rested on (that diffusion cannot spell a
+# title) was measured false on five models, and the spec's own retired-rules table is
+# the record of what that cost.
+THUMBNAIL_SKILL = (
+    Path(__file__).resolve().parent
+    / "prompts"
+    / "skills"
+    / "youtube-thumbnail-design"
+    / "SKILL.md"
+)
+THUMBNAIL_SPEC = Path(__file__).resolve().parent / "prompts" / "course_thumbnail_spec.md"
+
+# Two more VERBATIM vendored skills, from github.com/zlh-428/naruto-skills (Apache 2.0),
+# installed with `npx skillfish add ... -y --project`. Same rule as THUMBNAIL_SKILL: do
+# not edit them; PROVENANCE.md beside each records the commit, the tree hash, the
+# re-install line and — the part worth reading before touching this — what is
+# deliberately NOT used from each.
+#
+# These are roots, not files, because unlike `youtube-thumbnail-design` the useful part
+# is not one document: it is a GALLERY. `cover-image` supplies 20 visual styles and
+# `infographic` 20 information layouts, one small reference file each, and only the two
+# the model actually picks are ever loaded. The one-line gallery tables go in the cached
+# system half; `thumbnail_agent.load_style()` / `load_layout()` read a single file per
+# cover (~700 B and ~900 B). Loading all 40 would cost ~35k tokens to use one of them —
+# the same bound `mlai-games`' registry hit, resolved the same way.
+#
+# Only ONE gallery owns each dimension: styles from `cover-image`, layouts from
+# `infographic`. Both skills ship a style gallery and they do NOT agree — `chalkboard.md`
+# is byte-identical across the two while `pixel-art.md` differs — so `infographic`'s 17
+# styles are declined wholesale rather than merged (rule 23: two implementations of one
+# list is the divergence, however similar they look on the day).
+THUMBNAIL_STYLES = (
+    Path(__file__).resolve().parent / "prompts" / "skills" / "cover-image"
+)
+THUMBNAIL_LAYOUTS = (
+    Path(__file__).resolve().parent / "prompts" / "skills" / "infographic"
+)
+
 # The interactive-game guide, GENERATED from `mlai-games`' schema registry by
 # `mlai-games/scripts/emit-agent-guide.mjs` (`npm run build`). Read from where it is
 # built rather than copied into this repo — a copy is what `mlai_format_guide.md`
