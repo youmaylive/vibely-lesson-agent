@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "youtube-thumbnail-design": {
+      "source": "qu-skills/skills",
+      "sourceType": "github",
+      "skillPath": "guides/design/youtube-thumbnail-design/SKILL.md",
+      "computedHash": "281aff200fd5b4f0cea0afa3b3547097173f45730774309287e605c2370b4d21"
+    }
+  }
+}
