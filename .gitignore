@@ -48,3 +48,15 @@ context_history.json
 focus_chain_taskid_*.md
 taskHistory*.json
 service_account.json
+
+# Skill installer output (added 2026-09-08). `npx skills add` / `npx skillfish add`
+# write the upstream skill twice — into `.agents/skills/` and a `.claude/skills/`
+# symlink farm pointing at it — and neither is what ships. The copy the pipeline reads
+# is VENDORED at `lesson_agent/prompts/skills/`, which `workers/Dockerfile` COPYs and
+# `config.py`'s THUMBNAIL_SKILL / THUMBNAIL_STYLES / THUMBNAIL_LAYOUTS resolve; that
+# copy IS tracked. Tracking both would be rule 23's divergence with the installer as
+# the second author — the vendored tree could then drift from the ignored one with
+# nothing to say which is live. `skills-lock.json` and each PROVENANCE.md record what
+# upstream was installed, so the ignored trees are reproducible with one command.
+.agents/
+.claude/
