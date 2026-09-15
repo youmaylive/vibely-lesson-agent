@@ -459,8 +459,10 @@ the four covers that work all took this path.
 blemish; a wobbly headline is a dead card. Six labels have six times one label's chance of a garbled glyph,
 and the cost of hard-failing on the subject's own text is already on disk: the `recursion` cover burned all
 four attempts and **shipped with no headline at all**, which is worse than any defect this gate was written
-to catch. `TH-GLYPH` needs no change either — its question asks only for *"the largest headline text"*, so
-labels never reach it.
+to catch. `TH-GLYPH` needs no change either — its question asks only for the headline and now says *"do not
+spell any smaller text, label or watermark"* outright, so labels never reach it. That sentence was added
+when the same prompt was hardened for multi-line headlines (see `TH-GLYPH` below); before it, the claim
+rested on *"the largest headline text"* implying it.
 
 **The 0.75 threshold is a guess, and it is recorded as one.** It could not be calibrated before the fact:
 no labelled cover existed to sample. So it is set in the safe direction, which is deliberately the generous
@@ -594,6 +596,19 @@ and a second opinion would buy nothing. A `TH-GLYPH` failure is not fixable by m
 correction asks for a plain heavy condensed sans-serif with no ligatures and no decorative letterforms.
 It counts as a text failure for the text-free fallback, alongside `TH-TITLE`. The vision call erroring
 prints `TH-GLYPH_GATE_SKIPPED` and accepts the attempt — same fail-open-loudly reasoning as above.
+
+**The question names every line of the headline, and that clause is the one thing here added from a live
+run rather than from reasoning.** An image model breaks a long title across two or three lines whenever it
+likes, and it should — a four-word headline on one line is unreadable at card size. But *"the largest
+headline text"* then names something ambiguous, and a model that answers with the largest **line** spells a
+truthful *prefix*: a hard failure on a correctly-painted cover, caused by the wording of the question.
+`TH-TITLE` cannot cover for it — `transcribe` returns the break as `\n` and the normaliser folds it, so
+that gate is blind to exactly this. Whether it caused the observed `MARKET` for `MARKET SUPPLY AND DEMAND`
+is **unproven and not claimed**: the next cover's headline came back on one line, so nothing tripped the
+gate either way. The clause is kept because the direction is safe — asking for every line can only make
+the spelled string a longer superset — and the failure it removes is a hard one. A spelling that stops at
+the first line is still a hard `TH-GLYPH`, which is the half a test pins alongside it, or the fix would
+have proved only that the gate had been loosened.
 
 ## `TH-PALETTE` — the row is assigned to this course  · `no gate on the pixels`
 

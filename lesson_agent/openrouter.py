@@ -404,12 +404,29 @@ def parse_transcription(reply: str) -> tuple[str, str]:
 # defect being looked for. Word boundaries are deliberately NOT asked for — the comparison
 # in `thumbnail_agent` is on letters and digits alone, since spacing is what `transcribe`
 # already checks and a model asked to mark gaps would spell the marker.
+#
+# "even if it is set on more than one line" is the one clause added from a live failure
+# rather than from reasoning. An image model breaks a long headline across two or three
+# lines whenever it likes — nothing in the prompt asks it not to, and it should not,
+# because a four-word headline on one line is unreadable at card size. But "the largest
+# headline text" then names something ambiguous: a model that answers with the largest
+# *line* spells a truthful prefix of the headline, and `TH-GLYPH` compares against the
+# whole one, so a perfectly-painted cover fails hard on a wording defect in the question.
+# `transcribe` cannot substitute here — it already returns line breaks as `\n` and the
+# normaliser folds them, so it is blind to exactly this. Whether it caused the observed
+# `MARKET` for `MARKET SUPPLY AND DEMAND` is unproven and deliberately not claimed: the
+# next cover's headline came back on one line, so nothing tripped the gate either way.
+# The clause is cheap, the failure it removes is a hard one, and the direction is safe —
+# asking for every line can only ever make the spelled string a *longer* superset.
 SPELL_PROMPT = (
-    "Look at the largest headline text in this image. Spell it out one character at a "
+    "Look at the largest headline text in this image — the course title. It may be set "
+    "on one line or broken across two or more lines; read all of its lines, top to "
+    "bottom, as one continuous headline. Spell it out one character at a "
     "time, in order, separating every character with a single space. Copy each shape "
     "exactly as it is drawn, even if the result is not a real word, is misspelled, or "
     "uses an unusual character — do not correct it, do not complete it, do not guess "
-    "which word was intended. Output only the spelled-out characters and nothing else. "
+    "which word was intended. Do not spell any smaller text, label or watermark. "
+    "Output only the spelled-out characters and nothing else. "
     "If the image contains no text at all, output exactly: NO_TEXT"
 )
 

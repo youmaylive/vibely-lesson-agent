@@ -4933,6 +4933,68 @@ def test_generate_thumbnail_glyph_gate() -> None:
             f"spelled={fake.spelled}",
         )
 
+    # A HEADLINE SET ON TWO LINES. The image model breaks a long title wherever it likes and
+    # `transcribe` already returns that as `\n` — so the *word* gate has always folded it. The
+    # question `SPELL_PROMPT` asks did not: "the largest headline text" names something
+    # ambiguous on a two-line title, and a model answering with the largest LINE spells a
+    # truthful prefix of the right headline. That is a hard TH-GLYPH on a correctly-painted
+    # cover: four wasted image calls and a text-free fallback, caused by the wording of the
+    # question rather than by anything in the picture.
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        fake = _Fake(
+            transcripts=["HOW NEURONS\nFIRE"],
+            spellings=["H O W  N E U R O N S\nF I R E"],
+        )
+        report = _run(fake, tmp)
+        check(
+            "a two-line headline spelled line by line is not a defect",
+            not [p for p in report["problems"] if p.startswith("TH-GLYPH")]
+            and len(fake.image_prompts) == 1,
+            f"problems={report['problems']} images={len(fake.image_prompts)}",
+        )
+
+    # And the half that must still fail, or the case above would prove only that the gate had
+    # been loosened. A model reading ONE line of a two-line headline drops real letters, and
+    # dropped letters are the defect this gate exists for.
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        fake = _Fake(
+            transcripts=["HOW NEURONS FIRE"] * 2,
+            spellings=["H O W  N E U R O N S", "H O W  N E U R O N S  F I R E"],
+            png=_Fake.VARY,
+        )
+        _run(fake, tmp)
+        check(
+            "a spelling that stops at the first line is still caught",
+            len(fake.image_prompts) == 2 and "TH-GLYPH" in fake.claude_prompts[1],
+            f"images={len(fake.image_prompts)}",
+        )
+
+    # The prompt itself, pinned. This is the whole fix for the case above: the clause is not
+    # reachable through any behaviour the fake can simulate — a fake answers however it is
+    # told to — so the only thing that can assert it is the text sent to the model. A rule
+    # stated in a prompt and asserted by nothing is what rule 26 is about.
+    check(
+        "SPELL_PROMPT asks for every line of the headline, not the largest line",
+        "two or more lines" in orr.SPELL_PROMPT
+        and "as one continuous headline" in orr.SPELL_PROMPT,
+        orr.SPELL_PROMPT,
+    )
+    check(
+        "and still asks for characters, not words — the anti-autocomplete clauses survive",
+        "one character at a "  # split across the source lines
+        "time" in orr.SPELL_PROMPT
+        and "do not correct it" in orr.SPELL_PROMPT
+        and "not a real word" in orr.SPELL_PROMPT,
+        orr.SPELL_PROMPT,
+    )
+    check(
+        "and it excludes the smaller text, so LABELS: never reach the headline gate",
+        "Do not spell any smaller text" in orr.SPELL_PROMPT,
+        orr.SPELL_PROMPT,
+    )
+
 
 def test_generate_thumbnail_ships_text_free_after_four_failures() -> None:
     """The fallback. It must never raise. See the module docstring."""
